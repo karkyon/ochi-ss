@@ -50,3 +50,7 @@ docker/.env
 
 # Prisma
 prisma/migrations/  
+
+# node_modules（全ディレクトリ）
+node_modules/
+sync-service/node_modules/
