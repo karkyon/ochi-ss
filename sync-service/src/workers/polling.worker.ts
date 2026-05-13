@@ -11,7 +11,7 @@
  * - 全処理を sync_change_logs に記録
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import sql from "mssql";
 import { getSqlServerPool } from "../db/sqlserver";
 
@@ -158,7 +158,7 @@ async function handleStatusChange(order: any, notif: SqlNotification): Promise<v
         title: `注文ステータスが更新されました`,
         content: `注文番号 ${notif.WEB注文番号} のステータスが「${notif.変更後ステータス}」に変更されました。`,
         notifType: "info",
-        targetCustomers: null, // TODO: 対象得意先を絞る
+        targetCustomers: Prisma.JsonNull, // TODO: 対象得意先を絞る
         publishedAt: new Date(),
         createdBy: "sync_service",
       },
@@ -187,7 +187,7 @@ async function handleSpecChange(order: any, notif: SqlNotification): Promise<voi
         title: `注文仕様が変更されました`,
         content: `注文番号 ${notif.WEB注文番号} の ${notif.変更フィールド名} が変更されました。理由: ${notif.変更理由 ?? "記載なし"}`,
         notifType: "warning",
-        targetCustomers: null,
+        targetCustomers: Prisma.JsonNull,
         publishedAt: new Date(),
         createdBy: "sync_service",
       },

@@ -18,6 +18,7 @@
     "mssql": "^12.5.2"
   },
   "devDependencies": {
+    "@types/mssql": "^12.3.0",
     "@types/node": "^25.7.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
