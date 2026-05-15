@@ -565,6 +565,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   type="button"
                   className="px-3 py-2 text-xs rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap transition-colors"
                   title="直送先検索（STEP12-D で実装）"
+                onClick={() => console.log("[直送先検索ボタン] クリック")}
                 >
                   🔍 直送先検索
                 </button>
@@ -619,6 +620,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <select
               value={detailForm.materialCode}
               onChange={e => {
+                console.log("[材料選択]", e.target.value)
                 setDetailForm(p => ({ ...p, materialCode: e.target.value }))
                 setCalcResult(null)
               }}
@@ -641,6 +643,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <select
               value={detailForm.kakouShiyouCode || ""}
               onChange={e => {
+                console.log("[加工仕様選択]", e.target.value)
                 setDetailForm(p => ({ ...p, kakouShiyouCode: parseInt(e.target.value) || 0 }))
                 setCalcResult(null)
               }}
@@ -660,7 +663,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <label className="block text-xs font-medium text-gray-600 mb-1">加工指示（T面）</label>
             <select
               value={detailForm.kakouShijiCodeT}
-              onChange={e => setDetailForm(p => ({ ...p, kakouShijiCodeT: e.target.value }))}
+              onChange={e => { console.log("[加工指示T]", e.target.value); setDetailForm(p => ({ ...p, kakouShijiCodeT: e.target.value })) }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="">（なし）</option>
@@ -675,7 +678,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <label className="block text-xs font-medium text-gray-600 mb-1">加工指示（A面）</label>
             <select
               value={detailForm.kakouShijiCodeA}
-              onChange={e => setDetailForm(p => ({ ...p, kakouShijiCodeA: e.target.value }))}
+              onChange={e => { console.log("[加工指示A]", e.target.value); setDetailForm(p => ({ ...p, kakouShijiCodeA: e.target.value })) }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="">（なし）</option>
@@ -690,7 +693,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <label className="block text-xs font-medium text-gray-600 mb-1">加工指示（B面）</label>
             <select
               value={detailForm.kakouShijiCodeB}
-              onChange={e => setDetailForm(p => ({ ...p, kakouShijiCodeB: e.target.value }))}
+              onChange={e => { console.log("[加工指示B]", e.target.value); setDetailForm(p => ({ ...p, kakouShijiCodeB: e.target.value })) }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="">（なし）</option>
@@ -741,7 +744,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <p className="text-xs font-semibold text-gray-400">── 公差</p>
             <button
               type="button"
-              onClick={fetchStandardTolerance}
+              onClick={() => { console.log("[標準公差ボタン] クリック"); fetchStandardTolerance() }}
               className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
             >
               標準公差
@@ -780,7 +783,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <p className="text-xs font-semibold text-gray-400">── 面取り</p>
             <button
               type="button"
-              onClick={fetchStandardChamfer}
+              onClick={() => { console.log("[標準面取ボタン] クリック"); fetchStandardChamfer() }}
               className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
             >
               標準面取
@@ -874,6 +877,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
           <button
             type="button"
             onClick={() => {
+              console.log("[入力クリアボタン] クリック")
               setDetailForm(EMPTY_DETAIL_FORM)
               setCalcResult(null)
               setCalcError("")
@@ -884,7 +888,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
           </button>
           <button
             type="button"
-            onClick={handleCalculate}
+            onClick={() => { console.log("[見積計算ボタン] クリック"); handleCalculate() }}
             disabled={calcLoading}
             className="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -892,7 +896,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
           </button>
           <button
             type="button"
-            onClick={handleAddDetail}
+            onClick={() => { console.log("[明細追加ボタン] クリック"); handleAddDetail() }}
             disabled={!canAddDetail}
             className="px-5 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -954,7 +958,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     <td className="px-3 py-2.5 text-center">
                       <button
                         type="button"
-                        onClick={() => handleDeleteDetail(d.clientDetailId)}
+                        onClick={() => { console.log("[削除ボタン] clientDetailId:", d.clientDetailId); handleDeleteDetail(d.clientDetailId) }}
                         className="px-2 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
                       >
                         削除
@@ -970,7 +974,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
           <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3">
             <button
               type="button"
-              onClick={handleSave}
+              onClick={() => { console.log("[保存ボタン] クリック"); handleSave() }}
               disabled={saveLoading}
               className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#1a2744] text-white hover:bg-[#1a3a6e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
