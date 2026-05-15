@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
       // 見積ヘッダー作成
       const header = await tx.estimateHeader.create({
         data: {
-          customerId:      session.user.id!,
+          customerId:      session.user.customerId!,
           customerCode:    session.user.companyCode ?? "",
           customerName:    session.user.customerName ?? "",
           // chargeName は EstimateHeader スキーマ非存在 → createdBy に保存

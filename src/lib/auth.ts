@@ -312,6 +312,7 @@ export const authConfig: NextAuthConfig = {
         token.customerName = user.customerName
         token.role = user.role
         token.sessionTimeoutMin = user.sessionTimeoutMin
+        token.customerId = user.customerId
       }
       return token
     },
@@ -324,6 +325,7 @@ export const authConfig: NextAuthConfig = {
       session.user.customerName = token.customerName as string
       session.user.role = token.role as number
       session.user.sessionTimeoutMin = token.sessionTimeoutMin as number
+      session.user.customerId = token.customerId as string
       return session
     },
   },

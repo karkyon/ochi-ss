@@ -19,7 +19,7 @@ export default async function EstimateEditPage({ params }: Props) {
   const estimate = await prisma.estimateHeader.findFirst({
     where: {
       id,
-      customerId: session!.user.id!,
+      customerId: session!.user.customerId!,
       isDeleted: false,
     },
     include: {

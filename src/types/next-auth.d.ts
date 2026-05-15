@@ -13,6 +13,7 @@ declare module "next-auth" {
       userId: string           // ログインID
       userName: string         // 表示名
       chargeName: string       // 担当者名
+      customerId: string       // customers.id（FK用）
       companyCode: string      // 企業コード（5桁）
       customerName: string     // 企業名
       role: number             // 権限ロール（0-5）
@@ -24,6 +25,7 @@ declare module "next-auth" {
     userId: string
     userName: string
     chargeName: string
+    customerId: string
     companyCode: string
     customerName: string
     role: number
@@ -36,6 +38,7 @@ declare module "next-auth/jwt" {
     userId: string
     userName: string
     chargeName: string
+    customerId: string
     companyCode: string
     customerName: string
     role: number
