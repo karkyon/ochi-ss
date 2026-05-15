@@ -46,6 +46,18 @@ type EstimateDetail = {
   shortestDelivery: string | null
   deliveryDeadline: string | null
   calculated: boolean
+  // ▼ 追加: 計算中間値（保存時にDBへ送る）
+  intermediate: {
+    materialSizeT: number
+    materialSizeA: number
+    materialSizeB: number
+    materialUnitWeight: number
+    materialTotalWeight: number
+    productUnitWeight: number
+    productTotalWeight: number
+    processingCost6f: number
+    processingCostTotal: number
+  } | null
 }
 
 type HeaderForm = {
@@ -63,7 +75,7 @@ type HeaderForm = {
 type DetailForm = Omit<EstimateDetail,
   "clientDetailId" | "rowNo" | "materialName" | "kakouShiyou" |
   "kakouT" | "kakouA" | "kakouB" |
-  "unitPrice" | "totalPrice" | "shortestDelivery" | "deliveryDeadline" | "calculated"
+  "unitPrice" | "totalPrice" | "shortestDelivery" | "deliveryDeadline" | "calculated" | "intermediate"
 >
 
 // ────────────────────────────────────────────────
@@ -121,11 +133,23 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   const [detailForm, setDetailForm] = useState<DetailForm>(EMPTY_DETAIL_FORM)
 
   // 計算結果（計算ボタン押下後）
+  // ▼ 変更: sumPrice → totalPrice にマッピング。intermediate を追加
   const [calcResult, setCalcResult] = useState<{
     unitPrice: number
     totalPrice: number
     shortestDelivery: string
     deliveryDeadline: string
+    intermediate: {
+      materialSizeT: number
+      materialSizeA: number
+      materialSizeB: number
+      materialUnitWeight: number
+      materialTotalWeight: number
+      productUnitWeight: number
+      productTotalWeight: number
+      processingCost6f: number
+      processingCostTotal: number
+    } | null
   } | null>(null)
 
   // 明細リスト
@@ -146,14 +170,15 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       if (!res.ok) return
       const data = await res.json()
       if (data.success) {
+        // ▼ 変更: APIレスポンスフィールド名修正 TUpper→tUpper, AUpper→aUpper, BUpper→bUpper 等
         setDetailForm(prev => ({
           ...prev,
-          kousaTUpper: String(data.tolerance.TUpper ?? ""),
-          kousaTLower: String(data.tolerance.TLower ?? ""),
-          kousaAUpper: String(data.tolerance.AUpper ?? ""),
-          kousaALower: String(data.tolerance.ALower ?? ""),
-          kousaBUpper: String(data.tolerance.BUpper ?? ""),
-          kousaBLower: String(data.tolerance.BLower ?? ""),
+          kousaTUpper: String(data.tolerance.tUpper ?? ""),
+          kousaTLower: String(data.tolerance.tLower ?? ""),
+          kousaAUpper: String(data.tolerance.aUpper ?? ""),
+          kousaALower: String(data.tolerance.aLower ?? ""),
+          kousaBUpper: String(data.tolerance.bUpper ?? ""),
+          kousaBLower: String(data.tolerance.bLower ?? ""),
         }))
       }
     } catch { /* silent */ }
@@ -165,10 +190,11 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       if (!res.ok) return
       const data = await res.json()
       if (data.success) {
+        // ▼ 変更: APIレスポンスフィールド名修正 Chamfer4→chamfer4, Chamfer8→chamfer8
         setDetailForm(prev => ({
           ...prev,
-          mentori4: String(data.chamfer.Chamfer4 ?? ""),
-          mentori8: String(data.chamfer.Chamfer8 ?? ""),
+          mentori4: String(data.chamfer.chamfer4 ?? ""),
+          mentori8: String(data.chamfer.chamfer8 ?? ""),
         }))
       }
     } catch { /* silent */ }
@@ -237,7 +263,15 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       }
 
       const result = await res.json()
-      setCalcResult(result)
+      // ▼ 変更: APIレスポンス { unitPrice, sumPrice, shortestDelivery, deliveryDeadline, intermediate }
+      //         sumPrice → totalPrice としてstateに格納、intermediate を保持
+      setCalcResult({
+        unitPrice:        result.unitPrice,
+        totalPrice:       result.sumPrice,
+        shortestDelivery: result.shortestDelivery,
+        deliveryDeadline: result.deliveryDeadline,
+        intermediate:     result.intermediate ?? null,
+      })
     } catch {
       setCalcError("通信エラーが発生しました")
     } finally {
@@ -288,6 +322,8 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       shortestDelivery: calcResult.shortestDelivery,
       deliveryDeadline: calcResult.deliveryDeadline,
       calculated:       true,
+      // ▼ 追加: 計算中間値を明細に保持
+      intermediate:     calcResult.intermediate,
     }
 
     setDetails(prev => [...prev, newDetail])
@@ -322,10 +358,65 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
 
     setSaveLoading(true)
     try {
+      // ▼ 変更: route.ts の SaveHeaderRequest 形式に合わせたペイロード構造
+      //         + intermediate を各明細に含める
+      const payload = {
+        inputDate:         header.inputDate,
+        customerOrderNo:   header.customerOrderNo || undefined,
+        endUserNo:         header.endUserNo || undefined,
+        destinationCode:   header.destinationCode || undefined,
+        destinationName:   header.destinationName || undefined,
+        destinationDept:   header.destinationDept || undefined,
+        destinationPerson: header.destinationPerson || undefined,
+        requestNouki:      header.requestNouki || undefined,
+        remarks:           header.remarks || undefined,
+        editMode:          "New" as const,
+        details: details.map((d, idx) => ({
+          clientDetailId:      d.clientDetailId,
+          rowNo:               idx + 1,
+          materialCode:        d.materialCode,
+          materialName:        d.materialName,
+          kakouShiyouCode:     d.kakouShiyouCode,
+          kakouShiyou:         d.kakouShiyou,
+          kakouShijiCodeT:     d.kakouShijiCodeT || undefined,
+          kakouShijiCodeA:     d.kakouShijiCodeA || undefined,
+          kakouShijiCodeB:     d.kakouShijiCodeB || undefined,
+          kakouT:              d.kakouT,
+          kakouA:              d.kakouA,
+          kakouB:              d.kakouB,
+          sizeT:               parseFloat(d.sizeT),
+          sizeA:               parseFloat(d.sizeA),
+          sizeB:               parseFloat(d.sizeB),
+          kousaTUpper: d.kousaTUpper ? parseFloat(d.kousaTUpper) : null,
+          kousaTLower: d.kousaTLower ? parseFloat(d.kousaTLower) : null,
+          kousaAUpper: d.kousaAUpper ? parseFloat(d.kousaAUpper) : null,
+          kousaALower: d.kousaALower ? parseFloat(d.kousaALower) : null,
+          kousaBUpper: d.kousaBUpper ? parseFloat(d.kousaBUpper) : null,
+          kousaBLower: d.kousaBLower ? parseFloat(d.kousaBLower) : null,
+          mentori4:    d.mentori4 ? parseFloat(d.mentori4) : null,
+          mentori8:    d.mentori8 ? parseFloat(d.mentori8) : null,
+          quantity:            parseInt(d.quantity),
+          unitPrice:           d.unitPrice!,
+          totalPrice:          d.totalPrice!,
+          shortestDelivery:    d.shortestDelivery ?? undefined,
+          deliveryDeadline:    d.deliveryDeadline ?? null,
+          // ▼ 追加: 計算中間値
+          materialSizeT:       d.intermediate?.materialSizeT,
+          materialSizeA:       d.intermediate?.materialSizeA,
+          materialSizeB:       d.intermediate?.materialSizeB,
+          materialUnitWeight:  d.intermediate?.materialUnitWeight,
+          materialTotalWeight: d.intermediate?.materialTotalWeight,
+          productUnitWeight:   d.intermediate?.productUnitWeight,
+          productTotalWeight:  d.intermediate?.productTotalWeight,
+          processingCost6f:    d.intermediate?.processingCost6f,
+          processingCostTotal: d.intermediate?.processingCostTotal,
+        })),
+      }
+
       const res = await fetch("/api/v1/estimates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ header, details }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
