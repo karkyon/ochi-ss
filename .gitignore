@@ -55,3 +55,4 @@ prisma/migrations/
 node_modules/
 sync-service/node_modules/
 seed.ts
+certs/
