@@ -10,14 +10,8 @@ import { useRouter } from "next/navigation"
 type Material = { materialCode: string; materialName: string }
 type ProcessingSpec = { processingSpecCode: number; processingSpecName: string }
 
-// 加工指示の選択肢（マスタ化前の固定値）
-const KAKOU_SHIJI_OPTIONS = [
-  { code: "",   label: "（なし）" },
-  { code: "W",  label: "W研削" },
-  { code: "G",  label: "G研削" },
-  { code: "MC", label: "MC加工" },
-  { code: "RA", label: "RA研削" },
-]
+// 加工指示の選択肢
+type CuttingMethod = { code: number; label: string }
 
 type EstimateDetail = {
   clientDetailId: string  // クライアント側UUID
@@ -115,6 +109,17 @@ interface Props {
 
 export default function EstimateNewClient({ materials, processingSpecs, userInfo }: Props) {
   const router = useRouter()
+  // 加工指示マスタ（SQL Serverからバインド）
+  const [cuttingMethods, setCuttingMethods] = useState<CuttingMethod[]>([])
+  
+  useEffect(() => {
+    fetch(`/api/v1/cutting-methods?customerCode=${userInfo.customerCode}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.methods) setCuttingMethods(data.methods)
+      })
+      .catch(() => {/* silent */})
+  }, [userInfo.customerCode])
 
   // ヘッダーフォーム
   const [header, setHeader] = useState<HeaderForm>({
@@ -231,9 +236,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
         kakouShijiCodeT: detailForm.kakouShijiCodeT,
         kakouShijiCodeA: detailForm.kakouShijiCodeA,
         kakouShijiCodeB: detailForm.kakouShijiCodeB,
-        kakouT: KAKOU_SHIJI_OPTIONS.find(o => o.code === detailForm.kakouShijiCodeT)?.label ?? "",
-        kakouA: KAKOU_SHIJI_OPTIONS.find(o => o.code === detailForm.kakouShijiCodeA)?.label ?? "",
-        kakouB: KAKOU_SHIJI_OPTIONS.find(o => o.code === detailForm.kakouShijiCodeB)?.label ?? "",
+        kakouT: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeT)?.label ?? "",
+        kakouA: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeA)?.label ?? "",
+        kakouB: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeB)?.label ?? "",
         sizeT: parseFloat(detailForm.sizeT),
         sizeA: parseFloat(detailForm.sizeA),
         sizeB: parseFloat(detailForm.sizeB),
@@ -305,9 +310,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       kakouShijiCodeT: detailForm.kakouShijiCodeT,
       kakouShijiCodeA: detailForm.kakouShijiCodeA,
       kakouShijiCodeB: detailForm.kakouShijiCodeB,
-      kakouT: KAKOU_SHIJI_OPTIONS.find(o => o.code === detailForm.kakouShijiCodeT)?.label ?? "",
-      kakouA: KAKOU_SHIJI_OPTIONS.find(o => o.code === detailForm.kakouShijiCodeA)?.label ?? "",
-      kakouB: KAKOU_SHIJI_OPTIONS.find(o => o.code === detailForm.kakouShijiCodeB)?.label ?? "",
+      kakouT: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeT)?.label ?? "",
+      kakouA: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeA)?.label ?? "",
+      kakouB: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeB)?.label ?? "",
       sizeT: detailForm.sizeT,
       sizeA: detailForm.sizeA,
       sizeB: detailForm.sizeB,
@@ -650,8 +655,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               onChange={e => setDetailForm(p => ({ ...p, kakouShijiCodeT: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              {KAKOU_SHIJI_OPTIONS.map(o => (
-                <option key={o.code} value={o.code}>{o.label}</option>
+              <option value="">（なし）</option>
+              {cuttingMethods.map(m => (
+                <option key={m.code} value={String(m.code)}>{m.label}</option>
               ))}
             </select>
           </div>
@@ -664,8 +670,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               onChange={e => setDetailForm(p => ({ ...p, kakouShijiCodeA: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              {KAKOU_SHIJI_OPTIONS.map(o => (
-                <option key={o.code} value={o.code}>{o.label}</option>
+              <option value="">（なし）</option>
+              {cuttingMethods.map(m => (
+                <option key={m.code} value={String(m.code)}>{m.label}</option>
               ))}
             </select>
           </div>
@@ -678,8 +685,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               onChange={e => setDetailForm(p => ({ ...p, kakouShijiCodeB: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              {KAKOU_SHIJI_OPTIONS.map(o => (
-                <option key={o.code} value={o.code}>{o.label}</option>
+              <option value="">（なし）</option>
+              {cuttingMethods.map(m => (
+                <option key={m.code} value={String(m.code)}>{m.label}</option>
               ))}
             </select>
           </div>
