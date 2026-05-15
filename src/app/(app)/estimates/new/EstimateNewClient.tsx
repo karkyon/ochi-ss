@@ -254,6 +254,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
         editMode: "New",
       }
 
+      console.log("[フロント] 計算リクエスト payload:", JSON.stringify(payload, null, 2))
       const res = await fetch("/api/v1/estimates/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -267,6 +268,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       }
 
       const result = await res.json()
+      console.log("[フロント] 計算レスポンス:", JSON.stringify(result, null, 2))
       // ▼ 変更: APIレスポンス { unitPrice, sumPrice, shortestDelivery, deliveryDeadline, intermediate }
       //         sumPrice → totalPrice としてstateに格納、intermediate を保持
       setCalcResult({

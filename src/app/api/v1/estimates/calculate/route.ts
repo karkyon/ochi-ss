@@ -105,9 +105,9 @@ export async function POST(req: NextRequest) {
     request.input("ZairyouName",         sql.VarChar(20),      body.materialName ?? "")
     request.input("KakouShiyouCd",       sql.SmallInt,         body.kakouShiyouCode)
     request.input("KakouShiyou",         sql.VarChar(10),      body.kakouShiyou ?? "")
-    request.input("Kakou_T",             sql.VarChar(10),      body.kakouT ?? "")
-    request.input("Kakou_A",             sql.VarChar(10),      body.kakouA ?? "")
-    request.input("Kakou_B",             sql.VarChar(10),      body.kakouB ?? "")
+    request.input("Kakou_T",             sql.TinyInt,          body.kakouShijiCodeT ? Number(body.kakouShijiCodeT) : null)
+    request.input("Kakou_A",             sql.TinyInt,          body.kakouShijiCodeA ? Number(body.kakouShijiCodeA) : null)
+    request.input("Kakou_B",             sql.TinyInt,          body.kakouShijiCodeB ? Number(body.kakouShijiCodeB) : null)
     request.input("KakouShijiCd_T",      sql.TinyInt,          body.kakouShijiCodeT ? Number(body.kakouShijiCodeT) : null)
     request.input("KakouShijiCd_A",      sql.TinyInt,          body.kakouShijiCodeA ? Number(body.kakouShijiCodeA) : null)
     request.input("KakouShijiCd_B",      sql.TinyInt,          body.kakouShijiCodeB ? Number(body.kakouShijiCodeB) : null)
@@ -200,6 +200,18 @@ export async function POST(req: NextRequest) {
     request.output("Prefectures_OUT",     sql.VarChar(20))
     request.output("Coefficient_OUT",     sql.Decimal(3, 1))
 
+    console.log("[calculate] SP送信パラメータ:", {
+      materialCode: body.materialCode,
+      kakouShiyouCode: body.kakouShiyouCode,
+      kakouT: body.kakouT,
+      kakouShijiCodeT: body.kakouShijiCodeT,
+      kakouA: body.kakouA,
+      kakouShijiCodeA: body.kakouShijiCodeA,
+      kakouB: body.kakouB,
+      kakouShijiCodeB: body.kakouShijiCodeB,
+      sizeT: body.sizeT, sizeA: body.sizeA, sizeB: body.sizeB,
+      quantity: body.quantity,
+    })
     const result = await request.execute("usp_ASP_EstimateAmountCalculation_get")
 
     const out = result.output
