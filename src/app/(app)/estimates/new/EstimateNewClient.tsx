@@ -115,9 +115,10 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
     fetch(`/api/v1/cutting-methods?customerCode=${userInfo.customerCode}`)
       .then(r => r.json())
       .then(data => {
+        console.log('[加工指示API] レスポンス:', data)
         if (data.methods) setCuttingMethods(data.methods)
       })
-      .catch(() => {/* silent */})
+      .catch((e) => { console.error('[加工指示API] エラー:', e) })
   }, [userInfo.customerCode])
 
   // ヘッダーフォーム
@@ -208,6 +209,8 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   // 見積計算
   // ────────────────────────────────────────────────
   const handleCalculate = async () => {
+    console.log('[計算] detailForm:', JSON.stringify(detailForm))
+    console.log('[計算] cuttingMethods:', JSON.stringify(cuttingMethods))
     setCalcError("")
     setCalcResult(null)
 
@@ -297,6 +300,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   )
 
   const handleAddDetail = () => {
+    console.log('[明細追加] canAddDetail:', canAddDetail, 'calcResult:', JSON.stringify(calcResult))
     if (!canAddDetail || !calcResult) return
     const material = materials.find(m => m.materialCode === detailForm.materialCode)
     const spec     = processingSpecs.find(s => s.processingSpecCode === detailForm.kakouShiyouCode)
@@ -358,6 +362,8 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   // 保存
   // ────────────────────────────────────────────────
   const handleSave = async () => {
+    console.log('[保存] header:', JSON.stringify(header))
+    console.log('[保存] details:', JSON.stringify(details))
     setSaveMessage(null)
     if (!header.inputDate)    { setSaveMessage({ type: "error", text: "入力日付は必須です" }); return }
     if (details.length === 0) { setSaveMessage({ type: "error", text: "明細を1件以上追加してください" }); return }
@@ -432,6 +438,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       }
 
       const saved = await res.json()
+      console.log('[保存API] レスポンス:', JSON.stringify(saved))
       setSaveMessage({ type: "success", text: `見積を保存しました（見積No: ${saved.estimateNo}）` })
       router.push(`/estimates/${saved.id}/edit`)
     } catch {
