@@ -7,7 +7,7 @@
 //        RefObject<HTMLInputElement | null> → 直接 .current を参照
 // =============================================================
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -21,7 +21,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   default: "ログインに失敗しました。入力内容を確認してください。",
 }
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -254,5 +254,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   )
 }
