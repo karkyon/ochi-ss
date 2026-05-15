@@ -2,8 +2,12 @@
 // ============================================================
 // 標準面取り取得 API
 //   GET /api/v1/chamfer/standard?customerCode={code}
-//   → usp_ASP_ChamferAmountSetting_get を呼び出して
-//     顧客別の標準面取り値 (Chamfer4 / Chamfer8) を返す
+//   → usp_ASP_ChamferAmountSetting_get を呼び出す
+//
+// SPの実定義:
+//   CREATE PROCEDURE usp_ASP_ChamferAmountSetting_get (@TokuisakiCd varchar(6) = '')
+//   → OUTPUTパラメータなし。SELECTで結果セットを返す
+//   カラム: 面取指示区分, 標準面取4C, 標準面取8C
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server"
@@ -30,18 +34,25 @@ export async function GET(req: NextRequest) {
 
   try {
     const request = pool.request()
-    request.input("TokuisakiCd", sql.NVarChar(6), customerCode)
-    request.output("Mentori_4", sql.Decimal(5, 2))
-    request.output("Mentori_8", sql.Decimal(5, 2))
+    // SP は INPUT パラメータ1つのみ・OUTPUTなし・SELECTで結果セットを返す
+    request.input("TokuisakiCd", sql.VarChar(6), customerCode)
 
     const result = await request.execute("usp_ASP_ChamferAmountSetting_get")
-    const out = result.output
 
+    if (!result.recordset || result.recordset.length === 0) {
+      // 得意先別設定なし → デフォルト値（0）を返す
+      return NextResponse.json({
+        success: true,
+        chamfer: { chamfer4: 0, chamfer8: 0 },
+      })
+    }
+
+    const row = result.recordset[0]
     return NextResponse.json({
       success: true,
       chamfer: {
-        chamfer4: Number(out["Mentori_4"] ?? 0),
-        chamfer8: Number(out["Mentori_8"] ?? 0),
+        chamfer4: Number(row["標準面取4C"] ?? 0),
+        chamfer8: Number(row["標準面取8C"] ?? 0),
       },
     })
   } catch (err: any) {

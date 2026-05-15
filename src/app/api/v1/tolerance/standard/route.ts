@@ -2,8 +2,12 @@
 // ============================================================
 // 標準公差取得 API
 //   GET /api/v1/tolerance/standard?customerCode={code}
-//   → usp_ASP_ToleranceSetting_get を呼び出して
-//     顧客別の標準公差 6値を返す
+//   → usp_ASP_ToleranceSetting_get を呼び出す
+//
+// SPの実定義:
+//   CREATE PROCEDURE usp_ASP_ToleranceSetting_get (@TokuisakiCd varchar(6) = '')
+//   → OUTPUTパラメータなし。SELECTで結果セットを返す
+//   カラム: 標準公差1T, 標準公差2T, 標準公差1A, 標準公差2A, 標準公差1B, 標準公差2B
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server"
@@ -30,26 +34,33 @@ export async function GET(req: NextRequest) {
 
   try {
     const request = pool.request()
-    request.input("TokuisakiCd", sql.NVarChar(6), customerCode)
-    request.output("Kousa_T_U", sql.Decimal(6, 3))
-    request.output("Kousa_T_L", sql.Decimal(6, 3))
-    request.output("Kousa_A_U", sql.Decimal(6, 3))
-    request.output("Kousa_A_L", sql.Decimal(6, 3))
-    request.output("Kousa_B_U", sql.Decimal(6, 3))
-    request.output("Kousa_B_L", sql.Decimal(6, 3))
+    // SP は INPUT パラメータ1つのみ・OUTPUTなし・SELECTで結果セットを返す
+    request.input("TokuisakiCd", sql.VarChar(6), customerCode)
 
     const result = await request.execute("usp_ASP_ToleranceSetting_get")
-    const out = result.output
 
+    if (!result.recordset || result.recordset.length === 0) {
+      // 得意先別設定なし → デフォルト値（0）を返す
+      return NextResponse.json({
+        success: true,
+        tolerance: {
+          tUpper: 0, tLower: 0,
+          aUpper: 0, aLower: 0,
+          bUpper: 0, bLower: 0,
+        },
+      })
+    }
+
+    const row = result.recordset[0]
     return NextResponse.json({
       success: true,
       tolerance: {
-        tUpper: Number(out["Kousa_T_U"] ?? 0),
-        tLower: Number(out["Kousa_T_L"] ?? 0),
-        aUpper: Number(out["Kousa_A_U"] ?? 0),
-        aLower: Number(out["Kousa_A_L"] ?? 0),
-        bUpper: Number(out["Kousa_B_U"] ?? 0),
-        bLower: Number(out["Kousa_B_L"] ?? 0),
+        tUpper: Number(row["標準公差1T"] ?? 0),
+        tLower: Number(row["標準公差2T"] ?? 0),
+        aUpper: Number(row["標準公差1A"] ?? 0),
+        aLower: Number(row["標準公差2A"] ?? 0),
+        bUpper: Number(row["標準公差1B"] ?? 0),
+        bLower: Number(row["標準公差2B"] ?? 0),
       },
     })
   } catch (err: any) {
