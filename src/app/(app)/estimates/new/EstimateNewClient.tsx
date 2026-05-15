@@ -721,6 +721,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     value={detailForm[`size${axis}` as keyof DetailForm]}
                     onChange={e => {
                       console.log(`[寸法${axis}]`, e.target.value)
+                      console.log(`[寸法${axis}]`, e.target.value)
                       setDetailForm(p => ({ ...p, [`size${axis}`]: e.target.value }))
                       setCalcResult(null)
                     }}
@@ -830,6 +831,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 step="1"
                 value={detailForm.quantity}
                 onChange={e => {
+                  console.log('[数量]', e.target.value)
                   console.log('[数量]', e.target.value)
                   setDetailForm(p => ({ ...p, quantity: e.target.value }))
                   setCalcResult(null)
