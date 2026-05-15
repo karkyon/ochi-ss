@@ -297,6 +297,7 @@ export const authConfig: NextAuthConfig = {
           customerName: customer.customerName,
           role: user.userRole,
           sessionTimeoutMin: customer.sessionTimeoutMin ?? 140,
+          customerId: customer.id,
         }
       },
     }),
