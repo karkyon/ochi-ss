@@ -499,7 +499,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <input
               type="date"
               value={header.inputDate}
-              onChange={e => setHeader(h => ({ ...h, inputDate: e.target.value }))}
+              onChange={e => { console.log("[入力日付]", e.target.value); setHeader(h => ({ ...h, inputDate: e.target.value })) }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -512,7 +512,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <input
               type="text"
               value={header.customerOrderNo}
-              onChange={e => setHeader(h => ({ ...h, customerOrderNo: e.target.value }))}
+              onChange={e => { console.log("[お客様注文番号]", e.target.value); setHeader(h => ({ ...h, customerOrderNo: e.target.value })) }}
               maxLength={50}
               placeholder="例: ORD-2026-001"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -527,7 +527,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <input
               type="text"
               value={header.endUserNo}
-              onChange={e => setHeader(h => ({ ...h, endUserNo: e.target.value }))}
+              onChange={e => { console.log("[エンドユーザー番号]", e.target.value); setHeader(h => ({ ...h, endUserNo: e.target.value })) }}
               maxLength={50}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -545,7 +545,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               <input
                 type="text"
                 value={header.destinationCode}
-                onChange={e => setHeader(h => ({ ...h, destinationCode: e.target.value }))}
+                onChange={e => { console.log("[送り先コード]", e.target.value); setHeader(h => ({ ...h, destinationCode: e.target.value })) }}
                 maxLength={20}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -557,7 +557,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 <input
                   type="text"
                   value={header.destinationName}
-                  onChange={e => setHeader(h => ({ ...h, destinationName: e.target.value }))}
+                  onChange={e => { console.log("[送り先名]", e.target.value); setHeader(h => ({ ...h, destinationName: e.target.value })) }}
                   maxLength={100}
                   className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -576,7 +576,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               <input
                 type="date"
                 value={header.requestNouki}
-                onChange={e => setHeader(h => ({ ...h, requestNouki: e.target.value }))}
+                onChange={e => { console.log("[希望納期]", e.target.value); setHeader(h => ({ ...h, requestNouki: e.target.value })) }}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -586,7 +586,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               <input
                 type="text"
                 value={header.remarks}
-                onChange={e => setHeader(h => ({ ...h, remarks: e.target.value }))}
+                onChange={e => { console.log("[備考]", e.target.value); setHeader(h => ({ ...h, remarks: e.target.value })) }}
                 maxLength={200}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -720,6 +720,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     max="9999.999"
                     value={detailForm[`size${axis}` as keyof DetailForm]}
                     onChange={e => {
+                      console.log(`[寸法${axis}]`, e.target.value)
                       setDetailForm(p => ({ ...p, [`size${axis}`]: e.target.value }))
                       setCalcResult(null)
                     }}
@@ -754,7 +755,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     type="number"
                     step="0.001"
                     value={detailForm[`kousa${axis}Upper` as keyof DetailForm]}
-                    onChange={e => setDetailForm(p => ({ ...p, [`kousa${axis}Upper`]: e.target.value }))}
+                    onChange={e => { console.log(`[公差${axis}上限]`, e.target.value); setDetailForm(p => ({ ...p, [`kousa${axis}Upper`]: e.target.value })) }}
                     placeholder="上限"
                     className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
@@ -762,7 +763,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     type="number"
                     step="0.001"
                     value={detailForm[`kousa${axis}Lower` as keyof DetailForm]}
-                    onChange={e => setDetailForm(p => ({ ...p, [`kousa${axis}Lower`]: e.target.value }))}
+                    onChange={e => { console.log(`[公差${axis}下限]`, e.target.value); setDetailForm(p => ({ ...p, [`kousa${axis}Lower`]: e.target.value })) }}
                     placeholder="下限"
                     className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
@@ -792,7 +793,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   type="number"
                   step="0.01"
                   value={detailForm.mentori4}
-                  onChange={e => setDetailForm(p => ({ ...p, mentori4: e.target.value }))}
+                  onChange={e => { console.log('[4C面取り]', e.target.value); setDetailForm(p => ({ ...p, mentori4: e.target.value })) }}
                   placeholder="0.00"
                   className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -806,7 +807,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   type="number"
                   step="0.01"
                   value={detailForm.mentori8}
-                  onChange={e => setDetailForm(p => ({ ...p, mentori8: e.target.value }))}
+                  onChange={e => { console.log('[8C面取り]', e.target.value); setDetailForm(p => ({ ...p, mentori8: e.target.value })) }}
                   placeholder="0.00"
                   className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -829,6 +830,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 step="1"
                 value={detailForm.quantity}
                 onChange={e => {
+                  console.log('[数量]', e.target.value)
                   setDetailForm(p => ({ ...p, quantity: e.target.value }))
                   setCalcResult(null)
                 }}
