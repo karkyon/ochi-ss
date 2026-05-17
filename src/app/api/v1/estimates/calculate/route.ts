@@ -220,12 +220,16 @@ export async function POST(req: NextRequest) {
     const shortestNouki: string = out["ShortestNouki"]        ?? ""
     const deliveryDeadline     = out["DeliveryDeadline"]
 
-    if (unitPrice <= 0 || !shortestNouki) {
-      console.warn("[calculate] SP実行結果が不正:", { unitPrice, shortestNouki })
+    if (unitPrice <= 0) {
+      console.warn("[calculate] SP実行結果が不正(unitPrice<=0):", { unitPrice, shortestNouki })
       return NextResponse.json(
         { error: "計算結果が不正です。材料コード・加工仕様・寸法を確認してください。" },
         { status: 422 }
       )
+    }
+    if (!shortestNouki) {
+      console.warn("[calculate] shortestNouki が空 → 空文字で続行（SP仕様上一部組合せで返らない）")
+      // shortestNouki空でも unitPrice>0 なら計算成功とみなす
     }
 
     return NextResponse.json({
