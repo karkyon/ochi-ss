@@ -55,10 +55,12 @@ export default function EstimatesClient({
       if (v) params.set(k, v as string)
     }
     params.set("page", "1")
+    console.log("[検索ボタン] クリック 検索条件:", Object.fromEntries(params.entries()))
     router.push(`/estimates?${params.toString()}`)
   }
 
   const handleClear = () => {
+    console.log("[クリアボタン] クリック")
     formRef.current?.reset()
     router.push("/estimates")
   }

@@ -53,8 +53,10 @@ export default async function EstimatesPage({
   const orderNo  = sp.orderNo  ?? ""
 
   // DB検索
+  console.log("[/estimates page] session.user.customerId:", session!.user.customerId)
+  console.log("[/estimates page] 検索条件:", { dateFrom, dateTo, noFrom, noTo, destName, orderNo, page })
   const where: Prisma.EstimateHeaderWhereInput = {
-    customerId: session!.user.userId,
+    customerId: session!.user.customerId!,
     isDeleted:  false,
     estimateDate: {
       gte: new Date(dateFrom),
