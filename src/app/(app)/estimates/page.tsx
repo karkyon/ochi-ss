@@ -92,7 +92,7 @@ export default async function EstimatesPage({
 
   const estimates = rows.map((r) => ({
     id:              r.id,
-    estimateNo:      r.estimateNo ?? "（未採番）",
+    estimateNo:      r.estimateNo ?? "",
     estimateDate:    r.estimateDate?.toISOString().slice(0, 10) ?? "",
     destinationName: r.destinationName ?? "—",
     estimateStatus:  r.estimateStatus,

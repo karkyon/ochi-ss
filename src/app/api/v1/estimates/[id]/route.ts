@@ -14,6 +14,7 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
+  console.log('[GET /estimates/:id] id:', id)
 
   const estimate = await prisma.estimateHeader.findFirst({
     where: { id, customerId: session.user.userId!, isDeleted: false },
@@ -34,6 +35,7 @@ export async function PUT(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
+  console.log('[PUT /estimates/:id] id:', id)
   let body: any
   try { body = await req.json() } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })

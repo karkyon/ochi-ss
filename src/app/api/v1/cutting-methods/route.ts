@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("customerCode") ??
     (session.user as any).companyCode ?? ""
 
+  console.log('[GET /cutting-methods] customerCode:', customerCode)
   try {
     const pool = await getSqlServerPool()
     const req = pool.request()

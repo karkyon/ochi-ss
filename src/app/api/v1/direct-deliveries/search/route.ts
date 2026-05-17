@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
   const customerCode = (session.user as any).companyCode ?? ""
 
+  console.log('[GET /direct-deliveries/search] q:', q, 'customerCode:', customerCode)
   try {
     const pool = await getSqlServerPool()
     const req = pool.request()

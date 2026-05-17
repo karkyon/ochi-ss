@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     session.user.companyCode ??
     ""
 
+  console.log('[GET /tolerance/standard] customerCode:', customerCode)
   let pool: Awaited<ReturnType<typeof getSqlServerPool>>
   try {
     pool = await getSqlServerPool()

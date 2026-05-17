@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
+  console.log('[POST /estimates] customerId:', session.user.customerId, '明細件数:', body.details?.length)
   // ── バリデーション ──
   if (!body.inputDate) {
     return NextResponse.json({ error: "inputDate は必須です" }, { status: 400 })

@@ -249,10 +249,15 @@ export default function EstimatesClient({
                       <td className="px-4 py-3 font-medium text-blue-700 whitespace-nowrap">
                         <Link
                           href={`/estimates/${est.id}/edit`}
+                          onClick={() => console.log("[見積一覧] 編集クリック id:", est.id, "no:", est.estimateNo)}
                           className="hover:underline"
                         >
-                          {est.estimateNo}
+                          {est.estimateNo
+                            ? est.estimateNo
+                            : <span className="text-amber-600 text-xs font-normal">受付待ち</span>
+                          }
                         </Link>
+                        <div className="text-[10px] text-gray-400 mt-0.5">WebID: {est.id.slice(0, 8)}…</div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         {est.estimateDate
