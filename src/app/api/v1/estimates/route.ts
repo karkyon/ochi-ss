@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const perPage   = 20
 
   const where: Prisma.EstimateHeaderWhereInput = {
-    customerId: session.user.userId,
+    customerId: session.user.customerId!,
     isDeleted: false,
     ...(dateFrom && { estimateDate: { gte: new Date(dateFrom) } }),
     ...(dateTo   && { estimateDate: { lte: new Date(dateTo + "T23:59:59") } }),
