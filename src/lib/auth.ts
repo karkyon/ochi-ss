@@ -118,7 +118,7 @@ export const authConfig: NextAuthConfig = {
     maxAge: 140 * 60,
   },
   jwt: {
-    maxAge: 15 * 60,
+    maxAge: 140 * 60,  // 15*60→140*60 (sessionTimeoutMinに合わせる)
   },
   pages: {
     signIn: "/login",

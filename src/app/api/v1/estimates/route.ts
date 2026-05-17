@@ -194,12 +194,38 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── 見積番号採番ロジック ──
+  // フォーマット: W + YYYYMMDD + 2桁連番 (例: W2026051701)
+  // ※ Prisma.TransactionClient 型は tx として使用
+  async function generateEstimateNo(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], inputDate: string): Promise<string> {
+    const d = new Date(inputDate)
+    const yyyymmdd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`
+    const prefix = `W${yyyymmdd}`
+    const last = await tx.estimateHeader.findFirst({
+      where: { estimateNo: { startsWith: prefix } },
+      orderBy: { estimateNo: 'desc' },
+      select: { estimateNo: true },
+    })
+    let seq = 1
+    if (last?.estimateNo) {
+      const lastSeq = parseInt(last.estimateNo.slice(-2), 10)
+      if (!isNaN(lastSeq)) seq = lastSeq + 1
+    }
+    if (seq > 99) throw new Error('本日の見積番号が上限（99件）に達しました')
+    return `${prefix}${String(seq).padStart(2, '0')}`
+  }
+
   // ── トランザクション保存 ──
   try {
     const saved = await prisma.$transaction(async (tx) => {
+      // 見積番号採番
+      const estimateNo = await generateEstimateNo(tx, body.inputDate)
+      console.log('[POST /estimates] 採番見積番号:', estimateNo)
+
       // 見積ヘッダー作成
       const header = await tx.estimateHeader.create({
         data: {
+          estimateNo:      estimateNo,
           customerId:      session.user.customerId!,
           customerCode:    session.user.companyCode ?? "",
           customerName:    session.user.customerName ?? "",
