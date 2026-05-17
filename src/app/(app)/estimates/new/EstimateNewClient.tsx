@@ -440,7 +440,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       const saved = await res.json()
       console.log('[保存API] レスポンス:', JSON.stringify(saved))
       setSaveMessage({ type: "success", text: `見積を保存しました（見積No: ${saved.estimateNo}）` })
-      router.push(`/estimates/${saved.id}/edit`)
+      router.push(`/estimates/${saved.estimateId}/edit`)
     } catch {
       setSaveMessage({ type: "error", text: "通信エラーが発生しました" })
     } finally {
