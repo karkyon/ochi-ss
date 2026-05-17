@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
   const page      = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10))
   const perPage   = 20
 
+  console.log("[GET /estimates] session.user.customerId:", session.user.customerId)
+  console.log("[GET /estimates] 検索条件:", { dateFrom, dateTo, noFrom, noTo, destName, orderNo, page })
   const where: Prisma.EstimateHeaderWhereInput = {
     customerId: session.user.customerId!,
     isDeleted: false,
