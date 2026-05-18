@@ -73,6 +73,13 @@ export default async function OrderDetailPage({ params }: Props) {
             ← 注文一覧
           </Link>
           <Link
+            href={`/api/v1/orders/${order.id}/pdf`}
+            target="_blank"
+            className="px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-sm hover:bg-emerald-50 transition-colors"
+          >
+            🖨️ 注文書PDF
+          </Link>
+          <Link
             href="/dashboard"
             className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
           >

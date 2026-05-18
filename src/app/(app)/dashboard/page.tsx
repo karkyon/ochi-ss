@@ -33,7 +33,7 @@ const MENU_CARDS = [
     icon: "🏭",
     title: "納入先管理",
     description: "直送先の登録・編集",
-    href: "/delivery-destinations",
+    href: "/masters/direct-delivery",
     color: "purple",
   },
 ]

@@ -1,16 +1,16 @@
 // src/app/api/v1/orders/route.ts
-// GET /api/v1/orders — 注文一覧検索
+// GET /api/v1/orders — 注文一覧
+// POST /api/v1/orders — 注文確定
 
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 
+// ── GET 一覧 ──
 export async function GET(req: NextRequest) {
   const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { searchParams } = req.nextUrl
   const dateFrom = searchParams.get("dateFrom")
@@ -19,8 +19,6 @@ export async function GET(req: NextRequest) {
   const status   = searchParams.get("status")
   const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10))
   const perPage  = 20
-
-  console.log("[GET /api/v1/orders]", { dateFrom, dateTo, orderNo, status, page })
 
   const where: Prisma.OrderWhereInput = {
     customerId: session.user.customerId!,
@@ -40,31 +38,76 @@ export async function GET(req: NextRequest) {
       take: perPage,
       include: {
         estimateHeader: {
-          select: {
-            estimateNo:      true,
-            destinationName: true,
-            customerOrderNo: true,
-          },
+          select: { estimateNo: true, destinationName: true, customerOrderNo: true },
         },
       },
     }),
   ])
 
   return NextResponse.json({
-    total,
-    page,
-    perPage,
+    total, page, perPage,
     totalPages: Math.ceil(total / perPage),
     orders: rows.map(o => ({
-      id:              o.id,
-      orderNo:         o.orderNo ?? null,
-      orderDate:       o.orderDate.toISOString().slice(0, 10),
-      orderStatus:     o.orderStatus,
-      totalAmount:     Number(o.totalAmount ?? 0),
-      detailCount:     o.detailCount ?? 0,
-      estimateNo:      o.estimateHeader.estimateNo ?? null,
+      id: o.id,
+      orderNo: o.orderNo ?? null,
+      orderDate: o.orderDate.toISOString().slice(0, 10),
+      orderStatus: o.orderStatus,
+      totalAmount: Number(o.totalAmount ?? 0),
+      detailCount: o.detailCount ?? 0,
+      estimateNo: o.estimateHeader.estimateNo ?? null,
       destinationName: o.estimateHeader.destinationName ?? null,
       customerOrderNo: o.estimateHeader.customerOrderNo ?? null,
     })),
   })
+}
+
+// ── POST 注文確定 ──
+export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = await req.json()
+  const { estimateId } = body as { estimateId: string }
+
+  if (!estimateId) {
+    return NextResponse.json({ error: "estimateId required" }, { status: 400 })
+  }
+
+  console.log("[POST /api/v1/orders] estimateId:", estimateId)
+
+  // 見積取得・バリデーション
+  const estimate = await prisma.estimateHeader.findFirst({
+    where: { id: estimateId, customerId: session.user.customerId!, isDeleted: false },
+    include: { details: { where: { isDeleted: false } } },
+  })
+  if (!estimate) return NextResponse.json({ error: "見積が見つかりません" }, { status: 404 })
+  if (estimate.estimateStatus === "ordered") {
+    return NextResponse.json({ error: "この見積は既に注文済みです" }, { status: 409 })
+  }
+  if (estimate.details.length === 0) {
+    return NextResponse.json({ error: "明細が1件もありません" }, { status: 400 })
+  }
+
+  const totalAmount = estimate.details.reduce((s, d) => s + Number(d.totalPrice ?? 0), 0)
+  const detailCount = estimate.details.length
+
+  // 注文レコード作成 + 見積ステータス更新 (transaction)
+  const order = await prisma.$transaction(async tx => {
+    const o = await tx.order.create({
+      data: {
+        estimateHeaderId: estimateId,
+        customerId: session.user.customerId!,
+        orderStatus: "pending",
+        totalAmount,
+        detailCount,
+      },
+    })
+    await tx.estimateHeader.update({
+      where: { id: estimateId },
+      data: { estimateStatus: "ordered" },
+    })
+    return o
+  })
+
+  return NextResponse.json({ orderId: order.id, orderStatus: order.orderStatus }, { status: 201 })
 }
