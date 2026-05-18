@@ -1,5 +1,6 @@
 // /orders/confirm — 注文確認ページ
 "use client"
+// 納期有効期限チェック強化済み
 import { useEffect, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 

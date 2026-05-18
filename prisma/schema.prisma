@@ -391,3 +391,23 @@ model SyncChangeLog {
   @@index([recordId])
   @@map("sync_change_logs")
 }
+
+model ChamferRule {
+  id                 String   @id @default(cuid())
+  materialCode       String   @db.VarChar(4)
+  processingSpecCode Int
+  sizeAFrom          Decimal? @db.Decimal(7, 3)
+  sizeATo            Decimal? @db.Decimal(7, 3)
+  sizeBFrom          Decimal? @db.Decimal(7, 3)
+  sizeBTo            Decimal? @db.Decimal(7, 3)
+  limitChamfer4      Decimal? @db.Decimal(7, 3)
+  limitChamfer8      Decimal? @db.Decimal(7, 3)
+  maxChamfer4        Decimal? @db.Decimal(7, 3)
+  maxChamfer8        Decimal? @db.Decimal(7, 3)
+  priority           Int      @default(0)
+  isDeleted          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("chamfer_rules")
+}
