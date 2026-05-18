@@ -1,6 +1,5 @@
 "use client"
 import { useState, useCallback, useEffect } from "react"
-import { useRouter } from "next/navigation"
 
 
 // ──────────────────────────────────────────────────────────────────
@@ -303,7 +302,6 @@ interface Props {
 }
 
 export default function EstimateNewClient({ materials, processingSpecs, userInfo, copySource }: Props) {
-  const router = useRouter()
   // 加工指示マスタ（SQL Serverからバインド）
   const [cuttingMethods, setCuttingMethods] = useState<CuttingMethod[]>([])
   

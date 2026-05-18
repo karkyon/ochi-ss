@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
           shippingMethodId: body.shippingMethodId ?? null,
           // requestNouki は EstimateHeader スキーマ非存在のため除外
           remarks:         body.remarks ?? null,
-          estimateStatus:  "draft",
+          estimateStatus:  "saved",
           editMode:        "new",
           isDeleted:       false,
         },
