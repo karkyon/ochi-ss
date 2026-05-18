@@ -813,24 +813,92 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             </div>
 
             <div className="lg:col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">送り先名</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={header.destinationName}
-                  onChange={e => { console.log("[送り先名]", e.target.value); setHeader(h => ({ ...h, destinationName: e.target.value })) }}
-                  maxLength={100}
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600">送り先名称</label>
                 <button
                   type="button"
-                  className="px-3 py-2 text-xs rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap transition-colors"
-                  title="直送先検索"
-                onClick={() => { console.log("[直送先検索ボタン] クリック"); setShowDDModal(true) }}
+                  onClick={() => { console.log("[直送先検索ボタン(New)] クリック"); setShowDDModal(true) }}
+                  className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1"
                 >
                   🔍 直送先検索
                 </button>
               </div>
+              <input
+                type="text"
+                value={header.destinationName}
+                onChange={e => { console.log("[送り先名]", e.target.value); setHeader(h => ({ ...h, destinationName: e.target.value })) }}
+                maxLength={100}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">部署名</label>
+              <input
+                type="text"
+                value={header.destinationDept}
+                onChange={e => { console.log("[部署名]", e.target.value); setHeader(h => ({ ...h, destinationDept: e.target.value })) }}
+                maxLength={50}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">担当者名</label>
+              <input
+                type="text"
+                value={header.destinationPerson}
+                onChange={e => { console.log("[担当者名]", e.target.value); setHeader(h => ({ ...h, destinationPerson: e.target.value })) }}
+                maxLength={50}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
+              <input
+                type="text"
+                value={header.destinationZip}
+                onChange={e => { console.log("[郵便番号]", e.target.value); setHeader(h => ({ ...h, destinationZip: e.target.value })) }}
+                maxLength={8}
+                placeholder="000-0000"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">住所</label>
+              <input
+                type="text"
+                value={header.destinationAddress}
+                onChange={e => { console.log("[住所]", e.target.value); setHeader(h => ({ ...h, destinationAddress: e.target.value })) }}
+                maxLength={200}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">TEL</label>
+              <input
+                type="text"
+                value={header.destinationTel}
+                onChange={e => { console.log("[TEL]", e.target.value); setHeader(h => ({ ...h, destinationTel: e.target.value })) }}
+                maxLength={20}
+                placeholder="00-0000-0000"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">FAX</label>
+              <input
+                type="text"
+                value={header.destinationFax}
+                onChange={e => { console.log("[FAX]", e.target.value); setHeader(h => ({ ...h, destinationFax: e.target.value })) }}
+                maxLength={20}
+                placeholder="00-0000-0000"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             <div>
