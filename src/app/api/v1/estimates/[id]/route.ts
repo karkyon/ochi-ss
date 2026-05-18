@@ -17,7 +17,7 @@ export async function GET(
   console.log('[GET /estimates/:id] id:', id)
 
   const estimate = await prisma.estimateHeader.findFirst({
-    where: { id, customerId: session.user.userId!, isDeleted: false },
+    where: { id, customerId: session.user.customerId!, isDeleted: false },
     include: {
       details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } },
     },
@@ -50,7 +50,7 @@ export async function PUT(
 
   // 本人のデータか確認
   const existing = await prisma.estimateHeader.findFirst({
-    where: { id, customerId: session.user.userId!, isDeleted: false },
+    where: { id, customerId: session.user.customerId!, isDeleted: false },
   })
   if (!existing) return NextResponse.json({ error: "見積が見つかりません" }, { status: 404 })
   if (existing.estimateStatus === "ordered") {

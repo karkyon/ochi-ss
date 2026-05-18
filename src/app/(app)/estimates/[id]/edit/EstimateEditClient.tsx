@@ -4,7 +4,7 @@
 
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 // ──────────────────────────────────────────────────────
@@ -48,15 +48,31 @@ type EstimateDetail = {
 }
 
 type HeaderForm = {
-  inputDate:        string
-  customerOrderNo:  string
-  endUserNo:        string
-  destinationCode:  string
-  destinationName:  string
-  destinationDept:  string
+  inputDate:         string
+  customerOrderNo:   string
+  endUserNo:         string
+  destinationCode:   string
+  destinationName:   string
+  destinationDept:   string
   destinationPerson: string
-  requestNouki:     string
-  remarks:          string
+  destinationZip:    string
+  destinationAddress: string
+  destinationTel:    string
+  destinationFax:    string
+  requestNouki:      string
+  remarks:           string
+}
+
+// 直送先検索結果型
+type DirectDelivery = {
+  code:       string
+  name:       string
+  department: string
+  person:     string
+  zipCode:    string
+  address:    string
+  tel:        string
+  fax:        string
 }
 
 interface EstimateData {
@@ -165,16 +181,27 @@ export default function EstimateEditClient({ estimateData, materials, processing
 
   // ── 状態 ──
   const [header, setHeader] = useState<HeaderForm>({
-    inputDate:        estimateData.inputDate,
-    customerOrderNo:  estimateData.customerOrderNo,
-    endUserNo:        estimateData.endUserNo,
-    destinationCode:  estimateData.destinationCode,
-    destinationName:  estimateData.destinationName,
-    destinationDept:  estimateData.destinationDept,
+    inputDate:         estimateData.inputDate,
+    customerOrderNo:   estimateData.customerOrderNo,
+    endUserNo:         estimateData.endUserNo,
+    destinationCode:   estimateData.destinationCode,
+    destinationName:   estimateData.destinationName,
+    destinationDept:   estimateData.destinationDept,
     destinationPerson: estimateData.destinationPerson,
-    requestNouki:     "",
-    remarks:          estimateData.remarks,
+    destinationZip:    estimateData.destinationZip,
+    destinationAddress: estimateData.destinationAddress,
+    destinationTel:    estimateData.destinationTel,
+    destinationFax:    estimateData.destinationFax,
+    requestNouki:      "",
+    remarks:           estimateData.remarks,
   })
+
+  // 直送先検索モーダル
+  const [showDDModal,  setShowDDModal]  = useState(false)
+  const [ddSearch,     setDdSearch]     = useState({ name: "", address: "", code: "", tel: "" })
+  const [ddResults,    setDdResults]    = useState<DirectDelivery[]>([])
+  const [ddLoading,    setDdLoading]    = useState(false)
+  const [ddError,      setDdError]      = useState("")
 
   const [details, setDetails] = useState<EstimateDetail[]>(
     estimateData.details.map(dbDetailToClientDetail)
@@ -192,6 +219,48 @@ export default function EstimateEditClient({ estimateData, materials, processing
     setDetails(prev => prev.filter(d => d.clientDetailId !== clientDetailId))
   }, [])
 
+  // ── 直送先検索 ──
+  const handleDdSearch = async () => {
+    setDdLoading(true); setDdError(""); setDdResults([])
+    console.log("[直送先検索(Edit)] 検索条件:", ddSearch)
+    try {
+      const params = new URLSearchParams({
+        ...(ddSearch.name    && { name:    ddSearch.name }),
+        ...(ddSearch.address && { address: ddSearch.address }),
+        ...(ddSearch.code    && { code:    ddSearch.code }),
+        ...(ddSearch.tel     && { tel:     ddSearch.tel }),
+      })
+      const res = await fetch(`/api/v1/direct-deliveries/search?${params}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      console.log("[直送先検索(Edit)] 結果:", data)
+      setDdResults(data.results ?? [])
+      if ((data.results ?? []).length === 0) setDdError("該当する直送先が見つかりませんでした")
+    } catch (e: any) {
+      setDdError("検索中にエラーが発生しました: " + e.message)
+    } finally {
+      setDdLoading(false)
+    }
+  }
+
+  const handleDdSelect = (dd: DirectDelivery) => {
+    console.log("[直送先選択(Edit)]", dd)
+    setHeader(h => ({
+      ...h,
+      destinationCode:    dd.code,
+      destinationName:    dd.name,
+      destinationDept:    dd.department,
+      destinationPerson:  dd.person,
+      destinationZip:     dd.zipCode,
+      destinationAddress: dd.address,
+      destinationTel:     dd.tel,
+      destinationFax:     dd.fax,
+    }))
+    setShowDDModal(false)
+    setDdResults([])
+    setDdSearch({ name: "", address: "", code: "", tel: "" })
+  }
+
   // ── 保存（EditMode=Edit） ──
   const handleSave = async () => {
     setSaveMessage(null)
@@ -205,12 +274,16 @@ export default function EstimateEditClient({ estimateData, materials, processing
         inputDate:         header.inputDate,
         customerOrderNo:   header.customerOrderNo || undefined,
         endUserNo:         header.endUserNo || undefined,
-        destinationCode:   header.destinationCode || undefined,
-        destinationName:   header.destinationName || undefined,
-        destinationDept:   header.destinationDept || undefined,
-        destinationPerson: header.destinationPerson || undefined,
-        remarks:           header.remarks || undefined,
-        editMode:          "Edit" as const,
+        destinationCode:    header.destinationCode || undefined,
+        destinationName:    header.destinationName || undefined,
+        destinationDept:    header.destinationDept || undefined,
+        destinationPerson:  header.destinationPerson || undefined,
+        destinationZip:     header.destinationZip || undefined,
+        destinationAddress: header.destinationAddress || undefined,
+        destinationTel:     header.destinationTel || undefined,
+        destinationFax:     header.destinationFax || undefined,
+        remarks:            header.remarks || undefined,
+        editMode:           "Edit" as const,
         details: details.map((d, idx) => ({
           clientDetailId:      d.clientDetailId,
           rowNo:               idx + 1,
@@ -308,6 +381,88 @@ export default function EstimateEditClient({ estimateData, materials, processing
         )}
       </div>
 
+      {/* 直送先検索モーダル */}
+      {showDDModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDDModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800 text-base">直送先検索</h3>
+              <button onClick={() => setShowDDModal(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">直送先名</label>
+                <input type="text" value={ddSearch.name}
+                  onChange={e => setDdSearch(s => ({...s, name: e.target.value}))}
+                  onKeyDown={e => e.key === "Enter" && handleDdSearch()}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="名称で検索" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">住所</label>
+                <input type="text" value={ddSearch.address}
+                  onChange={e => setDdSearch(s => ({...s, address: e.target.value}))}
+                  onKeyDown={e => e.key === "Enter" && handleDdSearch()}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="住所で検索" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">直送先コード</label>
+                <input type="text" value={ddSearch.code}
+                  onChange={e => setDdSearch(s => ({...s, code: e.target.value}))}
+                  onKeyDown={e => e.key === "Enter" && handleDdSearch()}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="コードで検索" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">TEL</label>
+                <input type="text" value={ddSearch.tel}
+                  onChange={e => setDdSearch(s => ({...s, tel: e.target.value}))}
+                  onKeyDown={e => e.key === "Enter" && handleDdSearch()}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="電話番号で検索" />
+              </div>
+            </div>
+            <button onClick={handleDdSearch} disabled={ddLoading}
+              className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 mb-4">
+              {ddLoading ? "検索中..." : "🔍 検索"}
+            </button>
+            {ddError && <p className="text-red-600 text-sm mb-3">{ddError}</p>}
+            {ddResults.length > 0 && (
+              <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">コード</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">住所</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">TEL</th>
+                      <th className="px-2 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ddResults.map((dd, i) => (
+                      <tr key={i} className="border-t border-gray-100 hover:bg-blue-50">
+                        <td className="px-3 py-2 font-mono text-gray-600">{dd.code}</td>
+                        <td className="px-3 py-2 text-gray-800">{dd.name}</td>
+                        <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate">{dd.address}</td>
+                        <td className="px-3 py-2 text-gray-600">{dd.tel}</td>
+                        <td className="px-2 py-2">
+                          <button onClick={() => handleDdSelect(dd)}
+                            className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                            選択
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ヘッダー情報 */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         <p className="text-xs font-semibold text-gray-500 mb-4 uppercase tracking-wide">ヘッダー情報</p>
@@ -349,8 +504,15 @@ export default function EstimateEditClient({ estimateData, materials, processing
               onChange={e => setHeader(h => ({ ...h, endUserNo: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">送り先名称</label>
+          <div className="lg:col-span-3">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-600">送り先名称</label>
+              <button type="button"
+                onClick={() => { console.log("[直送先検索ボタン(Edit)] クリック"); setShowDDModal(true) }}
+                className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1">
+                🔍 直送先検索
+              </button>
+            </div>
             <input type="text" value={header.destinationName} maxLength={80}
               onChange={e => setHeader(h => ({ ...h, destinationName: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -365,6 +527,31 @@ export default function EstimateEditClient({ estimateData, materials, processing
             <label className="block text-xs font-medium text-gray-600 mb-1">担当者名</label>
             <input type="text" value={header.destinationPerson} maxLength={50}
               onChange={e => setHeader(h => ({ ...h, destinationPerson: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
+            <input type="text" value={header.destinationZip} maxLength={8}
+              onChange={e => setHeader(h => ({ ...h, destinationZip: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="000-0000" />
+          </div>
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">住所</label>
+            <input type="text" value={header.destinationAddress} maxLength={200}
+              onChange={e => setHeader(h => ({ ...h, destinationAddress: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">TEL</label>
+            <input type="text" value={header.destinationTel} maxLength={15}
+              onChange={e => setHeader(h => ({ ...h, destinationTel: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">FAX</label>
+            <input type="text" value={header.destinationFax} maxLength={15}
+              onChange={e => setHeader(h => ({ ...h, destinationFax: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
