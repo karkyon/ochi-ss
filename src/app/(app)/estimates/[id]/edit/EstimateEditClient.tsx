@@ -14,6 +14,9 @@ import { useRouter } from "next/navigation"
 type Material       = { materialCode: string; materialName: string }
 type ProcessingSpec = { processingSpecCode: number; processingSpecName: string }
 
+// 加工指示の選択肢
+type CuttingMethod = { code: number; label: string }
+
 type EstimateDetail = {
   clientDetailId:  string
   rowNo:           number
@@ -73,6 +76,35 @@ type DirectDelivery = {
   address:    string
   tel:        string
   fax:        string
+}
+
+
+type DetailForm = Omit<EstimateDetail,
+  | "clientDetailId"
+  | "rowNo"
+  | "materialName"
+  | "kakouShiyou"
+  | "kakouT"
+  | "kakouA"
+  | "kakouB"
+  | "unitPrice"
+  | "totalPrice"
+  | "shortestDelivery"
+  | "deliveryDeadline"
+  | "calculated"
+  | "intermediate"
+>
+
+const EMPTY_DETAIL_FORM: DetailForm = {
+  materialCode:    "",
+  kakouShiyouCode: 0,
+  kakouShijiCodeT: "", kakouShijiCodeA: "", kakouShijiCodeB: "",
+  sizeT: "", sizeA: "", sizeB: "",
+  kousaTUpper: "", kousaTLower: "",
+  kousaAUpper: "", kousaALower: "",
+  kousaBUpper: "", kousaBLower: "",
+  mentori4: "", mentori8: "",
+  quantity: "",
 }
 
 interface EstimateData {
@@ -207,8 +239,204 @@ export default function EstimateEditClient({ estimateData, materials, processing
     estimateData.details.map(dbDetailToClientDetail)
   )
 
+  // ── 明細追加用 state ──
+  const [cuttingMethods, setCuttingMethods] = useState<CuttingMethod[]>([])
+
+  const [detailForm, setDetailForm] = useState<DetailForm>(EMPTY_DETAIL_FORM)
+
+  const [calcResult, setCalcResult] = useState<{
+    unitPrice: number
+    totalPrice: number
+    shortestDelivery: string
+    deliveryDeadline: string
+    intermediate: {
+      materialSizeT: number
+      materialSizeA: number
+      materialSizeB: number
+      materialUnitWeight: number
+      materialTotalWeight: number
+      productUnitWeight: number
+      productTotalWeight: number
+      processingCost6f: number
+      processingCostTotal: number
+    } | null
+  } | null>(null)
+
+  const [calcLoading, setCalcLoading] = useState(false)
+  const [calcError,   setCalcError]   = useState("")
+
   const [saveLoading, setSaveLoading] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+
+
+  // ── 加工指示マスタ取得 ──
+  useEffect(() => {
+    console.log('[Edit] 加工指示API fetch start, customerCode:', userInfo.customerCode)
+    fetch(`/api/v1/cutting-methods?customerCode=${userInfo.customerCode}`)
+      .then(r => r.json())
+      .then(data => {
+        console.log('[Edit][加工指示API] レスポンス:', data)
+        if (data.methods) setCuttingMethods(data.methods)
+      })
+      .catch(e => { console.error('[Edit][加工指示API] エラー:', e) })
+  }, [userInfo.customerCode])
+
+  // ── 標準公差・面取取得 ──
+  const fetchStandardTolerance = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v1/tolerance/standard?customerCode=${userInfo.customerCode}`)
+      if (!res.ok) return
+      const data = await res.json()
+      console.log('[Edit][標準公差] レスポンス:', data)
+      if (data.success) {
+        setDetailForm(prev => ({
+          ...prev,
+          kousaTUpper: String(data.tolerance.tUpper ?? ""),
+          kousaTLower: String(data.tolerance.tLower ?? ""),
+          kousaAUpper: String(data.tolerance.aUpper ?? ""),
+          kousaALower: String(data.tolerance.aLower ?? ""),
+          kousaBUpper: String(data.tolerance.bUpper ?? ""),
+          kousaBLower: String(data.tolerance.bLower ?? ""),
+        }))
+      }
+    } catch { /* silent */ }
+  }, [userInfo.customerCode])
+
+  const fetchStandardChamfer = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v1/chamfer/standard?customerCode=${userInfo.customerCode}`)
+      if (!res.ok) return
+      const data = await res.json()
+      console.log('[Edit][標準面取] レスポンス:', data)
+      if (data.success) {
+        setDetailForm(prev => ({
+          ...prev,
+          mentori4: String(data.chamfer.chamfer4 ?? ""),
+          mentori8: String(data.chamfer.chamfer8 ?? ""),
+        }))
+      }
+    } catch { /* silent */ }
+  }, [userInfo.customerCode])
+
+  // ── 見積計算 ──
+  const handleCalculate = async () => {
+    console.log('[Edit][計算] detailForm:', JSON.stringify(detailForm))
+    setCalcError("")
+    setCalcResult(null)
+    if (!detailForm.materialCode)    { setCalcError("材料を選択してください"); return }
+    if (!detailForm.kakouShiyouCode) { setCalcError("加工仕様を選択してください"); return }
+    if (!detailForm.sizeT || !detailForm.sizeA || !detailForm.sizeB) {
+      setCalcError("仕上りサイズ T・A・B を入力してください"); return
+    }
+    if (!detailForm.quantity || parseInt(detailForm.quantity) < 1) {
+      setCalcError("数量を1以上で入力してください"); return
+    }
+    setCalcLoading(true)
+    try {
+      const material = materials.find(m => m.materialCode === detailForm.materialCode)
+      const spec     = processingSpecs.find(s => s.processingSpecCode === detailForm.kakouShiyouCode)
+      const payload = {
+        customerCode:    userInfo.customerCode,
+        materialCode:    detailForm.materialCode,
+        materialName:    material?.materialName ?? "",
+        kakouShiyouCode: detailForm.kakouShiyouCode,
+        kakouShiyou:     spec?.processingSpecName ?? "",
+        kakouShijiCodeT: detailForm.kakouShijiCodeT,
+        kakouShijiCodeA: detailForm.kakouShijiCodeA,
+        kakouShijiCodeB: detailForm.kakouShijiCodeB,
+        kakouT: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeT)?.label ?? "",
+        kakouA: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeA)?.label ?? "",
+        kakouB: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeB)?.label ?? "",
+        sizeT: parseFloat(detailForm.sizeT),
+        sizeA: parseFloat(detailForm.sizeA),
+        sizeB: parseFloat(detailForm.sizeB),
+        kousaTUpper: parseFloat(detailForm.kousaTUpper) || 0,
+        kousaTLower: parseFloat(detailForm.kousaTLower) || 0,
+        kousaAUpper: parseFloat(detailForm.kousaAUpper) || 0,
+        kousaALower: parseFloat(detailForm.kousaALower) || 0,
+        kousaBUpper: parseFloat(detailForm.kousaBUpper) || 0,
+        kousaBLower: parseFloat(detailForm.kousaBLower) || 0,
+        mentori4: parseFloat(detailForm.mentori4) || 0,
+        mentori8: parseFloat(detailForm.mentori8) || 0,
+        quantity: parseInt(detailForm.quantity),
+        requestNouki: header.requestNouki,
+        editMode: "Edit",
+      }
+      console.log('[Edit][フロント] 計算リクエスト payload:', JSON.stringify(payload, null, 2))
+      const res = await fetch("/api/v1/estimates/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        setCalcError(err.error ?? "計算に失敗しました")
+        return
+      }
+      const result = await res.json()
+      console.log('[Edit][フロント] 計算レスポンス:', JSON.stringify(result, null, 2))
+      setCalcResult({
+        unitPrice:        result.unitPrice,
+        totalPrice:       result.sumPrice,
+        shortestDelivery: result.shortestDelivery,
+        deliveryDeadline: result.deliveryDeadline,
+        intermediate:     result.intermediate ?? null,
+      })
+    } catch {
+      setCalcError("通信エラーが発生しました")
+    } finally {
+      setCalcLoading(false)
+    }
+  }
+
+  // ── 明細追加 ──
+  const canAddDetail = !!(
+    detailForm.materialCode &&
+    detailForm.kakouShiyouCode &&
+    detailForm.sizeT && detailForm.sizeA && detailForm.sizeB &&
+    detailForm.quantity &&
+    calcResult
+  )
+
+  const handleAddDetail = () => {
+    console.log('[Edit][明細追加] canAddDetail:', canAddDetail, 'calcResult:', JSON.stringify(calcResult))
+    if (!canAddDetail || !calcResult) return
+    const material = materials.find(m => m.materialCode === detailForm.materialCode)
+    const spec     = processingSpecs.find(s => s.processingSpecCode === detailForm.kakouShiyouCode)
+    const newDetail: EstimateDetail = {
+      clientDetailId:   crypto.randomUUID(),
+      rowNo:            details.length + 1,
+      materialCode:     detailForm.materialCode,
+      materialName:     material?.materialName ?? "",
+      kakouShiyouCode:  detailForm.kakouShiyouCode,
+      kakouShiyou:      spec?.processingSpecName ?? "",
+      kakouShijiCodeT:  detailForm.kakouShijiCodeT,
+      kakouShijiCodeA:  detailForm.kakouShijiCodeA,
+      kakouShijiCodeB:  detailForm.kakouShijiCodeB,
+      kakouT: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeT)?.label ?? "",
+      kakouA: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeA)?.label ?? "",
+      kakouB: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeB)?.label ?? "",
+      sizeT:            detailForm.sizeT,
+      sizeA:            detailForm.sizeA,
+      sizeB:            detailForm.sizeB,
+      kousaTUpper: detailForm.kousaTUpper, kousaTLower: detailForm.kousaTLower,
+      kousaAUpper: detailForm.kousaAUpper, kousaALower: detailForm.kousaALower,
+      kousaBUpper: detailForm.kousaBUpper, kousaBLower: detailForm.kousaBLower,
+      mentori4:         detailForm.mentori4,
+      mentori8:         detailForm.mentori8,
+      quantity:         detailForm.quantity,
+      unitPrice:        calcResult.unitPrice,
+      totalPrice:       calcResult.totalPrice,
+      shortestDelivery: calcResult.shortestDelivery,
+      deliveryDeadline: calcResult.deliveryDeadline,
+      calculated:       true,
+      intermediate:     calcResult.intermediate ?? undefined,
+    }
+    setDetails(prev => [...prev, newDetail])
+    setDetailForm(EMPTY_DETAIL_FORM)
+    setCalcResult(null)
+    setCalcError("")
+  }
 
   // 合計金額
   const grandTotal = details.reduce((sum, d) => sum + (d.totalPrice ?? 0), 0)
@@ -559,6 +787,154 @@ export default function EstimateEditClient({ estimateData, materials, processing
             <input type="text" value={header.remarks} maxLength={200}
               onChange={e => setHeader(h => ({ ...h, remarks: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+      </section>
+
+      {/* ──────── 明細入力フォーム（STEP 20追加） ──────── */}
+      <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
+          明細追加
+        </h2>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">材料 <span className="text-red-500">★</span></label>
+              <select
+                value={detailForm.materialCode}
+                onChange={e => { console.log('[Edit][材料選択]', e.target.value); setDetailForm(p => ({ ...p, materialCode: e.target.value })); setCalcResult(null) }}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- 材料を選択 --</option>
+                {materials.map(m => (
+                  <option key={m.materialCode} value={m.materialCode}>{m.materialCode} - {m.materialName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">加工仕様 <span className="text-red-500">★</span></label>
+              <select
+                value={detailForm.kakouShiyouCode || ""}
+                onChange={e => { console.log('[Edit][加工仕様選択]', e.target.value); setDetailForm(p => ({ ...p, kakouShiyouCode: parseInt(e.target.value) || 0 })); setCalcResult(null) }}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- 加工仕様を選択 --</option>
+                {processingSpecs.map(s => (
+                  <option key={s.processingSpecCode} value={s.processingSpecCode}>{s.processingSpecName}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-400 mb-2">── 加工指示</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(["T", "A", "B"] as const).map(axis => (
+                <div key={axis}>
+                  <label className="block text-xs text-gray-500 mb-1">{axis}面</label>
+                  <select
+                    value={detailForm[`kakouShijiCode${axis}` as keyof DetailForm] as string}
+                    onChange={e => { console.log(`[Edit][加工指示${axis}]`, e.target.value); setDetailForm(p => ({ ...p, [`kakouShijiCode${axis}`]: e.target.value })); setCalcResult(null) }}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">選択</option>
+                    {cuttingMethods.map(m => (
+                      <option key={m.code} value={String(m.code)}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {(["T", "A", "B"] as const).map(axis => (
+              <div key={axis}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  {axis === "T" ? "厚み T" : axis === "A" ? "幅 A" : "長さ B"} <span className="text-red-500">★</span>
+                </label>
+                <div className="flex items-center gap-1">
+                  <input type="number" step="0.001" min="0.001" max="9999.999"
+                    value={detailForm[`size${axis}` as keyof DetailForm] as string}
+                    onChange={e => { console.log(`[Edit][寸法${axis}]`, e.target.value); setDetailForm(p => ({ ...p, [`size${axis}`]: e.target.value })); setCalcResult(null) }}
+                    className="flex-1 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.000"
+                  />
+                  <span className="text-xs text-gray-400">mm</span>
+                </div>
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">数量 <span className="text-red-500">★</span></label>
+              <input type="number" min="1" step="1"
+                value={detailForm.quantity}
+                onChange={e => { console.log('[Edit][数量]', e.target.value); setDetailForm(p => ({ ...p, quantity: e.target.value })); setCalcResult(null) }}
+                placeholder="1"
+                className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-400">── 公差</p>
+              <button type="button" onClick={() => { console.log('[Edit][標準公差ボタン] クリック'); fetchStandardTolerance() }}
+                className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors">標準公差</button>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {(["T", "A", "B"] as const).map(axis => (
+                <div key={axis}>
+                  <p className="text-[10px] text-gray-500 mb-1">{axis}面</p>
+                  <div className="flex gap-1.5">
+                    <input type="number" step="0.001" value={detailForm[`kousa${axis}Upper` as keyof DetailForm] as string}
+                      onChange={e => { console.log(`[Edit][公差${axis}上限]`, e.target.value); setDetailForm(p => ({ ...p, [`kousa${axis}Upper`]: e.target.value })) }}
+                      placeholder="上限" className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <input type="number" step="0.001" value={detailForm[`kousa${axis}Lower` as keyof DetailForm] as string}
+                      onChange={e => { console.log(`[Edit][公差${axis}下限]`, e.target.value); setDetailForm(p => ({ ...p, [`kousa${axis}Lower`]: e.target.value })) }}
+                      placeholder="下限" className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-400">── 面取り</p>
+              <button type="button" onClick={() => { console.log('[Edit][標準面取ボタン] クリック'); fetchStandardChamfer() }}
+                className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors">標準面取</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 max-w-xs">
+              {(["4", "8"] as const).map(n => (
+                <div key={n}>
+                  <p className="text-[10px] text-gray-500 mb-1">{n}面</p>
+                  <input type="number" step="0.1" min="0"
+                    value={detailForm[`mentori${n}` as keyof DetailForm] as string}
+                    onChange={e => { console.log(`[Edit][面取${n}]`, e.target.value); setDetailForm(p => ({ ...p, [`mentori${n}`]: e.target.value })) }}
+                    placeholder="0" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {calcResult && (
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div><p className="text-blue-400">見積単価</p><p className="font-bold text-blue-800">¥{calcResult.unitPrice.toLocaleString()}</p></div>
+              <div><p className="text-blue-400">見積金額</p><p className="font-bold text-blue-800">¥{calcResult.totalPrice.toLocaleString()}</p></div>
+              <div><p className="text-blue-400">最短納期</p><p className="font-bold text-blue-800">{calcResult.shortestDelivery}</p></div>
+              <div><p className="text-blue-400">有効期限</p><p className="font-bold text-blue-800">{calcResult.deliveryDeadline ? new Date(calcResult.deliveryDeadline).toLocaleDateString("ja-JP") : "—"}</p></div>
+            </div>
+          )}
+          {calcError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">✕ {calcError}</p>
+          )}
+          <div className="flex flex-wrap gap-2 justify-end">
+            <button type="button"
+              onClick={() => { console.log('[Edit][入力クリアボタン] クリック'); setDetailForm(EMPTY_DETAIL_FORM); setCalcResult(null); setCalcError("") }}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">入力クリア</button>
+            <button type="button"
+              onClick={() => { console.log('[Edit][見積計算ボタン] クリック'); handleCalculate() }}
+              disabled={calcLoading}
+              className="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >{calcLoading ? "計算中..." : "📊 見積計算"}</button>
+            <button type="button"
+              onClick={() => { console.log('[Edit][明細追加ボタン] クリック'); handleAddDetail() }}
+              disabled={!canAddDetail}
+              className="px-5 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">＋ 明細に追加</button>
           </div>
         </div>
       </section>
