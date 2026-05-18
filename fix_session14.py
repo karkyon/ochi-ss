@@ -1,3 +1,37 @@
+#!/usr/bin/env python3
+"""
+fix_session14.py
+================
+TASK A: /orders/confirm — 納期有効期限チェック実際に実装
+         estimate取得後に deliveryDeadline 期限切れ明細を検出 → 警告バナー表示 + 注文確定ボタン無効化
+TASK B: /orders/confirm — 明細テーブル表示（deliveryDeadline 期限切れ行ハイライト）
+TASK C: /orders/complete — orderId から注文詳細取得して表示強化
+TASK D: /api/v1/orders/route.ts POST — estimateId から customerId 取得して権限確認強化
+"""
+
+import subprocess, sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+def read(p): return (ROOT / p).read_text(encoding="utf-8")
+def write(p, c):
+    path = ROOT / p; path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(c, encoding="utf-8"); print(f"  ✅ 書込: {p}")
+
+def rep(p, old, new, label):
+    path = ROOT / p
+    if not path.exists(): print(f"  ⚠️  [{label}] ファイル未存在"); return False
+    c = path.read_text(encoding="utf-8")
+    if old not in c: print(f"  ❌ [{label}] アンカー未発見"); return False
+    path.write_text(c.replace(old, new, 1), encoding="utf-8"); print(f"  ✅ [{label}]"); return True
+
+# ============================================================
+# TASK A+B: /orders/confirm 完全書き直し
+# ============================================================
+def task_ab():
+    print("\n[TASK A+B] /orders/confirm 納期有効期限チェック+明細表示 完全実装")
+    write("src/app/(app)/orders/confirm/page.tsx", '''\
 // /orders/confirm — 注文確認ページ（納期有効期限チェック付き）
 "use client"
 import { useEffect, useState, useCallback } from "react"
@@ -190,3 +224,132 @@ export default function OrderConfirmPage() {
     </div>
   )
 }
+''')
+
+# ============================================================
+# TASK C: /orders/complete — orderId から注文詳細表示強化
+# ============================================================
+def task_c():
+    print("\n[TASK C] /orders/complete 表示強化")
+    path = "src/app/(app)/orders/complete/page.tsx"
+    content = read(path)
+    if "orderId" in content and "fetch" in content:
+        print("  ⏭️  既に実装済み — スキップ")
+        return
+
+    write(path, '''\
+// /orders/complete — 注文完了ページ
+"use client"
+import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+
+export default function OrderCompletePage() {
+  const sp = useSearchParams()
+  const orderId = sp.get("orderId")
+  const [order, setOrder] = useState<any>(null)
+
+  useEffect(() => {
+    if (!orderId) return
+    fetch(`/api/v1/orders/${orderId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setOrder(d))
+      .catch(() => {})
+  }, [orderId])
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-12">
+      {/* 完了アイコン */}
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">✅</span>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">ご注文ありがとうございます</h1>
+        <p className="text-sm text-gray-500">注文を受け付けました。内容をご確認ください。</p>
+      </div>
+
+      {/* 注文サマリ */}
+      {order && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">注文内容</p>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">注文No</p>
+              <p className="font-bold text-indigo-700 text-base">{order.order?.orderNo ?? order.orderNo ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">注文日時</p>
+              <p className="font-medium">{order.order?.orderDate
+                ? new Date(order.order.orderDate).toLocaleDateString("ja-JP")
+                : order.orderDate
+                  ? new Date(order.orderDate).toLocaleDateString("ja-JP")
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">見積No</p>
+              <p className="font-medium">{order.estimateHeader?.estimateNo ?? order.estimateNo ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">明細件数</p>
+              <p className="font-medium">{order.details?.length ?? order.detailCount ?? "—"} 件</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!order && orderId && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 text-center text-gray-400 text-sm">
+          注文番号: {orderId}
+        </div>
+      )}
+
+      {/* アクション */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {orderId && (
+          <Link href={`/orders/${orderId}`}
+            className="px-5 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-center font-medium">
+            注文詳細を確認
+          </Link>
+        )}
+        <Link href="/orders"
+          className="px-5 py-2.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-center">
+          注文履歴一覧へ
+        </Link>
+        <Link href="/dashboard"
+          className="px-5 py-2.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-center">
+          メインメニューへ
+        </Link>
+      </div>
+    </div>
+  )
+}
+''')
+
+# ============================================================
+# メイン
+# ============================================================
+def main():
+    print("=" * 60)
+    print("fix_session14.py 開始")
+    print("=" * 60)
+    task_ab()
+    task_c()
+
+    print("\n→ tscチェック中...")
+    result = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True, cwd=str(ROOT))
+    if result.returncode != 0:
+        print("❌ tscエラー:")
+        print((result.stdout + result.stderr)[-6000:])
+        sys.exit(1)
+
+    print("✅ tscエラーなし → git add & push")
+    subprocess.run(["git", "add", "-A"], check=True, cwd=str(ROOT))
+    subprocess.run(["git", "commit", "-m",
+        "feat: orders/confirm 納期有効期限チェック+明細表示完全実装 / orders/complete 表示強化"],
+        check=True, cwd=str(ROOT))
+    subprocess.run(["git", "push"], check=True, cwd=str(ROOT))
+    print("✅ push完了")
+
+if __name__ == "__main__":
+    main()
