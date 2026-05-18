@@ -215,10 +215,11 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
   // ── 状態 ──
   // ── 納期有効期限チェック（編集モード時） ──
   useEffect(() => {
-    if (!estimateId) return
+    const targetId = estimateId ?? estimateData.id
+    if (!targetId) return
     const checkDeadline = async () => {
       try {
-        const res = await fetch(`/api/v1/estimates/${estimateId}/check-deadline`, { method: "POST" })
+        const res = await fetch(`/api/v1/estimates/${targetId}/check-deadline`, { method: "POST" })
         if (!res.ok) return
         const data = await res.json()
         if (data.hasExpired) {
@@ -228,7 +229,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
       } catch { /* silent */ }
     }
     checkDeadline()
-  }, [estimateId])
+  }, [estimateId, estimateData.id])
 
   const [header, setHeader] = useState<HeaderForm>({
     inputDate:         estimateData.inputDate,

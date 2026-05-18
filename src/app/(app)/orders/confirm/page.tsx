@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
+// check-deadline 統合済み
 export default function OrderConfirmPage() {
   const router = useRouter()
   const sp = useSearchParams()
