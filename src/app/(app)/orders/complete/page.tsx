@@ -35,7 +35,7 @@ export default function OrderCompletePage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-[10px] text-gray-400 mb-0.5">注文No</p>
-              <p className="font-bold text-indigo-700 text-base">{order.order?.orderNo ?? order.orderNo ?? "—"}</p>
+              <p className="font-bold text-indigo-700 text-base">{order.orderNo ?? order.order?.orderNo ?? "—"}</p>
             </div>
             <div>
               <p className="text-[10px] text-gray-400 mb-0.5">注文日時</p>

@@ -91,10 +91,32 @@ export async function POST(req: NextRequest) {
   const totalAmount = estimate.details.reduce((s, d) => s + Number(d.totalPrice ?? 0), 0)
   const detailCount = estimate.details.length
 
+  // 注文番号採番: Z + YYYYMMDD + 3桁連番 (例: Z2026051701)
+  async function generateOrderNo(): Promise<string> {
+    const now = new Date()
+    const yyyymmdd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}`
+    const prefix = `Z${yyyymmdd}`
+    const last = await prisma.order.findFirst({
+      where: { orderNo: { startsWith: prefix } },
+      orderBy: { orderNo: "desc" },
+      select: { orderNo: true },
+    })
+    let seq = 1
+    if (last?.orderNo) {
+      const lastSeq = parseInt(last.orderNo.slice(-3), 10)
+      if (!isNaN(lastSeq)) seq = lastSeq + 1
+    }
+    if (seq > 999) throw new Error("本日の注文番号が上限（999件）に達しました")
+    return `${prefix}${String(seq).padStart(3, "0")}`
+  }
+
+  const orderNo = await generateOrderNo()
+
   // 注文レコード作成 + 見積ステータス更新 (transaction)
   const order = await prisma.$transaction(async tx => {
     const o = await tx.order.create({
       data: {
+        orderNo,
         estimateHeaderId: estimateId,
         customerId: session.user.customerId!,
         orderStatus: "pending",
@@ -128,5 +150,5 @@ export async function POST(req: NextRequest) {
       console.error("[POST /orders] outbox create failed:", e)
     }
 
-    return NextResponse.json({ orderId: order.id, orderStatus: order.orderStatus }, { status: 201 })
+    return NextResponse.json({ orderId: order.id, orderNo: order.orderNo, orderStatus: order.orderStatus }, { status: 201 })
 }
