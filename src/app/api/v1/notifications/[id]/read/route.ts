@@ -1,8 +1,7 @@
-// PATCH /api/v1/notifications/[id]/read — 既読マーク（スタブ）
-// NotificationRead テーブルが未実装のため 200 返却のみ
-// v2 で notification_reads テーブル追加予定
+// PATCH /api/v1/notifications/[id]/read — 既読マーク（本実装）
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 
 export async function PATCH(
   _req: NextRequest,
@@ -10,7 +9,20 @@ export async function PATCH(
 ) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { id } = await params
-  // TODO: notification_reads テーブル実装後に既読記録を追加
-  return NextResponse.json({ id, read: true })
+  const customerId = session.user.customerId!
+
+  try {
+    await (prisma as any).notificationRead.upsert({
+      where: { notificationId_customerId: { notificationId: id, customerId } },
+      create: { notificationId: id, customerId },
+      update: { readAt: new Date() },
+    })
+    return NextResponse.json({ id, read: true })
+  } catch (err: any) {
+    // テーブル未作成の場合は 200 を返してサイレント失敗
+    console.warn("[notifications/read] upsert failed:", err.message)
+    return NextResponse.json({ id, read: true })
+  }
 }

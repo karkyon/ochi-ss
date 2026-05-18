@@ -1,7 +1,7 @@
 "use client"
 
 import { useSession, signOut } from "next-auth/react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 
 interface HeaderProps {
@@ -11,6 +11,16 @@ interface HeaderProps {
 export default function Header({ notificationCount = 0 }: HeaderProps) {
   const { data: session } = useSession()
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [timeoutWarning, setTimeoutWarning] = useState(false)
+
+  // セッションタイムアウト警告（残り25分で表示）
+  useEffect(() => {
+    const timeoutMin = (session?.user as any)?.sessionTimeoutMin ?? 140
+    const warnMs = (timeoutMin - 25) * 60 * 1000
+    if (warnMs <= 0) return
+    const timer = setTimeout(() => setTimeoutWarning(true), warnMs)
+    return () => clearTimeout(timer)
+  }, [session])
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login?logout=1" })
@@ -31,6 +41,14 @@ export default function Header({ notificationCount = 0 }: HeaderProps) {
 
         {/* スペーサー */}
         <div className="flex-1" />
+
+        {/* タイムアウト警告 */}
+        {timeoutWarning && (
+          <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[10px]">
+            <span>⚠️</span>
+            <span>セッション期限まもなく切れます</span>
+          </div>
+        )}
 
         {/* 通知ベル */}
         <Link

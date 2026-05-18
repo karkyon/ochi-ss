@@ -411,3 +411,15 @@ model ChamferRule {
 
   @@map("chamfer_rules")
 }
+
+/// お知らせ既読管理
+model NotificationRead {
+  id             String   @id @default(uuid())
+  notificationId String   @map("notification_id")
+  customerId     String   @map("customer_id")
+  readAt         DateTime @default(now()) @map("read_at")
+
+  @@unique([notificationId, customerId])
+  @@index([customerId])
+  @@map("notification_reads")
+}

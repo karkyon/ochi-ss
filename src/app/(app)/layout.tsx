@@ -15,14 +15,30 @@ export default async function AppLayout({
   // 未読お知らせ件数（ヘッダーバッジ用）
   let notificationCount = 0
   try {
+    const session2 = await auth()
+    const customerId = session2?.user?.customerId
     const now = new Date()
-    notificationCount = await prisma.notification.count({
+    const allNotifs = await prisma.notification.findMany({
       where: {
         isDeleted: false,
         publishedAt: { lte: now },
         OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
       },
+      select: { id: true },
     })
+    if (customerId && allNotifs.length > 0) {
+      try {
+        const reads = await (prisma as any).notificationRead.findMany({
+          where: { customerId, notificationId: { in: allNotifs.map((n: any) => n.id) } },
+          select: { notificationId: true },
+        })
+        notificationCount = allNotifs.length - reads.length
+      } catch {
+        notificationCount = allNotifs.length
+      }
+    } else {
+      notificationCount = allNotifs.length
+    }
   } catch { /* silent */ }
 
   return (
