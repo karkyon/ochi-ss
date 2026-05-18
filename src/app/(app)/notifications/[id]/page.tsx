@@ -1,8 +1,9 @@
-// /notifications/[id] — お知らせ詳細
+// /notifications/[id] — お知らせ詳細（自動既読付き）
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import NotificationDetailClient from "./NotificationDetailClient"
 
 const TYPE_LABEL: Record<string, { label: string; color: string }> = {
   info:    { label: "お知らせ",   color: "bg-blue-100 text-blue-700" },
@@ -29,7 +30,7 @@ export default async function NotificationDetailPage({ params }: Props) {
       <div className="flex items-center gap-2 mb-5">
         <Link href="/notifications" className="text-gray-400 hover:text-gray-600 text-sm">← お知らせ一覧</Link>
       </div>
-
+      <NotificationDetailClient id={id} />
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${t.color}`}>{t.label}</span>

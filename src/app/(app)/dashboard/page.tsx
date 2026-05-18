@@ -82,7 +82,10 @@ export default async function DashboardPage() {
       where: {
         isDeleted: false,
         publishedAt: { lte: now },
-        expiresAt: { gte: now },
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gte: now } },
+        ],
       },
       orderBy: { publishedAt: "desc" },
       take: 10,
@@ -132,7 +135,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          {MENU_CARDS.filter(card => !(card as any).adminOnly || ((session?.user as any)?.roleLevel ?? 0) >= 3).map((card) => (
+          {MENU_CARDS.filter(card => !(card as any).adminOnly || ((session?.user as any)?.role ?? 0) >= 3).map((card) => (
             <Link
               key={card.id}
               href={card.href}

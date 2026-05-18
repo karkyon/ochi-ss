@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-function isAdmin(session: any) { return (session?.user?.roleLevel ?? 0) >= 3 }
+function isAdmin(session: any) { return (session?.user?.role ?? 0) >= 3 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

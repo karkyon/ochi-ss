@@ -1,4 +1,4 @@
-// /notifications — お知らせ一覧
+// /notifications — お知らせ一覧（フィルタ+ページネーション）
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Link from "next/link"
@@ -8,24 +8,42 @@ const TYPE_LABEL: Record<string, { label: string; color: string }> = {
   warning: { label: "重要",       color: "bg-yellow-100 text-yellow-700" },
   urgent:  { label: "緊急",       color: "bg-red-100 text-red-600" },
 }
+const PER_PAGE = 20
 
-export default async function NotificationsPage() {
+interface Props {
+  searchParams: Promise<{ type?: string; page?: string }>
+}
+
+export default async function NotificationsPage({ searchParams }: Props) {
   const session = await auth()
-  const customerId = session!.user.customerId!
+  const { type, page: pageStr } = await searchParams
+  const page = Math.max(1, parseInt(pageStr ?? "1", 10))
 
-  let notifications: any[] = []
-  try {
-    const now = new Date()
-    notifications = await prisma.notification.findMany({
-      where: {
-        isDeleted: false,
-        publishedAt: { lte: now },
-        OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
-      },
-      orderBy: [{ publishedAt: "desc" }],
-      take: 50,
-    })
-  } catch { notifications = [] }
+  const now = new Date()
+  const where: any = {
+    isDeleted: false,
+    publishedAt: { lte: now },
+    OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+    ...(type ? { notifType: type } : {}),
+  }
+
+  const [total, notifications] = await Promise.all([
+    prisma.notification.count({ where }),
+    prisma.notification.findMany({
+      where,
+      orderBy: { publishedAt: "desc" },
+      skip: (page - 1) * PER_PAGE,
+      take: PER_PAGE,
+    }),
+  ])
+  const totalPages = Math.ceil(total / PER_PAGE)
+
+  const buildUrl = (p: number, t?: string) => {
+    const params = new URLSearchParams()
+    if (t) params.set("type", t)
+    if (p > 1) params.set("page", String(p))
+    return `/notifications${params.toString() ? "?" + params.toString() : ""}`
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -33,10 +51,33 @@ export default async function NotificationsPage() {
         <div className="flex items-center gap-2">
           <div className="w-1 h-6 rounded-full bg-[#1a2744]" />
           <h1 className="font-bold text-gray-800 text-lg">お知らせ一覧</h1>
+          <span className="text-xs text-gray-400 ml-1">{total}件</span>
         </div>
         <Link href="/dashboard" className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors">
           メインメニュー
         </Link>
+      </div>
+
+      {/* フィルタ */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {[
+          { value: "", label: "すべて" },
+          { value: "info",    label: "お知らせ" },
+          { value: "warning", label: "重要" },
+          { value: "urgent",  label: "緊急" },
+        ].map(({ value, label }) => (
+          <Link
+            key={value}
+            href={buildUrl(1, value || undefined)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              (type ?? "") === value
+                ? "bg-[#1a2744] text-white border-[#1a2744]"
+                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -65,6 +106,19 @@ export default async function NotificationsPage() {
           </div>
         )}
       </div>
+
+      {/* ページネーション */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {page > 1 && (
+            <Link href={buildUrl(page - 1, type)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">← 前へ</Link>
+          )}
+          <span className="px-3 py-1.5 text-sm text-gray-600">{page} / {totalPages}</span>
+          {page < totalPages && (
+            <Link href={buildUrl(page + 1, type)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">次へ →</Link>
+          )}
+        </div>
+      )}
     </div>
   )
 }

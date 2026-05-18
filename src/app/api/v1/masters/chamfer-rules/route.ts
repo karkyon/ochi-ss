@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 function isAdmin(session: any) {
-  const level = session?.user?.roleLevel ?? 0
+  const level = session?.user?.role ?? 0
   return level >= 3
 }
 
