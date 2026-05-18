@@ -319,19 +319,19 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
 
   // ヘッダーフォーム
   const [header, setHeader] = useState<HeaderForm>({
-    inputDate:       todayStr(),
-    customerOrderNo: "",
-    endUserNo:       "",
-    destinationCode: "",
-    destinationName: "",
-    destinationDept: "",
-    destinationPerson: "",
-    destinationZip:   "",
-    destinationAddress: "",
-    destinationTel:   "",
-    destinationFax:   "",
-    requestNouki:    "",
-    remarks:         "",
+    inputDate:          todayStr(),
+    customerOrderNo:    copySource?.customerOrderNo ?? "",
+    endUserNo:          copySource?.endUserNo ?? "",
+    destinationCode:    copySource?.destinationCode ?? "",
+    destinationName:    copySource?.destinationName ?? "",
+    destinationDept:    copySource?.destinationDept ?? "",
+    destinationPerson:  copySource?.destinationPerson ?? "",
+    destinationZip:     copySource?.destinationZip ?? "",
+    destinationAddress: copySource?.destinationAddress ?? "",
+    destinationTel:     copySource?.destinationTel ?? "",
+    destinationFax:     copySource?.destinationFax ?? "",
+    requestNouki:       "",
+    remarks:            copySource?.remarks ?? "",
   })
   const [showDDModal, setShowDDModal] = useState(false)
 
