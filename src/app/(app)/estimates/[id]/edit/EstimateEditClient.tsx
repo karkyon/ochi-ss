@@ -156,6 +156,7 @@ interface EstimateData {
 }
 
 interface Props {
+  estimateId?:    string
   estimateData:   EstimateData
   materials:      Material[]
   processingSpecs: ProcessingSpec[]
@@ -208,7 +209,7 @@ function dbDetailToClientDetail(d: EstimateData["details"][number]): EstimateDet
 // メインコンポーネント
 // ──────────────────────────────────────────────────────
 
-export default function EstimateEditClient({ estimateData, materials, processingSpecs, userInfo }: Props) {
+export default function EstimateEditClient({ estimateId, estimateData, materials, processingSpecs, userInfo }: Props) {
   const router = useRouter()
 
   // ── 状態 ──
