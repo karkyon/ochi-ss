@@ -82,10 +82,10 @@ export async function PUT(
         },
       })
 
-      // 既存明細を全て論理削除
+      // 既存明細を全て論理削除（isDeleted: false の行のみ対象）
       await tx.estimateDetail.updateMany({
-        where: { estimateHeaderId: id },
-        data:  { isDeleted: true },
+        where: { estimateHeaderId: id, isDeleted: false },
+        data:  { isDeleted: true, updatedAt: new Date() },
       })
 
       // 明細を再INSERT

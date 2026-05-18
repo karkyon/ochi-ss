@@ -246,6 +246,50 @@ const EMPTY_DETAIL_FORM: DetailForm = {
 // メインコンポーネント
 // ────────────────────────────────────────────────
 
+interface CopySourceDetail {
+  materialCode: string
+  materialName: string
+  kakouShiyouCode: number
+  kakouShiyou: string
+  kakouShijiCodeT: string
+  kakouShijiCodeA: string
+  kakouShijiCodeB: string
+  kakouT: string
+  kakouA: string
+  kakouB: string
+  sizeT: number
+  sizeA: number
+  sizeB: number
+  kousaTUpper: number | null
+  kousaTLower: number | null
+  kousaAUpper: number | null
+  kousaALower: number | null
+  kousaBUpper: number | null
+  kousaBLower: number | null
+  mentori4: number | null
+  mentori8: number | null
+  quantity: number
+  unitPrice: number | null
+  totalPrice: number | null
+  shortestDelivery: string
+  deliveryDeadline: string | null
+}
+
+interface CopySource {
+  customerOrderNo: string
+  endUserNo: string
+  destinationCode: string
+  destinationName: string
+  destinationDept: string
+  destinationPerson: string
+  destinationZip: string
+  destinationAddress: string
+  destinationTel: string
+  destinationFax: string
+  remarks: string
+  details: CopySourceDetail[]
+}
+
 interface Props {
   materials: Material[]
   processingSpecs: ProcessingSpec[]
@@ -255,9 +299,10 @@ interface Props {
     chargeName: string
     userId: string
   }
+  copySource?: CopySource | null
 }
 
-export default function EstimateNewClient({ materials, processingSpecs, userInfo }: Props) {
+export default function EstimateNewClient({ materials, processingSpecs, userInfo, copySource }: Props) {
   const router = useRouter()
   // 加工指示マスタ（SQL Serverからバインド）
   const [cuttingMethods, setCuttingMethods] = useState<CuttingMethod[]>([])
@@ -314,7 +359,41 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   } | null>(null)
 
   // 明細リスト
-  const [details, setDetails] = useState<EstimateDetail[]>([])
+  const [details, setDetails] = useState<EstimateDetail[]>(() => {
+    if (!copySource?.details?.length) return []
+    return copySource.details.map((d, i) => ({
+      clientDetailId:   crypto.randomUUID(),
+      rowNo:            i + 1,
+      materialCode:     d.materialCode,
+      materialName:     d.materialName,
+      kakouShiyouCode:  d.kakouShiyouCode,
+      kakouShiyou:      d.kakouShiyou,
+      kakouShijiCodeT:  d.kakouShijiCodeT,
+      kakouShijiCodeA:  d.kakouShijiCodeA,
+      kakouShijiCodeB:  d.kakouShijiCodeB,
+      kakouT:           d.kakouT,
+      kakouA:           d.kakouA,
+      kakouB:           d.kakouB,
+      sizeT:            String(d.sizeT),
+      sizeA:            String(d.sizeA),
+      sizeB:            String(d.sizeB),
+      kousaTUpper:      d.kousaTUpper != null ? String(d.kousaTUpper) : "",
+      kousaTLower:      d.kousaTLower != null ? String(d.kousaTLower) : "",
+      kousaAUpper:      d.kousaAUpper != null ? String(d.kousaAUpper) : "",
+      kousaALower:      d.kousaALower != null ? String(d.kousaALower) : "",
+      kousaBUpper:      d.kousaBUpper != null ? String(d.kousaBUpper) : "",
+      kousaBLower:      d.kousaBLower != null ? String(d.kousaBLower) : "",
+      mentori4:         d.mentori4 != null ? String(d.mentori4) : "",
+      mentori8:         d.mentori8 != null ? String(d.mentori8) : "",
+      quantity:         String(d.quantity),
+      unitPrice:        d.unitPrice,
+      totalPrice:       d.totalPrice,
+      shortestDelivery: d.shortestDelivery ?? null,
+      deliveryDeadline: d.deliveryDeadline ?? null,
+      calculated:       d.unitPrice != null && d.unitPrice > 0,
+      intermediate:     null,
+    }))
+  })
 
   // UI状態
   const [calcLoading, setCalcLoading]   = useState(false)

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         [TEL]           AS tel,
         [FAX]           AS fax,
         [担当者名]      AS chargeName,
-        [部署名]        AS departmentName
+        [直送先部署名]  AS departmentName
       FROM [ASP直送先]
       WHERE [得意先コード] = @TokuisakiCd
         AND (
