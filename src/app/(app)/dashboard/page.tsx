@@ -36,6 +36,15 @@ const MENU_CARDS = [
     href: "/masters/direct-delivery",
     color: "purple",
   },
+  {
+    id: "chamfer-rules",
+    icon: "⚙️",
+    title: "面取りルール管理",
+    description: "材料×仕様別の制限値設定",
+    href: "/masters/chamfer-rules",
+    color: "slate",
+    adminOnly: true,
+  },
 ]
 
 const COLOR_MAP: Record<string, string> = {
@@ -43,6 +52,7 @@ const COLOR_MAP: Record<string, string> = {
   green:  "bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 hover:shadow-emerald-100",
   amber:  "bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300 hover:shadow-amber-100",
   purple: "bg-violet-50 border-violet-200 hover:bg-violet-100 hover:border-violet-300 hover:shadow-violet-100",
+  slate:  "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 hover:shadow-slate-100",
 }
 
 const ICON_BG_MAP: Record<string, string> = {
@@ -50,6 +60,7 @@ const ICON_BG_MAP: Record<string, string> = {
   green:  "bg-emerald-100",
   amber:  "bg-amber-100",
   purple: "bg-violet-100",
+  slate:  "bg-slate-100",
 }
 
 export default async function DashboardPage() {
@@ -66,9 +77,25 @@ export default async function DashboardPage() {
   }> = []
 
   try {
-    // NOTE: notifications テーブルは未実装のため、空配列で初期化
-    // STEP 11 以降で実装予定
-    notifications = []
+    const now = new Date()
+    const rawNotifications = await prisma.notification.findMany({
+      where: {
+        isDeleted: false,
+        publishedAt: { lte: now },
+        expiresAt: { gte: now },
+      },
+      orderBy: { publishedAt: "desc" },
+      take: 10,
+      select: { id: true, title: true, notifType: true, publishedAt: true },
+    })
+    notifications = rawNotifications.map(n => ({
+      id: n.id,
+      subject: n.title,
+      notifyType: n.notifType,
+      priority: 0,
+      publishedAt: n.publishedAt,
+      isRead: false,
+    }))
   } catch {
     notifications = []
   }
@@ -105,7 +132,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          {MENU_CARDS.map((card) => (
+          {MENU_CARDS.filter(card => !(card as any).adminOnly || ((session?.user as any)?.roleLevel ?? 0) >= 3).map((card) => (
             <Link
               key={card.id}
               href={card.href}

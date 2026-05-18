@@ -212,6 +212,23 @@ export default function EstimateEditClient({ estimateData, materials, processing
   const router = useRouter()
 
   // ── 状態 ──
+  // ── 納期有効期限チェック（編集モード時） ──
+  useEffect(() => {
+    if (!estimateId) return
+    const checkDeadline = async () => {
+      try {
+        const res = await fetch(`/api/v1/estimates/${estimateId}/check-deadline`, { method: "POST" })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.hasExpired) {
+          const rows = (data.expiredDetails as Array<{rowNo:number}>).map((d:any) => `No.${d.rowNo}`).join("、")
+          alert(`⚠️ 納期保証期限が切れた明細があります（${rows}）。\n内容をご確認の上、見積計算を再実行してから保存してください。`)
+        }
+      } catch { /* silent */ }
+    }
+    checkDeadline()
+  }, [estimateId])
+
   const [header, setHeader] = useState<HeaderForm>({
     inputDate:         estimateData.inputDate,
     customerOrderNo:   estimateData.customerOrderNo,

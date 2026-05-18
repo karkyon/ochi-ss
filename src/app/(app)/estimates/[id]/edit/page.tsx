@@ -136,6 +136,7 @@ export default async function EstimateEditPage({ params }: Props) {
       </div>
 
       <EstimateEditClient
+        estimateId={id}
         estimateData={estimateData}
         materials={materials}
         processingSpecs={processingSpecs}
