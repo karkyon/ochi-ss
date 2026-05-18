@@ -109,5 +109,24 @@ export async function POST(req: NextRequest) {
     return o
   })
 
-  return NextResponse.json({ orderId: order.id, orderStatus: order.orderStatus }, { status: 201 })
+  // Outbox Event — SQL Server WEBデータ確認へ非同期送信
+    try {
+      await prisma.outboxEvent.create({
+        data: {
+          aggregateType: "order",
+          aggregateId:   order.id,
+          eventType:     "order.placed",
+          payload:       JSON.parse(JSON.stringify({
+            orderNo:         order.orderNo,
+            customerCode:    session.user.companyCode,
+            orderDate:       order.orderDate?.toISOString(),
+          })),
+          status: "pending",
+        },
+      })
+    } catch (e) {
+      console.error("[POST /orders] outbox create failed:", e)
+    }
+
+    return NextResponse.json({ orderId: order.id, orderStatus: order.orderStatus }, { status: 201 })
 }
