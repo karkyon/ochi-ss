@@ -400,6 +400,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   const [saveLoading, setSaveLoading]   = useState(false)
   const [calcError, setCalcError]       = useState("")
   const [saveMessage, setSaveMessage]   = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [savedEstimateId, setSavedEstimateId] = useState<string | null>(null)
 
   // ────────────────────────────────────────────────
   // 標準公差・面取の取得
@@ -679,7 +680,8 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       const saved = await res.json()
       console.log('[保存API] レスポンス:', JSON.stringify(saved))
       setSaveMessage({ type: "success", text: `見積を保存しました（見積No: ${saved.estimateNo}）` })
-      router.push(`/estimates/${saved.estimateId}/edit`)
+      setSavedEstimateId(saved.estimateId)
+      // 保存後は編集画面へ遷移せず、注文ボタンを表示する
     } catch {
       setSaveMessage({ type: "error", text: "通信エラーが発生しました" })
     } finally {
@@ -1299,8 +1301,16 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             </table>
           </div>
 
-          {/* 保存ボタン */}
-          <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3">
+          {/* 保存・注文ボタン */}
+          <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3 flex-wrap">
+            {savedEstimateId && (
+              <a
+                href={`/orders/confirm?estimateId=${savedEstimateId}`}
+                className="px-5 py-2.5 text-sm rounded-lg font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              >
+                🛒 注文する
+              </a>
+            )}
             <button
               type="button"
               onClick={() => { console.log("[保存ボタン] クリック"); handleSave() }}

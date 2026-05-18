@@ -950,6 +950,14 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
               disabled={calcLoading}
               className="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >{calcLoading ? "計算中..." : "📊 見積計算"}</button>
+            {estimateData.estimateStatus !== "ordered" && estimateData.estimateStatus !== "cancelled" && (
+              <a
+                href={`/orders/confirm?estimateId=${estimateData.id}`}
+                className="px-5 py-2.5 text-sm rounded-lg font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              >
+                🛒 注文する
+              </a>
+            )}
             <button type="button"
               onClick={() => { console.log('[Edit][明細追加ボタン] クリック'); handleAddDetail() }}
               disabled={!canAddDetail}

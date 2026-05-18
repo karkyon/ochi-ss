@@ -291,6 +291,12 @@ export default function EstimatesClient({
                             編集
                           </Link>
                           <Link
+                            href={`/orders/confirm?estimateId=${est.id}`}
+                            className="px-2.5 py-1 text-xs rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors whitespace-nowrap"
+                          >
+                            🛒 注文
+                          </Link>
+                          <Link
                             href={`/estimates/new?copyFrom=${est.id}`}
                             className="px-2.5 py-1 text-xs rounded border border-sky-300 text-sky-700 hover:bg-sky-50 transition-colors whitespace-nowrap"
                           >
