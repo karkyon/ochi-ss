@@ -31,6 +31,7 @@ function LoginPageInner() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPw, setShowPw]     = useState(false)
 
   const isTimeout = searchParams.get("timeout") === "1"
   const isLoggedOut = searchParams.get("logout") === "1"
@@ -188,18 +189,29 @@ function LoginPageInner() {
               <label htmlFor="password" className="block text-[13px] font-semibold text-[#374151] mb-1.5">
                 パスワード <span className="text-red-500">*</span>
               </label>
-              <input
-                id="password"
-                ref={passwordRef}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="パスワードを入力"
-                autoComplete="current-password"
-                maxLength={50}
-                className="w-full h-11 px-4 text-[15px] border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A4080]/30 focus:border-[#1A4080] transition-colors placeholder:text-[#C4C9D4] disabled:bg-gray-50"
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  ref={passwordRef}
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="パスワードを入力"
+                  autoComplete="current-password"
+                  maxLength={50}
+                  className="w-full h-11 px-4 pr-11 text-[15px] border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A4080]/30 focus:border-[#1A4080] transition-colors placeholder:text-[#C4C9D4] disabled:bg-gray-50"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm select-none"
+                  tabIndex={-1}
+                  aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
+                >
+                  {showPw ? "🙈" : "👁️"}
+                </button>
+              </div>
             </div>
 
             {/* ログイン状態保持 */}

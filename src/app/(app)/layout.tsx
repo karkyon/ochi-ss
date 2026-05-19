@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import { SessionProvider } from "next-auth/react"
 import Header from "@/components/layout/Header"
+import { ToastProvider } from "@/components/ui/Toast"
 
 export default async function AppLayout({
   children,
@@ -43,12 +44,19 @@ export default async function AppLayout({
 
   return (
     <SessionProvider session={session}>
+      <ToastProvider>
       <div className="min-h-screen bg-gray-50 flex flex-col">
+        {/* Skip to main content（アクセシビリティ） */}
+        <a href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[999] focus:px-4 focus:py-2 focus:bg-white focus:text-[#1a2744] focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-medium">
+          メインコンテンツへスキップ
+        </a>
         <Header notificationCount={notificationCount} />
-        <main className="flex-1">
+        <main id="main-content" className="flex-1">
           {children}
         </main>
       </div>
+      </ToastProvider>
     </SessionProvider>
   )
 }
