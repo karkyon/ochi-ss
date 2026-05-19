@@ -301,8 +301,26 @@ export async function POST(req: NextRequest) {
       return header
     })
 
+    // Outbox Event（非同期 — 失敗しても保存は成功扱い）
+    try {
+      await prisma.outboxEvent.create({
+        data: {
+          aggregateType: "estimate",
+          aggregateId:   saved.id,
+          eventType:     "estimate.created",
+          payload: {
+            estimateNo:      saved.estimateNo,
+            customerCode:    session.user.companyCode,
+            destinationName: body.destinationName ?? null,
+            detailCount:     body.details?.length ?? 0,
+          },
+          status: "pending",
+        },
+      })
+    } catch (e) { console.error("[POST /estimates] outbox create failed:", e) }
+
     return NextResponse.json(
-      { success: true, estimateId: saved.id },
+      { success: true, estimateId: saved.id, estimateNo: saved.estimateNo },
       { status: 201 }
     )
   } catch (err: any) {

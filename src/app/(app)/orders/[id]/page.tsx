@@ -287,6 +287,38 @@ export default async function OrderDetailPage({ params }: Props) {
         </div>
       )}
 
+      {/* 仕様変更履歴 */}
+      {(order as any).specChangeHistories?.length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 mb-4">
+          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-4">⚠️ 仕様変更履歴</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-amber-50 border-b border-amber-200">
+                <tr>
+                  {["行No","変更フィールド","変更前","変更後","変更理由","変更日時"].map(h => (
+                    <th key={h} className="px-3 py-2 text-left text-[10px] font-medium text-amber-600">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(order as any).specChangeHistories.map((h: any) => (
+                  <tr key={h.id} className="hover:bg-amber-50/50">
+                    <td className="px-3 py-2 text-center">{h.rowNo}</td>
+                    <td className="px-3 py-2 font-mono">{h.fieldName}</td>
+                    <td className="px-3 py-2 text-gray-400 line-through">{h.oldValue ?? "—"}</td>
+                    <td className="px-3 py-2 font-medium text-amber-700">{h.newValue}</td>
+                    <td className="px-3 py-2 text-gray-600">{h.changeReason ?? "—"}</td>
+                    <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
+                      {new Date(h.webNotifiedAt ?? h.id).toLocaleDateString("ja-JP")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* 備考 */}
       {est.remarks && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-4">
