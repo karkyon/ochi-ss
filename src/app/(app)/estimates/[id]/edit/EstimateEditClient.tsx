@@ -125,6 +125,9 @@ interface EstimateData {
   destinationAddress: string
   destinationTel:   string
   destinationFax:   string
+  requestNouki:     string
+  chargeName:       string
+  estimateDate:     string
   remarks:          string
   details: {
     id:              string
@@ -557,6 +560,9 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
         destinationAddress: header.destinationAddress || undefined,
         destinationTel:     header.destinationTel || undefined,
         destinationFax:     header.destinationFax || undefined,
+        estimateDate:       header.estimateDate || header.inputDate,
+        requestNouki:       header.requestNouki || undefined,
+        chargeName:         header.chargeName || undefined,
         remarks:            header.remarks || undefined,
         editMode:           "Edit" as const,
         details: details.map((d, idx) => ({
@@ -1061,6 +1067,17 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                   <td className="px-3 py-2 text-right text-gray-700">{d.sizeT}</td>
                   <td className="px-3 py-2 text-right text-gray-700">{d.sizeA}</td>
                   <td className="px-3 py-2 text-right text-gray-700">{d.sizeB}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-[10px]">
+                    {d.kousaTUpper || d.kousaTLower ? `+${d.kousaTUpper||0}/-${d.kousaTLower||0}` : "–"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-[10px]">
+                    {d.kousaAUpper || d.kousaALower ? `+${d.kousaAUpper||0}/-${d.kousaALower||0}` : "–"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-[10px]">
+                    {d.kousaBUpper || d.kousaBLower ? `+${d.kousaBUpper||0}/-${d.kousaBLower||0}` : "–"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-[10px]">{d.mentori4 || "–"}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-[10px]">{d.mentori8 || "–"}</td>
                   <td className="px-3 py-2 text-right text-gray-700">{d.quantity}</td>
                   <td className="px-3 py-2 text-right text-gray-700">
                     {d.unitPrice != null ? `¥${d.unitPrice.toLocaleString()}` : "—"}
