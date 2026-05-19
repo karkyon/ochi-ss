@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent
+
+def write(p, c):
+    path = ROOT / p; path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(c, encoding="utf-8"); print(f"  ✅ 書込: {p}")
+
+def main():
+    print("fix_session22d.py 開始")
+
+    # $extends で型が壊れているため両ファイルを (prisma as any) で書き直し
+    write("src/app/(app)/orders/[id]/page.tsx", '''\
 // src/app/(app)/orders/[id]/page.tsx
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -223,3 +237,108 @@ export default async function OrderDetailPage({ params }: Props) {
     </div>
   )
 }
+''')
+
+    write("src/app/api/v1/orders/[id]/route.ts", '''\
+// GET /api/v1/orders/[id] — 注文詳細取得
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+
+interface Props { params: Promise<{ id: string }> }
+
+export async function GET(req: NextRequest, { params }: Props) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { id } = await params
+  console.log("[GET /api/v1/orders/[id]]", id)
+
+  const order = await (prisma as any).order.findFirst({
+    where: { id, customerId: session.user.customerId!, isDeleted: false },
+    include: {
+      estimateHeader: {
+        include: {
+          details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } },
+        },
+      },
+      statusHistories:     { orderBy: { occurredAt: "asc" } },
+      specChangeHistories: { orderBy: { occurredAt: "asc" } },
+    },
+  })
+
+  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  const est = order.estimateHeader
+
+  return NextResponse.json({
+    id:              order.id,
+    orderNo:         order.orderNo ?? null,
+    orderDate:       new Date(order.orderDate).toISOString().slice(0, 10),
+    orderStatus:     order.orderStatus,
+    totalAmount:     Number(order.totalAmount ?? 0),
+    detailCount:     order.detailCount ?? est.details.length,
+    trackingNo:      order.trackingNo ?? null,
+    estimateNo:      est.estimateNo ?? null,
+    customerCode:    est.customerCode,
+    customerName:    est.customerName,
+    customerOrderNo: est.customerOrderNo ?? null,
+    destinationCode:    est.destinationCode ?? null,
+    destinationName:    est.destinationName ?? null,
+    destinationDept:    est.destinationDept ?? null,
+    destinationPerson:  est.destinationPerson ?? null,
+    destinationZip:     est.destinationZip ?? null,
+    destinationAddress: est.destinationAddress ?? null,
+    destinationTel:     est.destinationTel ?? null,
+    destinationFax:     est.destinationFax ?? null,
+    remarks:            est.remarks ?? null,
+    details: est.details.map((d: any) => ({
+      rowNo:            d.rowNo,
+      materialCode:     d.materialCode,
+      materialName:     d.materialName ?? null,
+      kakouShiyou:      d.kakouShiyou ?? null,
+      sizeT:            Number(d.sizeT),
+      sizeA:            Number(d.sizeA),
+      sizeB:            Number(d.sizeB),
+      quantity:         d.quantity,
+      unitPrice:        d.unitPrice  != null ? Number(d.unitPrice)  : null,
+      totalPrice:       d.totalPrice != null ? Number(d.totalPrice) : null,
+      shortestDelivery: d.shortestDelivery ?? null,
+      deliveryDeadline: d.deliveryDeadline ? new Date(d.deliveryDeadline).toISOString() : null,
+    })),
+    statusHistories: (order.statusHistories ?? []).map((h: any) => ({
+      id:           h.id,
+      fromStatus:   h.fromStatus ?? null,
+      toStatus:     h.toStatus,
+      changedBy:    h.changedBy,
+      changeReason: h.changeReason ?? null,
+      trackingNo:   h.trackingNo ?? null,
+      occurredAt:   new Date(h.occurredAt).toISOString(),
+    })),
+    specChangeHistories: (order.specChangeHistories ?? []).map((h: any) => ({
+      id:           h.id,
+      rowNo:        h.rowNo,
+      fieldName:    h.fieldName,
+      oldValue:     h.oldValue ?? null,
+      newValue:     h.newValue,
+      changeReason: h.changeReason ?? null,
+      changedBy:    h.changedBy,
+      occurredAt:   new Date(h.occurredAt).toISOString(),
+    })),
+  })
+}
+''')
+
+    print("→ tscチェック中...")
+    r = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True, cwd=str(ROOT))
+    if r.returncode != 0:
+        print("❌ tscエラー:"); print((r.stdout + r.stderr)[-4000:]); sys.exit(1)
+
+    print("✅ → git push")
+    subprocess.run(["git", "add", "-A"], check=True, cwd=str(ROOT))
+    subprocess.run(["git", "commit", "-m", "fix: orders[id] $extends型問題を as any で解決/specChangeHistories表示"], check=True, cwd=str(ROOT))
+    subprocess.run(["git", "push"], check=True, cwd=str(ROOT))
+    print("✅ push完了")
+
+if __name__ == "__main__":
+    main()
