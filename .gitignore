@@ -56,3 +56,6 @@ node_modules/
 sync-service/node_modules/
 seed.ts
 certs/
+
+# 開発用修正スクリプト
+fix_session*.py
