@@ -1,8 +1,9 @@
+"use client"
+import { formatDimension } from "@/lib/formatNumber"
 // src/app/(app)/estimates/[id]/edit/EstimateEditClient.tsx
 // STEP 14: 見積編集クライアントコンポーネント
 // 既存の EstimateNewClient をベースに EditMode=Edit で動作
 
-"use client"
 
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -874,6 +875,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                   <input type="number" step="0.001" min="0.001" max="9999.999"
                     value={detailForm[`size${axis}` as keyof DetailForm] as string}
                     onChange={e => { console.log(`[Edit][寸法${axis}]`, e.target.value); setDetailForm(p => ({ ...p, [`size${axis}`]: e.target.value })); setCalcResult(null) }}
+                    onBlur={e => setDetailForm(p => ({ ...p, [`size${axis}`]: formatDimension(e.target.value) }))}
                     className="flex-1 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.000"
                   />
                   <span className="text-xs text-gray-400">mm</span>
