@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { validateWithZod, estimateHeaderSchema } from "@/lib/zod-schemas"
 
 export async function GET(
   req: NextRequest,
@@ -40,6 +41,14 @@ export async function PUT(
   try { body = await req.json() } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
+
+  const v = validateWithZod(estimateHeaderSchema, {
+    inputDate: body.inputDate,
+    customerOrderNo: body.customerOrderNo,
+    destinationName: body.destinationName,
+    remarks: body.remarks,
+  })
+  if (!v.success) return NextResponse.json({ error: v.errors.join(" / ") }, { status: 422 })
 
   if (!body.inputDate) {
     return NextResponse.json({ error: "inputDate は必須です" }, { status: 400 })

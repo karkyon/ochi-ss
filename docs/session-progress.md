@@ -61,9 +61,9 @@
 - [x] E2Eテストチェックリスト（36項目）
 
 ## 残課題（低優先度）
-- [ ] /notifications 返信フォーム（返信可能な場合）
-- [ ] 数値入力フォームへの formatNumber ユーティリティ適用
-- [ ] React Hook Form + Zod バリデーション（現状は手動バリデーション）
+- [x] /notifications 返信フォーム（canReply 対応）✅
+- [x] 数値入力フォーム寸法フィールド onBlur formatDimension ✅
+- [x] Zod スキーマ共通化 + POST/PUT API バリデーション ✅
 - [ ] SQL Server 接続時の cutting-methods/direct-deliveries 本番動作確認
 - [ ] sync-service 本番環境での動作確認（SQL Server VPN接続）
 - [ ] WebSocket/SSE リアルタイム通知（将来対応）

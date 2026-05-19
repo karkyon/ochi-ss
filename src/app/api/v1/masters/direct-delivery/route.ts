@@ -2,13 +2,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { validateWithZod, directDeliverySchema } from "@/lib/zod-schemas"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const body = await req.json()
   const { deliveryCode, companyName, departmentName, contactPerson, postalCode, address1, phoneNumber, faxNumber, remarks } = body
-  if (!deliveryCode || !companyName) return NextResponse.json({ error: "コード・名称は必須です" }, { status: 400 })
+  const validation = validateWithZod(directDeliverySchema, { deliveryCode, companyName, departmentName, contactPerson, postalCode, address1, phoneNumber, faxNumber, remarks })
+  if (!validation.success) return NextResponse.json({ error: validation.errors.join(" / ") }, { status: 422 })
   try {
     const dd = await prisma.directDelivery.create({
       data: {
