@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Link from "next/link"
+import DashboardNotificationsClient from "./DashboardNotificationsClient"
 
 // メニューカード定義
 const MENU_CARDS = [
@@ -174,63 +175,8 @@ export default async function DashboardPage() {
       </section>
 
       {/* お知らせパネル */}
-      <section>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-1 h-5 rounded-full bg-[#1a2744]" />
-          <h2 className="font-bold text-gray-800">🔔 お知らせ</h2>
-          {unreadCount > 0 && (
-            <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-              {unreadCount}件の未読
-            </span>
-          )}
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {notifications.length === 0 ? (
-            <div className="px-5 py-10 text-center text-gray-400 text-sm">
-              現在お知らせはありません
-            </div>
-          ) : (
-            <>
-              <ul className="divide-y divide-gray-100">
-                {notifications.map((n) => (
-                  <li key={n.id}>
-                    <Link
-                      href={`/notifications/${n.id}`}
-                      className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors"
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          n.isRead ? "bg-transparent" : "bg-blue-500"
-                        }`}
-                      />
-                      <span className={`flex-1 text-sm truncate ${n.isRead ? "text-gray-500" : "font-semibold text-gray-800"}`}>
-                        {n.subject}
-                      </span>
-                      <span className="text-xs text-gray-400 flex-shrink-0">
-                        {n.publishedAt
-                          ? new Date(n.publishedAt).toLocaleDateString("ja-JP", {
-                              month: "2-digit",
-                              day: "2-digit",
-                            })
-                          : ""}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-gray-100 px-5 py-3 text-right">
-                <Link
-                  href="/notifications"
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                >
-                  お知らせ一覧を見る →
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
+      <DashboardNotificationsClient notifications={notifications} unreadCount={unreadCount} />
+      {/* お知らせパネル END */}
 
     </div>
   )
