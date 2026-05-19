@@ -65,6 +65,17 @@ export default function Header({ notificationCount = 0 }: HeaderProps) {
           )}
         </Link>
 
+        {/* ハンバーガーボタン（sm未満で表示） */}
+        <button
+          className="sm:hidden flex flex-col gap-1 p-2 rounded-lg text-white hover:bg-white/10 transition-colors"
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label="メニュー"
+        >
+          <span className={`block w-5 h-0.5 bg-current transition-transform ${menuOpen ? "rotate-45 translate-y-1.5" : ""}`} />
+          <span className={`block w-5 h-0.5 bg-current transition-opacity ${menuOpen ? "opacity-0" : ""}`} />
+          <span className={`block w-5 h-0.5 bg-current transition-transform ${menuOpen ? "-rotate-45 -translate-y-1.5" : ""}`} />
+        </button>
+
         {/* ユーザー情報 + ログアウト */}
         <div className="flex items-center gap-2 pl-2 border-l border-white/20">
           <div className="hidden sm:flex flex-col items-end">
@@ -83,6 +94,38 @@ export default function Header({ notificationCount = 0 }: HeaderProps) {
           </button>
         </div>
       </header>
+
+      {/* モバイルドロワーメニュー */}
+      {menuOpen && (
+        <div className="sm:hidden fixed inset-0 z-[90] flex flex-col" onClick={() => setMenuOpen(false)}>
+          <div className="h-14" />
+          <div className="bg-[#1a2744]/95 backdrop-blur flex-1 p-4 space-y-2" onClick={e => e.stopPropagation()}>
+            <div className="pb-3 mb-3 border-b border-white/20">
+              <p className="text-white text-sm font-medium">{session?.user?.chargeName ?? ""}</p>
+              <p className="text-[#93c5fd] text-xs">{session?.user?.customerName ?? ""}</p>
+            </div>
+            {[
+              { href: "/dashboard",    label: "🏠 メインメニュー" },
+              { href: "/estimates",    label: "📋 見積一覧" },
+              { href: "/estimates/new",label: "✏️ 新規見積" },
+              { href: "/orders",       label: "📦 注文履歴" },
+              { href: "/notifications",label: `🔔 お知らせ${notificationCount > 0 ? ` (${notificationCount})` : ""}` },
+              { href: "/masters/direct-delivery", label: "🏭 納入先管理" },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2.5 rounded-lg text-white text-sm hover:bg-white/10 transition-colors">
+                {label}
+              </Link>
+            ))}
+            <div className="pt-3 mt-3 border-t border-white/20">
+              <button onClick={() => { setMenuOpen(false); setShowLogoutDialog(true) }}
+                className="w-full px-4 py-2.5 rounded-lg text-red-300 text-sm text-left hover:bg-white/10 transition-colors">
+                🚪 ログアウト
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ログアウト確認ダイアログ */}
       {showLogoutDialog && (
