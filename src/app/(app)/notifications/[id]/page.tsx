@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import NotificationDetailClient from "./NotificationDetailClient"
+import NotificationReplyClient from "./NotificationReplyClient"
 
 const TYPE_LABEL: Record<string, { label: string; color: string }> = {
   info:    { label: "お知らせ",   color: "bg-blue-100 text-blue-700" },
@@ -41,6 +42,9 @@ export default async function NotificationDetailPage({ params }: Props) {
         <h1 className="text-xl font-bold text-gray-800 mb-6">{notification.title}</h1>
         <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{notification.content}</div>
       </div>
+      {(notification as any).canReply && (
+        <NotificationReplyClient notificationId={id} />
+      )}
     </div>
   )
 }

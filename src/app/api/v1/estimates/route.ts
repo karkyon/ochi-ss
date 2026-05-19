@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { validateWithZod, estimateHeaderSchema } from "@/lib/zod-schemas"
 
 // ────────────────────────────────────────────────
 // GET — 見積一覧（既存そのまま）
@@ -179,6 +180,19 @@ export async function POST(req: NextRequest) {
 
   console.log('[POST /estimates] customerId:', session.user.customerId, '明細件数:', body.details?.length)
   // ── バリデーション ──
+  // Zod バリデーション
+  const validation = validateWithZod(estimateHeaderSchema, {
+    inputDate:       body.inputDate,
+    customerOrderNo: body.customerOrderNo,
+    destinationName: body.destinationName,
+    destinationAddress: body.destinationAddress,
+    destinationTel:  body.destinationTel,
+    remarks:         body.remarks,
+  })
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.errors.join(" / ") }, { status: 422 })
+  }
+
   if (!body.inputDate) {
     return NextResponse.json({ error: "inputDate は必須です" }, { status: 400 })
   }
