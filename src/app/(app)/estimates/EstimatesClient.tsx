@@ -309,6 +309,19 @@ export default function EstimatesClient({
                           >
                             見積書
                           </Link>
+                          {est.estimateStatus !== "ordered" && est.estimateStatus !== "cancelled" && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`見積 ${est.estimateNo || est.id.slice(0,8)} をキャンセルしますか？`)) return
+                                const res = await fetch(`/api/v1/estimates/${est.id}/cancel`, { method: "POST" })
+                                if (res.ok) router.refresh()
+                                else alert("キャンセル失敗")
+                              }}
+                              className="px-2.5 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
+                            >
+                              取消
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -142,3 +142,4 @@ export async function PUT(
     )
   }
 }
+export { PUT as PATCH }

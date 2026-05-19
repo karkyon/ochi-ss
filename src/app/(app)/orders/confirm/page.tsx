@@ -56,6 +56,11 @@ export default function OrderConfirmPage() {
         body: JSON.stringify({ estimateId }),
       })
       const data = await res.json()
+      if (res.status === 409) {
+        // 既に注文済みの場合は既存注文詳細へ誘導
+        router.replace(`/orders/${data.orderId}`)
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? "注文に失敗しました")
       router.replace(`/orders/complete?orderId=${data.orderId}`)
     } catch (e: any) {
