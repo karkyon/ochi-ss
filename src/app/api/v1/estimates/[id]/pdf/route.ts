@@ -1,31 +1,18 @@
-// src/app/api/v1/estimates/[id]/pdf/route.ts
-// STEP 21: 見積書PDF出力
-// HTML を生成してブラウザに返す (Content-Type: text/html)
-// ブラウザの印刷機能で PDF 保存可能。将来 puppeteer 等へ差し替え可能。
-
+// GET /api/v1/estimates/[id]/pdf — 見積書HTML出力
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-interface Props {
-  params: Promise<{ id: string }>
-}
-
-export async function GET(req: NextRequest, { params }: Props) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  if (!session) return new NextResponse("Unauthorized", { status: 401 })
 
   const { id } = await params
-
-  // 見積データ取得
   const estimate = await prisma.estimateHeader.findFirst({
-    where: {
-      id,
-      customerId: session.user.customerId!,
-      isDeleted: false,
-    },
+    where: { id, customerId: session.user.customerId!, isDeleted: false },
     include: {
       details: {
         where: { isDeleted: false },
@@ -33,143 +20,153 @@ export async function GET(req: NextRequest, { params }: Props) {
       },
     },
   })
+  if (!estimate) return new NextResponse("Not Found", { status: 404 })
 
-  if (!estimate) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
+  const issueDate = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
+  const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    .toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
 
-  const totalAmount = estimate.details.reduce(
-    (sum, d) => sum + Number(d.totalPrice ?? 0),
-    0
-  )
+  const totalAmount = (estimate.details as any[]).reduce((s, d) => s + Number(d.totalPrice ?? 0), 0)
 
-  const detailRows = estimate.details.map((d, i) => {
-    const mentori = [
-      d.mentori4 ? `4C: ${d.mentori4}` : "",
-      d.mentori8 ? `8C: ${d.mentori8}` : "",
-    ].filter(Boolean).join(" / ")
-
-    return `
+  const detailRows = (estimate.details as any[]).map((d, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td>${d.materialCode ?? ""} ${d.materialName ?? ""}</td>
+      <td>${d.materialName ?? d.materialCode ?? ""}</td>
       <td>${d.kakouShiyou ?? ""}</td>
-      <td class="right">${d.sizeT ?? ""}</td>
-      <td class="right">${d.sizeA ?? ""}</td>
-      <td class="right">${d.sizeB ?? ""}</td>
-      <td class="right">${d.quantity}</td>
-      <td class="right">${d.unitPrice != null ? Number(d.unitPrice).toLocaleString() : "—"}</td>
-      <td class="right">${d.totalPrice != null ? Number(d.totalPrice).toLocaleString() : "—"}</td>
-      <td>${d.shortestDelivery ?? ""}</td>
-    </tr>`
-  }).join("")
-
-  const issueDate = new Date().toLocaleDateString("ja-JP", {
-    year: "numeric", month: "long", day: "numeric"
-  })
+      <td class="num">${Number(d.sizeT)}×${Number(d.sizeA)}×${Number(d.sizeB)}</td>
+      <td class="num">${d.quantity ?? ""}</td>
+      <td class="num">¥${Number(d.unitPrice ?? 0).toLocaleString()}</td>
+      <td class="num">¥${Number(d.totalPrice ?? 0).toLocaleString()}</td>
+      <td>${d.shortestDelivery ?? "—"}</td>
+    </tr>`).join("")
 
   const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>見積書 ${estimate.estimateNo ?? ""}</title>
-<style>
-  @page { margin: 15mm; }
-  * { box-sizing: border-box; }
-  body { font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; font-size: 11pt; color: #111; margin: 0; padding: 0; }
-  h1 { text-align: center; font-size: 20pt; letter-spacing: 0.3em; border-bottom: 2px solid #1a2744; padding-bottom: 6px; margin-bottom: 16px; }
-  .header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-  .block { border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; }
-  .block h3 { font-size: 9pt; color: #666; margin: 0 0 4px 0; }
-  .block p { margin: 2px 0; font-size: 10pt; }
-  .meta { text-align: right; margin-bottom: 16px; }
-  .meta p { margin: 2px 0; font-size: 10pt; }
-  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-  th { background: #1a2744; color: #fff; padding: 5px 4px; text-align: center; }
-  td { padding: 4px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
-  td.right { text-align: right; }
-  tr:nth-child(even) td { background: #f8f9fb; }
-  .total-row { font-weight: bold; border-top: 2px solid #1a2744; }
-  .total-row td { padding: 6px 4px; }
-  .footer { margin-top: 24px; font-size: 9pt; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }
-  .print-btn { position: fixed; top: 12px; right: 16px; padding: 8px 16px; background: #1a2744; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
-  @media print { .print-btn { display: none; } }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>見積書 ${estimate.estimateNo ?? ""}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; padding: 20mm; }
+    @media print { body { padding: 10mm; } .no-print { display: none !important; } @page { size: A4; margin: 10mm; } }
+    .no-print { text-align: center; padding: 16px; margin-bottom: 20px; }
+    .no-print button { padding: 10px 28px; font-size: 14px; background: #1a2744; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    .no-print button:hover { background: #1a3a6e; }
+    h1 { font-size: 24px; text-align: center; letter-spacing: 4px; margin-bottom: 20px; border-bottom: 3px double #1a2744; padding-bottom: 10px; }
+    .header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .info-block { border: 1px solid #ddd; border-radius: 4px; padding: 12px; }
+    .info-block h3 { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #eee; }
+    .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
+    .info-row .label { color: #666; flex-shrink: 0; margin-right: 8px; }
+    .info-row .value { font-weight: 500; text-align: right; }
+    .destination { border: 2px solid #1a2744; border-radius: 4px; padding: 12px; margin-bottom: 20px; }
+    .destination .company { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+    .destination .dept { font-size: 13px; color: #444; margin-bottom: 2px; }
+    .destination .address { font-size: 11px; color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
+    th { background: #1a2744; color: #fff; padding: 6px 8px; text-align: left; font-weight: 500; white-space: nowrap; }
+    td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    tr:nth-child(even) td { background: #f8f9fb; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .total-row td { font-weight: bold; font-size: 13px; border-top: 2px solid #1a2744; background: #f0f4ff !important; }
+    .footer { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .company-info { font-size: 11px; color: #333; }
+    .company-info .name { font-size: 16px; font-weight: bold; color: #1a2744; margin-bottom: 6px; }
+    .remarks { border: 1px solid #ddd; border-radius: 4px; padding: 10px; font-size: 11px; white-space: pre-wrap; }
+    .seal-area { display: flex; gap: 8px; justify-content: flex-end; }
+    .seal-box { width: 60px; height: 60px; border: 1px solid #999; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; }
+  </style>
 </head>
 <body>
-<button class="print-btn" onclick="window.print()">🖨️ 印刷・PDF保存</button>
-
-<h1>見 積 書</h1>
-
-<div class="meta">
-  <p>発行日：${issueDate}</p>
-  <p>見積番号：<strong>${estimate.estimateNo ?? "（未採番）"}</strong></p>
-  <p>有効期限：発行日より30日間</p>
-</div>
-
-<div class="header-grid">
-  <div class="block">
-    <h3>お客様情報</h3>
-    <p><strong>${estimate.customerName ?? ""}</strong> 御中</p>
-    <p>お客様コード：${estimate.customerCode ?? ""}</p>
-    ${estimate.customerOrderNo ? `<p>お客様注文番号：${estimate.customerOrderNo}</p>` : ""}
-    ${estimate.endUserNo ? `<p>エンドユーザー番号：${estimate.endUserNo}</p>` : ""}
+  <div class="no-print">
+    <button onclick="window.print()">🖨️ PDF印刷 / 保存</button>
   </div>
-  <div class="block">
-    <h3>送り先</h3>
-    ${estimate.destinationName ? `<p><strong>${estimate.destinationName}</strong></p>` : "<p>—</p>"}
-    ${estimate.destinationDept ? `<p>${estimate.destinationDept}</p>` : ""}
-    ${estimate.destinationPerson ? `<p>担当：${estimate.destinationPerson}</p>` : ""}
-    ${estimate.destinationZip ? `<p>〒${estimate.destinationZip}</p>` : ""}
-    ${estimate.destinationAddress ? `<p>${estimate.destinationAddress}</p>` : ""}
-    ${estimate.destinationTel ? `<p>TEL: ${estimate.destinationTel}</p>` : ""}
+
+  <h1>見　積　書</h1>
+
+  <div class="header-grid">
+    <div>
+      <div class="destination">
+        <div class="company">${estimate.destinationName ?? "—"}&ensp;御中</div>
+        ${estimate.destinationDept ? `<div class="dept">${estimate.destinationDept}</div>` : ""}
+        ${estimate.destinationPerson ? `<div class="dept">${estimate.destinationPerson} 様</div>` : ""}
+        ${estimate.destinationAddress ? `<div class="address">〒${estimate.destinationZip ?? ""} ${estimate.destinationAddress}</div>` : ""}
+      </div>
+      <div style="font-size:18px; font-weight:bold; color:#1a2744; margin-bottom:4px;">
+        合計金額：¥${totalAmount.toLocaleString()}（税抜）
+      </div>
+      <div style="font-size:11px; color:#666; margin-bottom:2px;">
+        上記金額にて見積申し上げます。
+      </div>
+    </div>
+    <div class="info-block">
+      <h3>見積情報</h3>
+      <div class="info-row"><span class="label">見積No</span><span class="value">${estimate.estimateNo ?? "—"}</span></div>
+      <div class="info-row"><span class="label">発行日</span><span class="value">${issueDate}</span></div>
+      <div class="info-row"><span class="label">有効期限</span><span class="value">${validUntil}</span></div>
+      <div class="info-row"><span class="label">お客様注文No</span><span class="value">${estimate.customerOrderNo ?? "—"}</span></div>
+      <div class="info-row"><span class="label">希望納期</span><span class="value">${(estimate as any).requestNouki ?? "—"}</span></div>
+      <div style="margin-top:12px;">
+        <div class="seal-area">
+          <div class="seal-box">確認</div>
+          <div class="seal-box">担当</div>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
 
-<p style="text-align:center;margin:12px 0;font-size:11pt;">
-  下記の通りお見積り申し上げます。<br>
-  <strong>合計金額：¥${totalAmount.toLocaleString()}（税別）</strong>
-</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:3%">No</th>
+        <th style="width:12%">材料</th>
+        <th style="width:10%">加工仕様</th>
+        <th style="width:15%">寸法T×A×B</th>
+        <th style="width:6%">数量</th>
+        <th style="width:10%">単価</th>
+        <th style="width:11%">金額</th>
+        <th style="width:10%">最短納期</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${detailRows}
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td colspan="6" class="num">合　計（税抜）</td>
+        <td class="num">¥${totalAmount.toLocaleString()}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
 
-<table>
-  <thead>
-    <tr>
-      <th style="width:28px">No</th>
-      <th>材料</th>
-      <th>加工仕様</th>
-      <th style="width:52px">T(mm)</th>
-      <th style="width:52px">A(mm)</th>
-      <th style="width:52px">B(mm)</th>
-      <th style="width:40px">数量</th>
-      <th style="width:70px">単価(円)</th>
-      <th style="width:80px">金額(円)</th>
-      <th style="width:80px">最短納期</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${detailRows}
-  </tbody>
-  <tfoot>
-    <tr class="total-row">
-      <td colspan="8" style="text-align:right">合計（税別）</td>
-      <td class="right">¥${totalAmount.toLocaleString()}</td>
-      <td></td>
-    </tr>
-  </tfoot>
-</table>
+  ${estimate.remarks ? `
+  <div class="remarks">
+    <strong>備考：</strong>
+    ${estimate.remarks}
+  </div>` : ""}
 
-${estimate.remarks ? `<p style="margin-top:12px;font-size:10pt;"><strong>備考：</strong>${estimate.remarks}</p>` : ""}
-
-<div class="footer">
-  <p>越智製作所　TEL: 072-882-5524　E-mail: weborder@ochi-ss.co.jp</p>
-  <p>本見積書の有効期限は発行日より30日間です。期限を過ぎた場合は再度お見積りが必要となります。</p>
-</div>
+  <div class="footer" style="margin-top:24px;">
+    <div class="company-info">
+      <div class="name">越智製作所</div>
+      <div>〒577-0802 大阪府東大阪市小若江3-4-1</div>
+      <div>TEL：072-882-5524　FAX：072-882-5527</div>
+      <div>E-mail：weborder@ochi-ss.co.jp</div>
+    </div>
+    <div class="info-block" style="font-size:11px;">
+      <h3>お支払条件</h3>
+      <div>月末締め翌月末払い</div>
+      <div style="margin-top:8px; color:#666; font-size:10px;">
+        ※ 見積有効期限内にご注文をお願いいたします<br>
+        ※ 価格は税抜きです（消費税は別途申し受けます）
+      </div>
+    </div>
+  </div>
 </body>
 </html>`
 
   return new NextResponse(html, {
-    status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",

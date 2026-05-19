@@ -1,85 +1,82 @@
-// src/app/api/v1/direct-deliveries/search/route.ts
-// STEP 12-D: 直送先検索API
-// GET /api/v1/direct-deliveries/search?q={keyword}
-
+// GET /api/v1/direct-deliveries/search?q=xxx&customerCode=xxxxx
+// 直送先マスタ検索。SQL Server 接続失敗時は PostgreSQL fallback
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getSqlServerPool } from "@/lib/sqlserver"
+import { prisma } from "@/lib/prisma"
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { searchParams } = new URL(request.url)
-  const q = searchParams.get("q")?.trim() ?? ""
+  const { searchParams } = req.nextUrl
+  const q            = searchParams.get("q")            ?? ""
+  const customerCode = searchParams.get("customerCode") ?? session.user.companyCode ?? ""
 
-  if (q.length < 2) {
-    return NextResponse.json({ results: [] })
-  }
-
-  const customerCode = (session.user as any).companyCode ?? ""
-
-  console.log('[GET /direct-deliveries/search] q:', q, 'customerCode:', customerCode)
+  // SQL Server 試行
   try {
-    const pool = await getSqlServerPool()
-    const req = pool.request()
-
-    req.input("TokuisakiCd", customerCode)
-    req.input("Keyword", `%${q}%`)
-
-    const result = await req.query(`
-      SELECT TOP 50
-        [直送先コード]  AS deliveryCode,
-        [名称]          AS name,
-        [フリガナ]      AS nameKana,
-        [略称]          AS shortName,
-        [郵便番号]      AS postalCode,
-        [住所1]         AS address1,
-        [住所2]         AS address2,
-        [住所3]         AS address3,
-        [TEL]           AS tel,
-        [FAX]           AS fax,
-        [担当者名]      AS chargeName,
-        [直送先部署名]  AS departmentName
-      FROM [ASP直送先]
-      WHERE [得意先コード] = @TokuisakiCd
-        AND (
-          [名称]        LIKE @Keyword
-          OR [フリガナ] LIKE @Keyword
-          OR [略称]     LIKE @Keyword
-          OR [住所1]    LIKE @Keyword
-          OR [住所2]    LIKE @Keyword
-          OR [住所3]    LIKE @Keyword
-          OR [TEL]      LIKE @Keyword
-          OR [直送先コード] LIKE @Keyword
-        )
-      ORDER BY [直送先コード]
-    `)
-
-    const results = result.recordset.map((row: any) => ({
-      deliveryCode:   String(row.deliveryCode ?? "").trim(),
-      name:           String(row.name ?? "").trim(),
-      nameKana:       String(row.nameKana ?? "").trim(),
-      shortName:      String(row.shortName ?? "").trim(),
-      postalCode:     String(row.postalCode ?? "").trim(),
-      address1:       String(row.address1 ?? "").trim(),
-      address2:       String(row.address2 ?? "").trim(),
-      address3:       String(row.address3 ?? "").trim(),
-      tel:            String(row.tel ?? "").trim(),
-      fax:            String(row.fax ?? "").trim(),
-      chargeName:     String(row.chargeName ?? "").trim(),
-      departmentName: String(row.departmentName ?? "").trim(),
-    }))
-
-    return NextResponse.json({ results })
-
+    const { getSqlServerPool } = await import("@/lib/sqlserver").catch(() => ({ getSqlServerPool: null }))
+    if (getSqlServerPool) {
+      const pool = await (getSqlServerPool as Function)()
+      const result = await pool.request()
+        .input("CustomerCode", customerCode)
+        .input("Query", `%${q}%`)
+        .query(`
+          SELECT TOP 50
+            直送先コード AS deliveryCode,
+            直送先名称   AS companyName,
+            部署名       AS departmentName,
+            担当者名     AS contactPerson,
+            郵便番号     AS postalCode,
+            住所1        AS address1,
+            住所2        AS address2,
+            電話番号     AS phoneNumber,
+            FAX番号      AS faxNumber
+          FROM 直送先マスタ
+          WHERE 得意先コード = @CustomerCode
+            AND 有効フラグ = 1
+            AND (直送先名称 LIKE @Query OR 直送先コード LIKE @Query OR 住所1 LIKE @Query)
+          ORDER BY 直送先コード
+        `)
+      return NextResponse.json({ deliveries: result.recordset, total: result.recordset.length, source: "sqlserver" })
+    }
   } catch (err: any) {
-    console.error("[direct-deliveries/search] エラー:", err.message)
-    return NextResponse.json(
-      { error: "直送先検索に失敗しました", detail: err.message },
-      { status: 500 }
-    )
+    console.error("[direct-deliveries/search] SQL Serverエラー:", err.message)
+  }
+
+  // PostgreSQL fallback
+  try {
+    const rows = await prisma.directDelivery.findMany({
+      where: {
+        customerId: session.user.customerId!,
+        isDeleted: false,
+        ...(q ? {
+          OR: [
+            { companyName:   { contains: q } },
+            { deliveryCode:  { contains: q } },
+            { address1:      { contains: q } },
+          ],
+        } : {}),
+      },
+      orderBy: { deliveryCode: "asc" },
+      take: 50,
+    })
+    return NextResponse.json({
+      deliveries: rows.map(r => ({
+        deliveryCode:   r.deliveryCode,
+        companyName:    r.companyName,
+        departmentName: r.departmentName ?? "",
+        contactPerson:  r.contactPerson ?? "",
+        postalCode:     r.postalCode ?? "",
+        address1:       r.address1 ?? "",
+        address2:       "",
+        phoneNumber:    r.phoneNumber ?? "",
+        faxNumber:      r.faxNumber ?? "",
+      })),
+      total: rows.length,
+      source: "postgres_fallback",
+    })
+  } catch (err: any) {
+    console.error("[direct-deliveries/search] PostgreSQLエラー:", err.message)
+    return NextResponse.json({ error: "検索失敗" }, { status: 500 })
   }
 }
