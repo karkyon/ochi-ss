@@ -11,6 +11,7 @@ interface HeaderProps {
 export default function Header({ notificationCount = 0 }: HeaderProps) {
   const { data: session } = useSession()
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [timeoutWarning, setTimeoutWarning] = useState(false)
 
   // セッションタイムアウト警告（残り25分で表示）
