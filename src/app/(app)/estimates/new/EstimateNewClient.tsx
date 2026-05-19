@@ -677,7 +677,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
 
       const saved = await res.json()
       console.log('[保存API] レスポンス:', JSON.stringify(saved))
-      setSaveMessage({ type: "success", text: `見積を保存しました（見積No: ${saved.estimateNo}）` })
+      setSaveMessage({ type: "success", text: `✅ 見積を保存しました　見積No: ${saved.estimateNo ?? saved.estimateId?.slice(0,8)}` })
       setSavedEstimateId(saved.estimateId)
       // 保存後は編集画面へ遷移せず、注文ボタンを表示する
     } catch {

@@ -1,3 +1,37 @@
+#!/usr/bin/env python3
+"""
+fix_session24.py
+================
+TASK A: /notifications 一覧 — 未読のみフィルタ実装（NotificationRead テーブル連携）
+TASK B: /estimates/[id]/edit page.tsx — copyFrom クエリ対応確認
+TASK C: /estimates/new EstimateNewClient — 保存後 estimateNo を saveMessage に表示
+TASK D: POST /api/v1/orders — 二重注文防止チェック（既に ordered の場合 409）
+TASK E: POST /api/v1/estimates/[id]/cancel — 見積キャンセルAPI実装
+"""
+
+import subprocess, sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+def read(p): return (ROOT / p).read_text(encoding="utf-8")
+def write(p, c):
+    path = ROOT / p; path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(c, encoding="utf-8"); print(f"  ✅ 書込: {p}")
+
+def rep(p, old, new, label):
+    path = ROOT / p
+    if not path.exists(): print(f"  ⚠️  [{label}] 未存在"); return False
+    c = path.read_text(encoding="utf-8")
+    if old not in c: print(f"  ❌ [{label}] アンカー未発見"); return False
+    path.write_text(c.replace(old, new, 1), encoding="utf-8"); print(f"  ✅ [{label}]"); return True
+
+# ============================================================
+# TASK A: /notifications 未読フィルタ実装
+# ============================================================
+def task_a():
+    print("\n[TASK A] /notifications 未読フィルタ実装")
+    write("src/app/(app)/notifications/page.tsx", '''\
 // /notifications — お知らせ一覧（フィルタ+ページネーション+未読フィルタ）
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -170,3 +204,110 @@ export default async function NotificationsPage({ searchParams }: Props) {
     </div>
   )
 }
+''')
+
+# ============================================================
+# TASK B: EstimateNewClient — 保存後 estimateNo を表示
+# ============================================================
+def task_b():
+    print("\n[TASK B] EstimateNewClient 保存後 estimateNo 表示")
+    rep(
+        "src/app/(app)/estimates/new/EstimateNewClient.tsx",
+        "setSaveMessage({ type: \"success\", text: `見積を保存しました（見積No: ${saved.estimateNo}）` })",
+        "setSaveMessage({ type: \"success\", text: `✅ 見積を保存しました　見積No: ${saved.estimateNo ?? saved.estimateId?.slice(0,8)}` })",
+        "保存後estimateNo表示"
+    )
+
+# ============================================================
+# TASK C: POST /api/v1/orders — 二重注文防止（409チェック）
+# ============================================================
+def task_c():
+    print("\n[TASK C] POST /api/v1/orders 二重注文防止チェック")
+    path = "src/app/api/v1/orders/route.ts"
+    content = read(path)
+    if "already_ordered" in content or "orderCount" in content or "409" in content:
+        print("  ⏭️  既に実装済み")
+        return
+
+    rep(path,
+        "  // 注文番号採番: Z + YYYYMMDD + 3桁連番",
+        '''\
+  // 二重注文防止チェック
+  const existingOrder = await prisma.order.findFirst({
+    where: { estimateHeaderId: estimateId, isDeleted: false },
+  })
+  if (existingOrder) {
+    return NextResponse.json(
+      { error: "この見積はすでに注文済みです", orderId: existingOrder.id, orderNo: existingOrder.orderNo },
+      { status: 409 }
+    )
+  }
+
+  // 注文番号採番: Z + YYYYMMDD + 3桁連番''',
+        "二重注文防止チェック追加"
+    )
+
+# ============================================================
+# TASK D: POST /api/v1/estimates/[id]/cancel — キャンセルAPI
+# ============================================================
+def task_d():
+    print("\n[TASK D] POST /api/v1/estimates/[id]/cancel 実装")
+    write("src/app/api/v1/estimates/[id]/cancel/route.ts", '''\
+// POST /api/v1/estimates/[id]/cancel — 見積キャンセル（論理削除）
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { id } = await params
+  const estimate = await prisma.estimateHeader.findFirst({
+    where: { id, customerId: session.user.customerId!, isDeleted: false },
+  })
+  if (!estimate) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  if (estimate.estimateStatus === "ordered") {
+    return NextResponse.json({ error: "注文済みの見積はキャンセルできません" }, { status: 422 })
+  }
+
+  await prisma.estimateHeader.update({
+    where: { id },
+    data: { estimateStatus: "cancelled", isDeleted: true },
+  })
+  return NextResponse.json({ cancelled: true, id })
+}
+''')
+
+# ============================================================
+# メイン
+# ============================================================
+def main():
+    print("=" * 60)
+    print("fix_session24.py 開始")
+    print("=" * 60)
+    task_a()
+    task_b()
+    task_c()
+    task_d()
+
+    print("\n→ tscチェック中...")
+    result = subprocess.run(["npx", "tsc", "--noEmit"], capture_output=True, text=True, cwd=str(ROOT))
+    if result.returncode != 0:
+        print("❌ tscエラー:")
+        print((result.stdout + result.stderr)[-6000:])
+        sys.exit(1)
+
+    print("✅ tscエラーなし → git add & push")
+    subprocess.run(["git", "add", "-A"], check=True, cwd=str(ROOT))
+    subprocess.run(["git", "commit", "-m",
+        "feat: notifications未読フィルタ/二重注文防止409/estimateキャンセルAPI"],
+        check=True, cwd=str(ROOT))
+    subprocess.run(["git", "push"], check=True, cwd=str(ROOT))
+    print("✅ push完了")
+
+if __name__ == "__main__":
+    main()
