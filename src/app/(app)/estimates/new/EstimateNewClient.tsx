@@ -202,6 +202,8 @@ type EstimateDetail = {
 
 type HeaderForm = {
   inputDate: string
+  estimateDate: string
+  chargeName: string
   customerOrderNo: string
   endUserNo: string
   destinationCode: string
@@ -319,6 +321,8 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
   // ヘッダーフォーム
   const [header, setHeader] = useState<HeaderForm>({
     inputDate:          todayStr(),
+    estimateDate:       todayStr(),
+    chargeName:         userInfo.chargeName ?? "",
     customerOrderNo:    copySource?.customerOrderNo ?? "",
     endUserNo:          copySource?.endUserNo ?? "",
     destinationCode:    copySource?.destinationCode ?? "",
@@ -588,6 +592,31 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
     )
   }
 
+  // ── 明細行 編集（Task 2-5）──
+  const handleEditDetail = (clientDetailId: string) => {
+    const target = details.find(d => d.clientDetailId === clientDetailId)
+    if (!target) return
+    // フォームに値をセット
+    setDetailForm({
+      materialCode:    target.materialCode,
+      kakouShiyouCode: target.kakouShiyouCode,
+      kakouShijiCodeT: target.kakouShijiCodeT,
+      kakouShijiCodeA: target.kakouShijiCodeA,
+      kakouShijiCodeB: target.kakouShijiCodeB,
+      sizeT: target.sizeT, sizeA: target.sizeA, sizeB: target.sizeB,
+      kousaTUpper: target.kousaTUpper, kousaTLower: target.kousaTLower,
+      kousaAUpper: target.kousaAUpper, kousaALower: target.kousaALower,
+      kousaBUpper: target.kousaBUpper, kousaBLower: target.kousaBLower,
+      mentori4: target.mentori4, mentori8: target.mentori8,
+      quantity: target.quantity,
+    })
+    // 対象行を一覧から削除（再計算→追加の流れ）
+    setDetails(prev => prev.filter(d => d.clientDetailId !== clientDetailId).map((d, i) => ({ ...d, rowNo: i + 1 })))
+    setCalcResult(null)
+    setCalcError("")
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // ────────────────────────────────────────────────
   // 合計金額
   // ────────────────────────────────────────────────
@@ -619,7 +648,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
         destinationAddress: header.destinationAddress || undefined,
         destinationTel:     header.destinationTel || undefined,
         destinationFax:     header.destinationFax || undefined,
+        estimateDate:      header.estimateDate || header.inputDate,
         requestNouki:      header.requestNouki || undefined,
+        chargeName:        header.chargeName || undefined,
         remarks:           header.remarks || undefined,
         editMode:          "New" as const,
         details: details.map((d, idx) => ({
@@ -763,6 +794,44 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               value={header.inputDate}
               onChange={e => { console.log("[入力日付]", e.target.value); setHeader(h => ({ ...h, inputDate: e.target.value })) }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* 見積日付 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              見積日付 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={header.estimateDate}
+              onChange={e => setHeader(h => ({ ...h, estimateDate: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-yellow-50"
+            />
+          </div>
+
+          {/* 希望納期 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">希望納期</label>
+            <input
+              type="text"
+              value={header.requestNouki}
+              onChange={e => setHeader(h => ({ ...h, requestNouki: e.target.value }))}
+              placeholder="例: 2026-06-30"
+              maxLength={20}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-yellow-50"
+            />
+          </div>
+
+          {/* 担当者名 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">担当者名</label>
+            <input
+              type="text"
+              value={header.chargeName}
+              onChange={e => setHeader(h => ({ ...h, chargeName: e.target.value }))}
+              maxLength={50}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-yellow-50"
             />
           </div>
 
@@ -1257,6 +1326,11 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">T</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">A</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">B</th>
+                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差T</th>
+                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差A</th>
+                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差B</th>
+                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">4C</th>
+                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">8C</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">数量</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">単価</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">金額</th>

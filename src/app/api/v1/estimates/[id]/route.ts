@@ -74,6 +74,8 @@ export async function PUT(
         data: {
           inputDate:         new Date(body.inputDate),
           estimateDate:      new Date(body.inputDate),
+          requestNouki:      body.requestNouki ?? null,
+          chargeName:        body.chargeName ?? null,
           customerOrderNo:   body.customerOrderNo ?? null,
           endUserNo:         body.endUserNo ?? null,
           destinationCode:   body.destinationCode ?? null,

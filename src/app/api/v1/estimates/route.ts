@@ -158,6 +158,7 @@ interface SaveHeaderRequest {
   destinationFax?: string
   shippingMethodId?: number
   requestNouki?: string
+  chargeName?: string
   remarks?: string
   editMode: "New" | "Edit" | "Copy"
 
@@ -243,8 +244,8 @@ export async function POST(req: NextRequest) {
           customerId:      session.user.customerId!,
           customerCode:    session.user.companyCode ?? "",
           customerName:    session.user.customerName ?? "",
-          // chargeName は EstimateHeader スキーマ非存在 → createdBy に保存
-          createdBy:       session.user.chargeName ?? session.user.userId ?? "",
+          chargeName:      body.chargeName ?? session.user.chargeName ?? null,
+          createdBy:       body.chargeName ?? session.user.chargeName ?? session.user.userId ?? "",
           estimateDate:    new Date(body.inputDate),
           inputDate:       new Date(body.inputDate),
           customerOrderNo: body.customerOrderNo ?? null,
@@ -258,7 +259,7 @@ export async function POST(req: NextRequest) {
           destinationTel:  body.destinationTel ?? null,
           destinationFax:  body.destinationFax ?? null,
           shippingMethodId: body.shippingMethodId ?? null,
-          // requestNouki は EstimateHeader スキーマ非存在のため除外
+          requestNouki:    body.requestNouki ?? null,
           remarks:         body.remarks ?? null,
           estimateStatus:  "saved",
           editMode:        "new",

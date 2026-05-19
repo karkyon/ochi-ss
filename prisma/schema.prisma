@@ -20,19 +20,19 @@ datasource db {
 
 /// 得意先（企業）マスタ
 model Customer {
-  id                  String    @id @default(uuid())
-  customerCode        String    @unique @map("customer_code")        // 6桁企業コード
-  customerName        String    @map("customer_name")
-  customerStatus      Int       @default(1) @map("customer_status")  // 1:有効 0:停止
-  loginEnabled        Boolean   @default(true) @map("login_enabled")
-  featureRestrictions Json?     @map("feature_restrictions")         // 機能制限JSON
-  allowedPages        Json?     @map("allowed_pages")                // 許可ページ一覧
-  sessionTimeoutMin   Int       @default(140) @map("session_timeout_min")
-  maxConcurrentLogins Int       @default(5) @map("max_concurrent_logins")
-  highSecurityFlag    Boolean   @default(false) @map("high_security_flag")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-  isDeleted           Boolean   @default(false) @map("is_deleted")
+  id                  String   @id @default(uuid())
+  customerCode        String   @unique @map("customer_code") // 6桁企業コード
+  customerName        String   @map("customer_name")
+  customerStatus      Int      @default(1) @map("customer_status") // 1:有効 0:停止
+  loginEnabled        Boolean  @default(true) @map("login_enabled")
+  featureRestrictions Json?    @map("feature_restrictions") // 機能制限JSON
+  allowedPages        Json?    @map("allowed_pages") // 許可ページ一覧
+  sessionTimeoutMin   Int      @default(140) @map("session_timeout_min")
+  maxConcurrentLogins Int      @default(5) @map("max_concurrent_logins")
+  highSecurityFlag    Boolean  @default(false) @map("high_security_flag")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  isDeleted           Boolean  @default(false) @map("is_deleted")
 
   users            User[]
   estimates        EstimateHeader[]
@@ -43,19 +43,19 @@ model Customer {
 
 /// ユーザー（企業内の担当者）
 model User {
-  id           String    @id @default(uuid())
-  customerId   String    @map("customer_id")
-  username     String                             // ログインID（企業内一意）
-  passwordHash String    @map("password_hash")   // bcrypt コスト12
-  chargeName   String?   @map("charge_name")     // 担当者名
-  userStatus   Int       @default(1) @map("user_status")
-  accountLocked Boolean  @default(false) @map("account_locked")
-  userRole     Int       @default(1) @map("user_role")
+  id            String    @id @default(uuid())
+  customerId    String    @map("customer_id")
+  username      String // ログインID（企業内一意）
+  passwordHash  String    @map("password_hash") // bcrypt コスト12
+  chargeName    String?   @map("charge_name") // 担当者名
+  userStatus    Int       @default(1) @map("user_status")
+  accountLocked Boolean   @default(false) @map("account_locked")
+  userRole      Int       @default(1) @map("user_role")
   // 0:Guest / 1:User / 2:Manager / 3:Admin / 4:SuperAdmin
-  lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  isDeleted    Boolean   @default(false) @map("is_deleted")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  isDeleted     Boolean   @default(false) @map("is_deleted")
 
   customer       Customer       @relation(fields: [customerId], references: [id])
   loginHistories LoginHistory[]
@@ -73,7 +73,7 @@ model LoginHistory {
   ipAddress    String   @map("ip_address")
   userAgent    String?  @map("user_agent")
   sessionId    String?  @map("session_id")
-  result       Int      @map("result")        // 1:成功 / 負値:失敗コード
+  result       Int      @map("result") // 1:成功 / 負値:失敗コード
   failReason   String?  @map("fail_reason")
   loginMethod  String?  @map("login_method")
 
@@ -90,7 +90,7 @@ model SecurityLog {
   message    String
   ipAddress  String?  @map("ip_address")
   username   String?
-  logLevel   String   @map("log_level")    // DEBUG/INFO/WARNING/ERROR/ALERT
+  logLevel   String   @map("log_level") // DEBUG/INFO/WARNING/ERROR/ALERT
   occurredAt DateTime @default(now()) @map("occurred_at")
 
   @@index([occurredAt])
@@ -105,11 +105,11 @@ model SecurityLog {
 /// 見積ヘッダー
 model EstimateHeader {
   id                 String    @id @default(uuid())
-  estimateNo         String?   @unique @map("estimate_no")           // サーバー採番（8桁）
+  estimateNo         String?   @unique @map("estimate_no") // サーバー採番（8桁）
   customerId         String    @map("customer_id")
   customerCode       String    @map("customer_code")
   customerName       String    @map("customer_name")
-  customerOrderNo    String?   @map("customer_order_no")             // お客様注文番号
+  customerOrderNo    String?   @map("customer_order_no") // お客様注文番号
   endUserNo          String?   @map("end_user_no")
   estimateDate       DateTime? @map("estimate_date")
   inputDate          DateTime  @default(now()) @map("input_date")
@@ -119,10 +119,12 @@ model EstimateHeader {
   destinationDept    String?   @map("destination_dept")
   destinationPerson  String?   @map("destination_person")
   destinationZip     String?   @map("destination_zip")
-  destinationAddress String?   @map("destination_address")           // AES-256-GCM 暗号化
-  destinationTel     String?   @map("destination_tel")               // AES-256-GCM 暗号化
-  destinationFax     String?   @map("destination_fax")               // AES-256-GCM 暗号化
+  destinationAddress String?   @map("destination_address") // AES-256-GCM 暗号化
+  destinationTel     String?   @map("destination_tel") // AES-256-GCM 暗号化
+  destinationFax     String?   @map("destination_fax") // AES-256-GCM 暗号化
   shippingMethodId   Int?      @map("shipping_method_id")
+  requestNouki       String?   @map("request_nouki") // 希望納期（テキスト入力）
+  chargeName         String?   @map("charge_name") // 担当者名
   remarks            String?
   estimateStatus     String    @default("draft") @map("estimate_status")
   // draft / saved / ordered / cancelled
@@ -131,67 +133,72 @@ model EstimateHeader {
   createdBy          String    @map("created_by")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
+  isDraftOnly        Boolean   @default(false) @map("is_draft_only") // Draft専用フラグ
+  draftExpiresAt     DateTime? @map("draft_expires_at") // Draft有効期限
+  draftSavedAt       DateTime? @map("draft_saved_at") // 最終自動保存日時
+  draftDeviceInfo    String?   @map("draft_device_info") // 保存端末情報
   isDeleted          Boolean   @default(false) @map("is_deleted")
 
-  customer    Customer         @relation(fields: [customerId], references: [id])
-  details     EstimateDetail[]
-  order       Order?
-  syncEvents  OutboxEvent[]
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  details    EstimateDetail[]
+  order      Order?
+  syncEvents OutboxEvent[]
 
   @@index([customerId, estimateStatus])
+  @@index([customerId, isDraftOnly, draftExpiresAt])
   @@index([estimateNo])
   @@map("estimate_headers")
 }
 
 /// 見積明細
 model EstimateDetail {
-  id               String   @id @default(uuid())
-  estimateHeaderId String   @map("estimate_header_id")
-  rowNo            Int      @map("row_no")
-  materialCode     String   @map("material_code")
-  materialName     String?  @map("material_name")
+  id                  String    @id @default(uuid())
+  estimateHeaderId    String    @map("estimate_header_id")
+  rowNo               Int       @map("row_no")
+  materialCode        String    @map("material_code")
+  materialName        String?   @map("material_name")
   // 加工仕様
-  kakouShiyouCode  Int      @map("kakou_shiyou_code")
-  kakouShiyou      String?  @map("kakou_shiyou")
+  kakouShiyouCode     Int       @map("kakou_shiyou_code")
+  kakouShiyou         String?   @map("kakou_shiyou")
   // 加工指示コード（T/A/B）
-  kakouShijiCodeT  String?  @map("kakou_shiji_code_t")
-  kakouShijiCodeA  String?  @map("kakou_shiji_code_a")
-  kakouShijiCodeB  String?  @map("kakou_shiji_code_b")
-  kakouT           String?  @map("kakou_t")
-  kakouA           String?  @map("kakou_a")
-  kakouB           String?  @map("kakou_b")
+  kakouShijiCodeT     String?   @map("kakou_shiji_code_t")
+  kakouShijiCodeA     String?   @map("kakou_shiji_code_a")
+  kakouShijiCodeB     String?   @map("kakou_shiji_code_b")
+  kakouT              String?   @map("kakou_t")
+  kakouA              String?   @map("kakou_a")
+  kakouB              String?   @map("kakou_b")
   // 寸法（mm）
-  sizeT            Decimal  @map("size_t") @db.Decimal(7, 3)
-  sizeA            Decimal  @map("size_a") @db.Decimal(7, 3)
-  sizeB            Decimal  @map("size_b") @db.Decimal(7, 3)
+  sizeT               Decimal   @map("size_t") @db.Decimal(7, 3)
+  sizeA               Decimal   @map("size_a") @db.Decimal(7, 3)
+  sizeB               Decimal   @map("size_b") @db.Decimal(7, 3)
   // 公差（T/A/B × 上下限）
-  kousaTUpper      Decimal? @map("kousa_t_upper") @db.Decimal(6, 3)
-  kousaTLower      Decimal? @map("kousa_t_lower") @db.Decimal(6, 3)
-  kousaAUpper      Decimal? @map("kousa_a_upper") @db.Decimal(6, 3)
-  kousaALower      Decimal? @map("kousa_a_lower") @db.Decimal(6, 3)
-  kousaBUpper      Decimal? @map("kousa_b_upper") @db.Decimal(6, 3)
-  kousaBLower      Decimal? @map("kousa_b_lower") @db.Decimal(6, 3)
+  kousaTUpper         Decimal?  @map("kousa_t_upper") @db.Decimal(6, 3)
+  kousaTLower         Decimal?  @map("kousa_t_lower") @db.Decimal(6, 3)
+  kousaAUpper         Decimal?  @map("kousa_a_upper") @db.Decimal(6, 3)
+  kousaALower         Decimal?  @map("kousa_a_lower") @db.Decimal(6, 3)
+  kousaBUpper         Decimal?  @map("kousa_b_upper") @db.Decimal(6, 3)
+  kousaBLower         Decimal?  @map("kousa_b_lower") @db.Decimal(6, 3)
   // 面取り
-  mentoriShiji     String?  @map("mentori_shiji")
-  mentori4         Decimal? @map("mentori_4") @db.Decimal(5, 2)
-  mentori8         Decimal? @map("mentori_8") @db.Decimal(5, 2)
+  mentoriShiji        String?   @map("mentori_shiji")
+  mentori4            Decimal?  @map("mentori_4") @db.Decimal(5, 2)
+  mentori8            Decimal?  @map("mentori_8") @db.Decimal(5, 2)
   // 数量
-  quantity         Int
+  quantity            Int
   // 計算結果
-  unitPrice        Decimal? @map("unit_price") @db.Decimal(12, 2)
-  totalPrice       Decimal? @map("total_price") @db.Decimal(14, 2)
-  shortestDelivery String?  @map("shortest_delivery")
-  deliveryDeadline DateTime? @map("delivery_deadline")
+  unitPrice           Decimal?  @map("unit_price") @db.Decimal(12, 2)
+  totalPrice          Decimal?  @map("total_price") @db.Decimal(14, 2)
+  shortestDelivery    String?   @map("shortest_delivery")
+  deliveryDeadline    DateTime? @map("delivery_deadline")
   // 計算中間値（デバッグ・監査用）
-  materialSizeT       Decimal? @map("material_size_t") @db.Decimal(7, 3)
-  materialSizeA       Decimal? @map("material_size_a") @db.Decimal(7, 3)
-  materialSizeB       Decimal? @map("material_size_b") @db.Decimal(7, 3)
-  materialUnitWeight  Decimal? @map("material_unit_weight") @db.Decimal(10, 4)
-  materialTotalWeight Decimal? @map("material_total_weight") @db.Decimal(10, 4)
-  productUnitWeight   Decimal? @map("product_unit_weight") @db.Decimal(10, 4)
-  productTotalWeight  Decimal? @map("product_total_weight") @db.Decimal(10, 4)
-  processingCost6f    Decimal? @map("processing_cost_6f") @db.Decimal(12, 2)
-  processingCostTotal Decimal? @map("processing_cost_total") @db.Decimal(12, 2)
+  materialSizeT       Decimal?  @map("material_size_t") @db.Decimal(7, 3)
+  materialSizeA       Decimal?  @map("material_size_a") @db.Decimal(7, 3)
+  materialSizeB       Decimal?  @map("material_size_b") @db.Decimal(7, 3)
+  materialUnitWeight  Decimal?  @map("material_unit_weight") @db.Decimal(10, 4)
+  materialTotalWeight Decimal?  @map("material_total_weight") @db.Decimal(10, 4)
+  productUnitWeight   Decimal?  @map("product_unit_weight") @db.Decimal(10, 4)
+  productTotalWeight  Decimal?  @map("product_total_weight") @db.Decimal(10, 4)
+  processingCost6f    Decimal?  @map("processing_cost_6f") @db.Decimal(12, 2)
+  processingCostTotal Decimal?  @map("processing_cost_total") @db.Decimal(12, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -207,7 +214,7 @@ model EstimateDetail {
 /// 注文（発注確定）
 model Order {
   id               String    @id @default(uuid())
-  orderNo          String?   @unique @map("order_no")           // 業務側採番後に設定
+  orderNo          String?   @unique @map("order_no") // 業務側採番後に設定
   estimateHeaderId String    @unique @map("estimate_header_id")
   customerId       String    @map("customer_id")
   orderDate        DateTime  @default(now()) @map("order_date")
@@ -215,7 +222,7 @@ model Order {
   // pending / confirmed / in_progress / shipped / completed / cancelled
   totalAmount      Decimal?  @map("total_amount") @db.Decimal(14, 2)
   detailCount      Int?      @map("detail_count")
-  trackingNo       String?   @map("tracking_no")                // 送り状番号
+  trackingNo       String?   @map("tracking_no") // 送り状番号
   confirmedAt      DateTime? @map("confirmed_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
@@ -236,23 +243,23 @@ model Order {
 
 /// 直送先マスタ（得意先ごとに管理）
 model DirectDelivery {
-  id                String  @id @default(uuid())
-  customerId        String  @map("customer_id")
-  customerCode      String  @map("customer_code")
-  deliveryCode      String  @map("delivery_code")
-  companyName       String  @map("company_name")
+  id                String   @id @default(uuid())
+  customerId        String   @map("customer_id")
+  customerCode      String   @map("customer_code")
+  deliveryCode      String   @map("delivery_code")
+  companyName       String   @map("company_name")
   furigana          String?
-  shortName         String? @map("short_name")
-  corporateType     String? @map("corporate_type")
-  corporatePosition String? @map("corporate_position")
-  departmentName    String? @map("department_name")
-  contactPerson     String? @map("contact_person")
-  postalCode        String? @map("postal_code")
-  address1          String? @map("address1")        // AES-256-GCM 暗号化
-  address2          String? @map("address2")        // AES-256-GCM 暗号化
-  address3          String? @map("address3")        // AES-256-GCM 暗号化
-  phoneNumber       String? @map("phone_number")    // AES-256-GCM 暗号化
-  faxNumber         String? @map("fax_number")      // AES-256-GCM 暗号化
+  shortName         String?  @map("short_name")
+  corporateType     String?  @map("corporate_type")
+  corporatePosition String?  @map("corporate_position")
+  departmentName    String?  @map("department_name")
+  contactPerson     String?  @map("contact_person")
+  postalCode        String?  @map("postal_code")
+  address1          String?  @map("address1") // AES-256-GCM 暗号化
+  address2          String?  @map("address2") // AES-256-GCM 暗号化
+  address3          String?  @map("address3") // AES-256-GCM 暗号化
+  phoneNumber       String?  @map("phone_number") // AES-256-GCM 暗号化
+  faxNumber         String?  @map("fax_number") // AES-256-GCM 暗号化
   remarks           String?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -293,8 +300,8 @@ model Notification {
   id              String    @id @default(uuid())
   title           String
   content         String
-  notifType       String    @map("notif_type")         // info / warning / urgent
-  targetCustomers Json?     @map("target_customers")   // null=全顧客
+  notifType       String    @map("notif_type") // info / warning / urgent
+  targetCustomers Json?     @map("target_customers") // null=全顧客
   publishedAt     DateTime? @map("published_at")
   expiresAt       DateTime? @map("expires_at")
   createdBy       String    @map("created_by")
@@ -313,8 +320,8 @@ model Notification {
 /// Transactional Outbox（Web→業務への送信キュー）
 model OutboxEvent {
   id            String    @id @default(uuid())
-  aggregateType String    @map("aggregate_type")   // estimate / order
-  aggregateId   String    @map("aggregate_id")     // EstimateHeader.id or Order.id
+  aggregateType String    @map("aggregate_type") // estimate / order
+  aggregateId   String    @map("aggregate_id") // EstimateHeader.id or Order.id
   eventType     String    @map("event_type")
   // estimate.created / order.placed / order.cancelled など
   payload       Json
@@ -340,10 +347,10 @@ model OrderStatusHistory {
   orderId      String    @map("order_id")
   fromStatus   String?   @map("from_status")
   toStatus     String    @map("to_status")
-  changedBy    String    @map("changed_by")     // "system" または担当者識別子
-  changeSource String    @map("change_source")  // "web" / "business_system"
+  changedBy    String    @map("changed_by") // "system" または担当者識別子
+  changeSource String    @map("change_source") // "web" / "business_system"
   changeReason String?   @map("change_reason")
-  trackingNo   String?   @map("tracking_no")   // 送り状番号
+  trackingNo   String?   @map("tracking_no") // 送り状番号
   notifiedAt   DateTime? @map("notified_at")
   occurredAt   DateTime  @default(now()) @map("occurred_at")
 
@@ -358,13 +365,13 @@ model SpecChangeHistory {
   id            String    @id @default(uuid())
   orderId       String    @map("order_id")
   rowNo         Int       @map("row_no")
-  fieldName     String    @map("field_name")           // 変更されたフィールド名
+  fieldName     String    @map("field_name") // 変更されたフィールド名
   oldValue      String?   @map("old_value")
   newValue      String    @map("new_value")
-  changeReason  String?   @map("change_reason")        // 業務側担当者が記入した変更理由
+  changeReason  String?   @map("change_reason") // 業務側担当者が記入した変更理由
   changedBy     String    @map("changed_by")
-  changeSource  String    @map("change_source")        // "web" / "business_system"
-  webNotifiedAt DateTime? @map("web_notified_at")      // Web顧客への通知日時
+  changeSource  String    @map("change_source") // "web" / "business_system"
+  webNotifiedAt DateTime? @map("web_notified_at") // Web顧客への通知日時
   occurredAt    DateTime  @default(now()) @map("occurred_at")
 
   order Order @relation(fields: [orderId], references: [id])
@@ -375,17 +382,17 @@ model SpecChangeHistory {
 
 /// 全同期イベント査証ログ（削除禁止・isDeletedなし）
 model SyncChangeLog {
-  id          String   @id @default(uuid())
-  direction   String   @map("direction")         // "web_to_biz" / "biz_to_web"
-  eventType   String   @map("event_type")
-  sourceTable String   @map("source_table")
-  targetTable String   @map("target_table")
-  recordId    String   @map("record_id")
-  payload     Json?
-  status      String   @map("status")            // success / failed
-  errorMessage String? @map("error_message")
-  processedAt DateTime @default(now()) @map("processed_at")
-  durationMs  Int?     @map("duration_ms")
+  id           String   @id @default(uuid())
+  direction    String   @map("direction") // "web_to_biz" / "biz_to_web"
+  eventType    String   @map("event_type")
+  sourceTable  String   @map("source_table")
+  targetTable  String   @map("target_table")
+  recordId     String   @map("record_id")
+  payload      Json?
+  status       String   @map("status") // success / failed
+  errorMessage String?  @map("error_message")
+  processedAt  DateTime @default(now()) @map("processed_at")
+  durationMs   Int?     @map("duration_ms")
 
   @@index([direction, processedAt])
   @@index([recordId])

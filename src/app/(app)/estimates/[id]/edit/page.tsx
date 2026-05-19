@@ -72,6 +72,9 @@ export default async function EstimateEditPage({ params }: Props) {
     destinationAddress: estimate.destinationAddress ?? "",
     destinationTel:   estimate.destinationTel ?? "",
     destinationFax:   estimate.destinationFax ?? "",
+    requestNouki:     (estimate as any).requestNouki ?? "",
+    chargeName:       (estimate as any).chargeName ?? "",
+    estimateDate:     estimate.estimateDate?.toISOString().slice(0, 10) ?? estimate.inputDate.toISOString().slice(0, 10),
     remarks:          estimate.remarks ?? "",
     details: estimate.details.map(d => ({
       id:              d.id,
