@@ -1095,6 +1095,13 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                     >
                       削除
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEditDetail(d.clientDetailId)}
+                      className="px-2 py-1 text-xs rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors ml-1"
+                    >
+                      編集
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -1349,6 +1349,17 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     <td className="px-3 py-2.5 text-right text-gray-600">{d.sizeT}</td>
                     <td className="px-3 py-2.5 text-right text-gray-600">{d.sizeA}</td>
                     <td className="px-3 py-2.5 text-right text-gray-600">{d.sizeB}</td>
+                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">
+                      {d.kousaTUpper || d.kousaTLower ? `+${d.kousaTUpper||0}/-${d.kousaTLower||0}` : "–"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">
+                      {d.kousaAUpper || d.kousaALower ? `+${d.kousaAUpper||0}/-${d.kousaALower||0}` : "–"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">
+                      {d.kousaBUpper || d.kousaBLower ? `+${d.kousaBUpper||0}/-${d.kousaBLower||0}` : "–"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">{d.mentori4 || "–"}</td>
+                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">{d.mentori8 || "–"}</td>
                     <td className="px-3 py-2.5 text-right text-gray-600">{d.quantity}</td>
                     <td className="px-3 py-2.5 text-right text-gray-700">
                       {d.unitPrice != null ? `¥${d.unitPrice.toLocaleString()}` : "—"}
