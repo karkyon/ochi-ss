@@ -1054,10 +1054,10 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                     value={detailForm[`size${axis}` as keyof DetailForm]}
                     onChange={e => {
                       console.log(`[寸法${axis}]`, e.target.value)
-                      console.log(`[寸法${axis}]`, e.target.value)
                       setDetailForm(p => ({ ...p, [`size${axis}`]: e.target.value }))
                       setCalcResult(null)
                     }}
+                    onBlur={e => setDetailForm(p => ({ ...p, [`size${axis}`]: formatDimension(e.target.value) }))}
                     className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0.000"
                   />
