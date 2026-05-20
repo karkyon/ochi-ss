@@ -131,6 +131,7 @@ interface EstimateData {
   chargeName:       string
   estimateDate:     string
   remarks:          string
+  isDraftOnly?:     boolean
   details: {
     id:              string
     rowNo:           number
@@ -219,6 +220,36 @@ function dbDetailToClientDetail(d: EstimateData["details"][number]): EstimateDet
 
 export default function EstimateEditClient({ estimateId, estimateData, materials, processingSpecs, userInfo }: Props) {
   const router = useRouter()
+
+  // Draft 自動保存 Hook（isDraftOnly の場合のみ有効）
+  const initialDraftId = estimateData?.isDraftOnly ? estimateData.id : null
+  const { draftId: _draftIdEdit, savedAt, saveStatus, triggerSave } = useDraftAutoSave(initialDraftId)
+
+  // Draft 用: EstimateDetail（sizeT=string）→ DetailItem（sizeT=number）変換
+  const toDetailItemsEdit = (dets: ReturnType<typeof dbDetailToClientDetail>[]) =>
+    dets.map(d => ({
+      materialCode:    d.materialCode,
+      kakouShiyouCode: d.kakouShiyouCode,
+      kakouShijiCodeT: d.kakouShijiCodeT || undefined,
+      kakouShijiCodeA: d.kakouShijiCodeA || undefined,
+      kakouShijiCodeB: d.kakouShijiCodeB || undefined,
+      sizeT:           d.sizeT ? parseFloat(d.sizeT) : 0,
+      sizeA:           d.sizeA ? parseFloat(d.sizeA) : 0,
+      sizeB:           d.sizeB ? parseFloat(d.sizeB) : 0,
+      kousaTUpper:     d.kousaTUpper ? parseFloat(d.kousaTUpper) : null,
+      kousaTLower:     d.kousaTLower ? parseFloat(d.kousaTLower) : null,
+      kousaAUpper:     d.kousaAUpper ? parseFloat(d.kousaAUpper) : null,
+      kousaALower:     d.kousaALower ? parseFloat(d.kousaALower) : null,
+      kousaBUpper:     d.kousaBUpper ? parseFloat(d.kousaBUpper) : null,
+      kousaBLower:     d.kousaBLower ? parseFloat(d.kousaBLower) : null,
+      mentori4:        d.mentori4 ? parseFloat(d.mentori4) : null,
+      mentori8:        d.mentori8 ? parseFloat(d.mentori8) : null,
+      quantity:        d.quantity ? parseInt(d.quantity) : 0,
+      unitPrice:       d.unitPrice,
+      totalPrice:      d.totalPrice,
+      shortestDelivery: d.shortestDelivery ?? null,
+      deliveryDeadline: d.deliveryDeadline ?? null,
+    }))
 
   // ── 状態 ──
   // ── 納期有効期限チェック（編集モード時） ──
@@ -1118,7 +1149,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
           <DraftSaveIndicator
             status={saveStatus}
             savedAt={savedAt}
-            onRetry={() => triggerSave(header, details, true)}
+            onRetry={() => triggerSave(header, toDetailItemsEdit(details), true)}
           />
         </div>
       )}

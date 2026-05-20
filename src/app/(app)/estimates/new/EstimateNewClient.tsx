@@ -366,15 +366,6 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
     } | null
   } | null>(null)
 
-  // ヘッダー変更時に自動保存トリガー
-  const handleHeaderChange = useCallback((updater: (h: HeaderForm) => HeaderForm) => {
-    setHeader(prev => {
-      const next = updater(prev)
-      triggerSave(next, details)
-      return next
-    })
-  }, [details, triggerSave])
-
   // 明細リスト
   const [details, setDetails] = useState<EstimateDetail[]>(() => {
     if (!copySource?.details?.length) return []
@@ -411,6 +402,41 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       intermediate:     null,
     }))
   })
+
+  // Draft 用: EstimateDetail（sizeT=string）→ DetailItem（sizeT=number）変換
+  const toDetailItems = (dets: EstimateDetail[]) =>
+    dets.map(d => ({
+      materialCode:    d.materialCode,
+      kakouShiyouCode: d.kakouShiyouCode,
+      kakouShijiCodeT: d.kakouShijiCodeT || undefined,
+      kakouShijiCodeA: d.kakouShijiCodeA || undefined,
+      kakouShijiCodeB: d.kakouShijiCodeB || undefined,
+      sizeT:           d.sizeT ? parseFloat(d.sizeT) : 0,
+      sizeA:           d.sizeA ? parseFloat(d.sizeA) : 0,
+      sizeB:           d.sizeB ? parseFloat(d.sizeB) : 0,
+      kousaTUpper:     d.kousaTUpper ? parseFloat(d.kousaTUpper) : null,
+      kousaTLower:     d.kousaTLower ? parseFloat(d.kousaTLower) : null,
+      kousaAUpper:     d.kousaAUpper ? parseFloat(d.kousaAUpper) : null,
+      kousaALower:     d.kousaALower ? parseFloat(d.kousaALower) : null,
+      kousaBUpper:     d.kousaBUpper ? parseFloat(d.kousaBUpper) : null,
+      kousaBLower:     d.kousaBLower ? parseFloat(d.kousaBLower) : null,
+      mentori4:        d.mentori4 ? parseFloat(d.mentori4) : null,
+      mentori8:        d.mentori8 ? parseFloat(d.mentori8) : null,
+      quantity:        d.quantity ? parseInt(d.quantity) : 0,
+      unitPrice:       d.unitPrice,
+      totalPrice:      d.totalPrice,
+      shortestDelivery: d.shortestDelivery ?? null,
+      deliveryDeadline: d.deliveryDeadline ?? null,
+    }))
+
+  // ヘッダー変更時に自動保存トリガー
+  const handleHeaderChange = useCallback((updater: (h: HeaderForm) => HeaderForm) => {
+    setHeader(prev => {
+      const next = updater(prev)
+      triggerSave(next, toDetailItems(details))
+      return next
+    })
+  }, [details, triggerSave]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // UI状態
   const [calcLoading, setCalcLoading]   = useState(false)
@@ -589,7 +615,11 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       intermediate:     calcResult.intermediate,
     }
 
-    setDetails(prev => [...prev, newDetail])
+    setDetails(prev => {
+      const next = [...prev, newDetail]
+      triggerSave(header, toDetailItems(next), true) // 明細追加時は即時保存
+      return next
+    })
     setDetailForm(EMPTY_DETAIL_FORM)
     setCalcResult(null)
     setCalcError("")
@@ -1404,7 +1434,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             <DraftSaveIndicator
               status={saveStatus}
               savedAt={savedAt}
-              onRetry={() => triggerSave(header, details, true)}
+              onRetry={() => triggerSave(header, toDetailItems(details), true)}
             />
           </div>
 
