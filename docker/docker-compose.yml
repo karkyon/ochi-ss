@@ -132,6 +132,33 @@ services:
       - ochi_internal
 
   # -----------------------------------------------------------
+  # Cron（Draft クリーンアップ・定期バッチ）
+  # -----------------------------------------------------------
+  cron:
+    image: node:20-alpine
+    container_name: ochi_cron
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ../:/app:ro
+      - cron_logs:/var/log/ochi
+    environment:
+      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD}@postgres:5432/ochi_ss
+      TZ: Asia/Tokyo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # 毎日0時にDraft期限切れクリーンアップを実行
+    command: >
+      sh -c "
+        apk add --no-cache dcron &&
+        echo '0 0 * * * cd /app && npx ts-node --project tsconfig.json scripts/cleanup-expired-drafts.ts >> /var/log/ochi/cleanup.log 2>&1' | crontab - &&
+        crond -f -l 2
+      "
+    networks:
+      - ochi_internal
+
+  # -----------------------------------------------------------
   # Caddy（リバースプロキシ + 自動HTTPS）
   # -----------------------------------------------------------
   caddy:
@@ -155,3 +182,4 @@ volumes:
   redisdata:
   caddy_data:
   caddy_config:
+  cron_logs:

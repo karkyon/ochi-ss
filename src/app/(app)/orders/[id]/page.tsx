@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import OrderCancelButton from "./OrderCancelButton"
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   pending:     { label: "処理中",   color: "bg-yellow-100 text-yellow-700" },
