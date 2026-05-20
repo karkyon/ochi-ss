@@ -58,6 +58,9 @@ export default async function OrderDetailPage({ params }: Props) {
         <div className="flex items-center gap-2">
           <Link href="/orders" className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">← 注文一覧</Link>
           <Link href={`/api/v1/orders/${order.id}/pdf`} target="_blank" className="px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-sm hover:bg-emerald-50">🖨️ 注文書PDF</Link>
+          {["pending", "confirmed"].includes(order.orderStatus) && (
+            <OrderCancelButton orderId={order.id} orderNo={order.orderNo ?? order.id.slice(0, 8)} />
+          )}
           <Link href="/dashboard" className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">メインメニュー</Link>
         </div>
       </div>
