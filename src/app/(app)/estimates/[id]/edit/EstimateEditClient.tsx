@@ -1067,22 +1067,22 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">No</th>
-                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">材料 <span className="text-red-500">*</span></th>
-                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">加工仕様 <span className="text-red-500">*</span></th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">T</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">A</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">B</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差T</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差A</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差B</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">4C</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">8C</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">数量 <span className="text-red-500">*</span></th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">単価</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">金額</th>
-                <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap">最短納期</th>
-                <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap">操作</th>
+                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">No</th>
+                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">材料 <span className="text-red-500">*</span></th>
+                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">加工仕様 <span className="text-red-500">*</span></th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">T</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">A</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">B</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">公差T</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">公差A</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">公差B</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">4C</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">8C</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">数量 <span className="text-red-500">*</span></th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">単価</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">金額</th>
+                <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">最短納期</th>
+                <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
