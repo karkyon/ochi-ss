@@ -158,7 +158,7 @@ function LoginPageInner() {
                 onKeyDown={handleKeyDown(userIdRef)}
                 placeholder="12345"
                 autoComplete="organization"
-                className="w-full h-11 px-4 text-[15px] border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A4080]/30 focus:border-[#1A4080] transition-colors placeholder:text-[#C4C9D4] disabled:bg-gray-50"
+                className="w-full h-11 px-4 text-[15px] border border-[#D1D5DB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A4080]/30 focus:border-[#1A4080] transition-colors placeholder:text-[#C4C9D4] disabled:bg-gray-50 font-mono tracking-[0.2em] text-center"
                 disabled={isLoading}
               />
               <p className="text-[11px] text-[#9CA3AF] mt-1">例: 00010（5桁の数字）</p>
