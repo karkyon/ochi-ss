@@ -23,9 +23,15 @@ export async function GET() {
     where: {
       customerId:    session.user.customerId!,
       estimateStatus: "draft",
-      isDraftOnly:   true,
+      // isDraftOnly=true に限定せず、draft ステータスのもの全件を対象にする
+      // （自動保存 draft + 通常保存途中の両方をカバー）
       isDeleted:     false,
-      draftExpiresAt: { gt: now },
+      OR: [
+        // 自動保存 Draft（有効期限内）
+        { isDraftOnly: true, draftExpiresAt: { gt: now } },
+        // 通常の保存途中（isDraftOnly=false でも draft ステータスのもの）
+        { isDraftOnly: false },
+      ],
     },
     orderBy: { draftSavedAt: "desc" },
     take: 5,

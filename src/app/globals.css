@@ -28,11 +28,15 @@ body {
 /* ─── Ochi-ss ユーティリティ ─── */
 
 /* フォーカス時黄色ハイライト（旧システム踏襲） */
-.ochi-input:focus {
-  background-color: #ffffcc !important;
-  border-color: #f59e0b !important;
-  outline: none !important;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+@layer utilities {
+  .ochi-input:focus {
+    background-color: #ffffcc !important;
+    border-color: #f59e0b !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+    /* Tailwind v4: ring をリセットして黄色背景を確実に表示 */
+    --tw-ring-shadow: 0 0 0 0 transparent !important;
+  }
 }
 
 /* 数値カラム等幅フォント */

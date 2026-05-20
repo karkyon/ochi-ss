@@ -47,19 +47,26 @@ export default function DraftRestoreBanner() {
 
   useEffect(() => {
     // 同一セッションで既に「後で」を押していたら非表示
-    if (sessionStorage.getItem(SESSION_FLAG)) return
+    const dismissed = sessionStorage.getItem(SESSION_FLAG)
+    if (dismissed) {
+      console.log("[DraftRestoreBanner] sessionStorage フラグあり → バナー非表示")
+      return
+    }
 
     void (async () => {
       try {
+        console.log("[DraftRestoreBanner] drafts API 呼び出し中...")
         const res = await fetch("/api/v1/estimates/drafts")
+        console.log("[DraftRestoreBanner] API status:", res.status)
         if (!res.ok) return
         const data = await res.json()
+        console.log("[DraftRestoreBanner] drafts件数:", data.drafts?.length ?? 0, data.drafts)
         if (data.drafts && data.drafts.length > 0) {
           setDrafts(data.drafts)
           setVisible(true)
         }
-      } catch {
-        // ネットワークエラーはサイレント
+      } catch (e) {
+        console.warn("[DraftRestoreBanner] ネットワークエラー:", e)
       }
     })()
   }, [])

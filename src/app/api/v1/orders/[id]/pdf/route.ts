@@ -170,6 +170,20 @@ export async function GET(
 </body>
 </html>`
 
+    // PDF発行ログ記録（監査証跡）
+  try {
+    await prisma.securityLog.create({
+      data: {
+        eventType: "PDF_ISSUE",
+        message:   `注文書PDF発行 orderId=${id}`,
+        logLevel:  "INFO",
+        username:  (session.user as any).userId ?? "",
+      },
+    })
+  } catch (logErr) {
+    console.warn("[orders/pdf] SecurityLog 記録失敗:", logErr)
+  }
+
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
   })

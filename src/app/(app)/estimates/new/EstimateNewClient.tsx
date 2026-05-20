@@ -232,6 +232,12 @@ type DetailForm = Omit<EstimateDetail,
 // 初期値
 // ────────────────────────────────────────────────
 
+// 納期有効期限切れチェック
+function isDeliveryExpired(deliveryDeadline: string | null | undefined): boolean {
+  if (!deliveryDeadline) return false
+  return new Date(deliveryDeadline) < new Date()
+}
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -311,6 +317,8 @@ interface Props {
 export default function EstimateNewClient({ materials, processingSpecs, userInfo, copySource }: Props) {
   // 加工指示マスタ（SQL Serverからバインド）
   const [cuttingMethods, setCuttingMethods] = useState<CuttingMethod[]>([])
+  // 材料コード → 加工仕様コード[] マップ（動的フィルタ用）
+  const [materialProcessingMap, setMaterialProcessingMap] = useState<Record<string, number[]>>({})
   
   useEffect(() => {
     fetch(`/api/v1/cutting-methods?customerCode=${userInfo.customerCode}`)
@@ -321,6 +329,17 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       })
       .catch((e) => { console.error('[加工指示API] エラー:', e) })
   }, [userInfo.customerCode])
+
+  // 材料×加工仕様マップ取得
+  useEffect(() => {
+    fetch("/api/v1/masters/material-processing-map")
+      .then(r => r.json())
+      .then(data => {
+        console.log('[材料×加工仕様マップ] レスポンス件数:', Object.keys(data.map ?? {}).length)
+        if (data.map) setMaterialProcessingMap(data.map)
+      })
+      .catch((e) => { console.warn('[材料×加工仕様マップ] エラー:', e) })
+  }, [])
 
   // Draft 自動保存 Hook
   const { draftId: _draftId, savedAt, saveStatus, triggerSave } = useDraftAutoSave(null)
@@ -404,6 +423,23 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       intermediate:     null,
     }))
   })
+
+  // 明細行 選択状態管理（全選択/個別選択）
+  const [selectedDetails, setSelectedDetails] = useState<Set<string>>(new Set())
+  const allDetailIds = details.map(d => d.clientDetailId)
+  const isAllSelected = allDetailIds.length > 0 && allDetailIds.every(id => selectedDetails.has(id))
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedDetails(new Set(allDetailIds))
+    else setSelectedDetails(new Set())
+  }
+  const handleSelectOne = (id: string, checked: boolean) => {
+    setSelectedDetails(prev => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
 
   // Draft 用: EstimateDetail（sizeT=string）→ DetailItem（sizeT=number）変換
   const toDetailItems = (dets: EstimateDetail[]) =>
@@ -839,7 +875,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               type="date"
               value={header.inputDate}
               onChange={e => { console.log("[入力日付]", e.target.value); setHeader(h => ({ ...h, inputDate: e.target.value })) }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
             />
           </div>
 
@@ -892,7 +928,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               onChange={e => { console.log("[お客様注文番号]", e.target.value); setHeader(h => ({ ...h, customerOrderNo: e.target.value })) }}
               maxLength={50}
               placeholder="例: ORD-2026-001"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
             />
           </div>
 
@@ -906,7 +942,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               value={header.endUserNo}
               onChange={e => { console.log("[エンドユーザー番号]", e.target.value); setHeader(h => ({ ...h, endUserNo: e.target.value })) }}
               maxLength={50}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
             />
           </div>
 
@@ -924,7 +960,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationCode}
                 onChange={e => { console.log("[送り先コード]", e.target.value); setHeader(h => ({ ...h, destinationCode: e.target.value })) }}
                 maxLength={20}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -944,7 +980,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationName}
                 onChange={e => { console.log("[送り先名]", e.target.value); setHeader(h => ({ ...h, destinationName: e.target.value })) }}
                 maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -955,7 +991,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationDept}
                 onChange={e => { console.log("[部署名]", e.target.value); setHeader(h => ({ ...h, destinationDept: e.target.value })) }}
                 maxLength={50}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -966,7 +1002,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationPerson}
                 onChange={e => { console.log("[担当者名]", e.target.value); setHeader(h => ({ ...h, destinationPerson: e.target.value })) }}
                 maxLength={50}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -978,7 +1014,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 onChange={e => { console.log("[郵便番号]", e.target.value); setHeader(h => ({ ...h, destinationZip: e.target.value })) }}
                 maxLength={8}
                 placeholder="000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -989,7 +1025,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationAddress}
                 onChange={e => { console.log("[住所]", e.target.value); setHeader(h => ({ ...h, destinationAddress: e.target.value })) }}
                 maxLength={200}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -1001,7 +1037,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 onChange={e => { console.log("[TEL]", e.target.value); setHeader(h => ({ ...h, destinationTel: e.target.value })) }}
                 maxLength={20}
                 placeholder="00-0000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -1013,7 +1049,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 onChange={e => { console.log("[FAX]", e.target.value); setHeader(h => ({ ...h, destinationFax: e.target.value })) }}
                 maxLength={20}
                 placeholder="00-0000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -1023,7 +1059,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 type="date"
                 value={header.requestNouki}
                 onChange={e => { console.log("[希望納期]", e.target.value); setHeader(h => ({ ...h, requestNouki: e.target.value })) }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -1034,7 +1070,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.remarks}
                 onChange={e => { console.log("[備考]", e.target.value); setHeader(h => ({ ...h, remarks: e.target.value })) }}
                 maxLength={200}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -1095,7 +1131,11 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="">選択してください</option>
-              {processingSpecs.map(s => (
+              {(materialProcessingMap[detailForm.materialCode]
+                ? processingSpecs.filter(s =>
+                    materialProcessingMap[detailForm.materialCode].includes(s.processingSpecCode))
+                : processingSpecs
+              ).map(s => (
                 <option key={s.processingSpecCode} value={s.processingSpecCode}>
                   {s.processingSpecName}
                 </option>
@@ -1285,7 +1325,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   setCalcResult(null)
                 }}
                 placeholder="1"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
               />
             </div>
 
@@ -1347,6 +1387,11 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
           >
             ＋ 明細に追加
           </button>
+          {!canAddDetail && (
+            <p className="text-xs text-amber-600 mt-1">
+              ⚠ 先に「見積計算」を実行してください
+            </p>
+          )}
         </div>
       </section>
 
@@ -1386,7 +1431,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {details.map((d, i) => (
-                  <tr key={d.clientDetailId} className={i % 2 === 1 ? "bg-gray-50/50" : ""}>
+                  <tr
+              key={d.clientDetailId}
+              className={isDeliveryExpired(d.deliveryDeadline) ? "bg-red-50 border-l-4 border-red-400" : ""} className={i % 2 === 1 ? "bg-gray-50/50" : ""}>
                     <td className="px-3 py-2.5 text-gray-500">{d.rowNo}</td>
                     <td className="px-3 py-2.5 font-medium text-gray-700 whitespace-nowrap">
                       {d.materialName}

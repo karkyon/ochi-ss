@@ -198,6 +198,20 @@ export async function GET(
 </body>
 </html>`
 
+  // PDF発行ログ記録（監査証跡）
+  try {
+    await prisma.securityLog.create({
+      data: {
+        eventType: "PDF_ISSUE",
+        message:   `見積書PDF発行 estimateId=${id} estimateNo=${estimate.estimateNo ?? "未採番"}`,
+        logLevel:  "INFO",
+        username:  (session.user as any).userId ?? "",
+      },
+    })
+  } catch (logErr) {
+    console.warn("[estimates/pdf] SecurityLog 記録失敗:", logErr)
+  }
+
   return new NextResponse(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
