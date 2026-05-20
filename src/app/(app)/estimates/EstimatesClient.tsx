@@ -9,7 +9,9 @@ type Estimate = {
   estimateNo: string
   estimateDate: string
   destinationName: string
+  destinationAddress: string
   estimateStatus: string
+  isDraftOnly: boolean
   customerOrderNo: string
   detailCount: number
   totalAmount: number
@@ -25,6 +27,9 @@ interface Props {
     noTo: string
     destName: string
     orderNo: string
+    status: string
+    sort: string
+    order: string
   }
   estimates: Estimate[]
   total: number
@@ -55,8 +60,29 @@ export default function EstimatesClient({
       if (v) params.set(k, v as string)
     }
     params.set("page", "1")
-    console.log("[検索ボタン] クリック 検索条件:", Object.fromEntries(params.entries()))
+    // sort/order は現在値を引き継ぐ
+    if (defaultValues.sort)  params.set("sort",  defaultValues.sort)
+    if (defaultValues.order) params.set("order", defaultValues.order)
     router.push(`/estimates?${params.toString()}`)
+  }
+
+  // ソートトグル
+  const handleSort = (col: string) => {
+    const newOrder = defaultValues.sort === col && defaultValues.order === "desc" ? "asc" : "desc"
+    const params = new URLSearchParams()
+    Object.entries(defaultValues).forEach(([k, v]) => { if (v) params.set(k, v) })
+    params.set("sort", col)
+    params.set("order", newOrder)
+    params.set("page", "1")
+    router.push(`/estimates?${params.toString()}`)
+  }
+
+  // ソートアイコン
+  const sortIcon = (col: string) => {
+    if (defaultValues.sort !== col) return <span className="text-gray-300 ml-1">⇅</span>
+    return defaultValues.order === "asc"
+      ? <span className="text-blue-500 ml-1">↑</span>
+      : <span className="text-blue-500 ml-1">↓</span>
   }
 
   const handleClear = () => {
@@ -164,20 +190,32 @@ export default function EstimatesClient({
 
         </div>
 
-        <div className="flex justify-end gap-2 mt-4">
-          <button
-            type="button"
-            onClick={handleClear}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            クリア
-          </button>
-          <button
-            type="submit"
-            className="px-5 py-2 rounded-lg bg-[#1a2744] text-white text-sm font-medium hover:bg-[#1a3a6e] transition-colors"
-          >
-            🔍 検索
-          </button>
+        <div className="flex items-center justify-between mt-4 flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="status"
+              value="draft"
+              defaultChecked={defaultValues.status === "draft"}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            下書き（Draft）のみ表示
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              クリア
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-lg bg-[#1a2744] text-white text-sm font-medium hover:bg-[#1a3a6e] transition-colors"
+            >
+              🔍 検索
+            </button>
+          </div>
         </div>
       </form>
 
@@ -212,14 +250,19 @@ export default function EstimatesClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    見積No
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer hover:text-blue-600"
+                      onClick={() => handleSort("estimateNo")}>
+                    見積No{sortIcon("estimateNo")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    見積日付
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer hover:text-blue-600"
+                      onClick={() => handleSort("estimateDate")}>
+                    見積日付{sortIcon("estimateDate")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
                     送り先名
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                    送り先住所
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">
                     合計額（税抜）
@@ -267,6 +310,9 @@ export default function EstimatesClient({
                       <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate">
                         {est.destinationName}
                       </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px] truncate">
+                        {est.destinationAddress || "—"}
+                      </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-800 whitespace-nowrap">
                         {est.totalAmount > 0
                           ? `¥${est.totalAmount.toLocaleString()}`
@@ -276,11 +322,17 @@ export default function EstimatesClient({
                         {est.detailCount}件
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}
-                        >
-                          {status.label}
-                        </span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
+                            {status.label}
+                          </span>
+                          {est.isDraftOnly && (
+                            <Link href={`/estimates/${est.id}/edit`}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 whitespace-nowrap">
+                              ✏ 下書き中
+                            </Link>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1.5">

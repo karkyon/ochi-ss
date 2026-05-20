@@ -19,6 +19,9 @@ type SearchParams = {
   noTo?: string
   destName?: string
   orderNo?: string
+  status?: string   // "draft" でDraftのみ
+  sort?: string     // "estimateDate" | "estimateNo"
+  order?: string    // "asc" | "desc"
   page?: string
 }
 
@@ -51,6 +54,9 @@ export default async function EstimatesPage({
   const noTo     = sp.noTo     ?? ""
   const destName = sp.destName ?? ""
   const orderNo  = sp.orderNo  ?? ""
+  const status   = sp.status   ?? ""
+  const sort     = sp.sort     ?? "estimateDate"
+  const order    = (sp.order === "asc" ? "asc" : "desc") as "asc" | "desc"
 
   // DB検索
   console.log("[/estimates page] session.user.customerId:", session!.user.customerId)
@@ -66,22 +72,27 @@ export default async function EstimatesPage({
     ...(noTo     && { estimateNo: { lte: noTo } }),
     ...(destName && { destinationName: { contains: destName } }),
     ...(orderNo  && { customerOrderNo: { contains: orderNo } }),
+    ...(status === "draft" && { isDraftOnly: true }),
   }
 
   const [total, rows] = await Promise.all([
     prisma.estimateHeader.count({ where }),
     prisma.estimateHeader.findMany({
       where,
-      orderBy: { estimateDate: "desc" },
+      orderBy: sort === "estimateNo"
+        ? { estimateNo: order }
+        : { estimateDate: order },
       skip: (page - 1) * perPage,
       take: perPage,
       select: {
-        id:              true,
-        estimateNo:      true,
-        estimateDate:    true,
-        destinationName: true,
-        estimateStatus:  true,
-        customerOrderNo: true,
+        id:                 true,
+        estimateNo:         true,
+        estimateDate:       true,
+        destinationName:    true,
+        destinationAddress: true,
+        estimateStatus:     true,
+        isDraftOnly:        true,
+        customerOrderNo:    true,
         details: {
           where: { isDeleted: false },
           select: { totalPrice: true },
@@ -91,14 +102,16 @@ export default async function EstimatesPage({
   ])
 
   const estimates = rows.map((r) => ({
-    id:              r.id,
-    estimateNo:      r.estimateNo ?? "",
-    estimateDate:    r.estimateDate?.toISOString().slice(0, 10) ?? "",
-    destinationName: r.destinationName ?? "—",
-    estimateStatus:  r.estimateStatus,
-    customerOrderNo: r.customerOrderNo ?? "",
-    detailCount:     r.details.length,
-    totalAmount:     r.details.reduce((s, d) => s + Number(d.totalPrice ?? 0), 0),
+    id:                 r.id,
+    estimateNo:         r.estimateNo ?? "",
+    estimateDate:       r.estimateDate?.toISOString().slice(0, 10) ?? "",
+    destinationName:    r.destinationName ?? "—",
+    destinationAddress: r.destinationAddress ?? "",
+    estimateStatus:     r.estimateStatus,
+    isDraftOnly:        r.isDraftOnly,
+    customerOrderNo:    r.customerOrderNo ?? "",
+    detailCount:        r.details.length,
+    totalAmount:        r.details.reduce((s, d) => s + Number(d.totalPrice ?? 0), 0),
   }))
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
@@ -130,7 +143,7 @@ export default async function EstimatesPage({
 
       {/* 検索フォーム — Client Component */}
       <EstimatesClient
-        defaultValues={{ dateFrom, dateTo, noFrom, noTo, destName, orderNo }}
+        defaultValues={{ dateFrom, dateTo, noFrom, noTo, destName, orderNo, status, sort, order }}
         estimates={estimates}
         total={total}
         page={page}
