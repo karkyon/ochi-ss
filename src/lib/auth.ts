@@ -208,6 +208,8 @@ export const authConfig: NextAuthConfig = {
             passwordHash: true,
             userStatus: true,
             accountLocked: true,
+            loginFailCount: true,
+            lockedUntil: true,
             userRole: true,
             customer: {
               select: {
@@ -231,6 +233,16 @@ export const authConfig: NextAuthConfig = {
         }
 
         // ⑤ アカウント有効性確認（userStatus=1 が有効）
+        // ⑤-a ロック期限切れの場合は自動解除
+        if (user.accountLocked && user.lockedUntil && new Date() > new Date(user.lockedUntil)) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { accountLocked: false, loginFailCount: 0, lockedUntil: null },
+          })
+          user.accountLocked = false
+          user.loginFailCount = 0
+        }
+        // ⑤-b ロック中確認
         if (user.accountLocked || user.userStatus !== 1) {
           await recordLoginHistory({
             userId: user.id,
@@ -238,11 +250,11 @@ export const authConfig: NextAuthConfig = {
             ipAddress,
             userAgent,
             result: -2,
-            failReason: "ユーザー無効/ロック",
+            failReason: user.accountLocked ? "アカウントロック" : "ユーザー無効",
           })
           await recordSecurityLog({
-            eventType: "Login_UserDisabled",
-            message: `ユーザー無効/ロック: username=${userId}, customerCode=${customer.customerCode}`,
+            eventType: "Login_UserLocked",
+            message: `アカウントロック中: username=${userId}, customerCode=${customer.customerCode}, lockedUntil=${user.lockedUntil?.toISOString() ?? "indefinite"}`,
             ipAddress,
             username: userId,
             logLevel: "WARNING",
@@ -253,25 +265,46 @@ export const authConfig: NextAuthConfig = {
         // ⑥ パスワード検証（bcrypt コスト12）
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
         if (!isPasswordValid) {
+          // 失敗カウントを +1、5回でアカウントロック（30分）
+          const newFailCount = (user.loginFailCount ?? 0) + 1
+          const shouldLock = newFailCount >= 5
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              loginFailCount: newFailCount,
+              ...(shouldLock && {
+                accountLocked: true,
+                lockedUntil: new Date(Date.now() + 30 * 60 * 1000),
+              }),
+            },
+          })
           await recordLoginHistory({
             userId: user.id,
             customerCode: customer.customerCode,
             ipAddress,
             userAgent,
             result: -1,
-            failReason: "パスワード不一致",
+            failReason: shouldLock
+              ? `パスワード不一致 (${newFailCount}回目) → アカウントロック30分`
+              : `パスワード不一致 (${newFailCount}回目)`,
           })
           await recordSecurityLog({
-            eventType: "Login_Failure",
-            message: `パスワード不一致: username=${userId}, customerCode=${customer.customerCode}`,
+            eventType: shouldLock ? "Login_AccountLocked" : "Login_Failure",
+            message: shouldLock
+              ? `アカウントロック: username=${userId}, customerCode=${customer.customerCode}, failCount=${newFailCount}`
+              : `パスワード不一致: username=${userId}, customerCode=${customer.customerCode}, failCount=${newFailCount}`,
             ipAddress,
             username: userId,
-            logLevel: "WARNING",
+            logLevel: shouldLock ? "ALERT" : "WARNING",
           })
-          throw new Error("-1")
+          throw new Error(shouldLock ? "-2" : "-1")
         }
 
-        // ⑦ 成功
+        // ⑦ 成功 — 失敗カウントリセット + 最終ログイン日時更新
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { loginFailCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+        })
         await recordLoginHistory({
           userId: user.id,
           customerCode: customer.customerCode,
