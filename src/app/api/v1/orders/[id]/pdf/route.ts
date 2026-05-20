@@ -126,13 +126,21 @@ export async function GET(
   <table style="font-size:10px;">
     <thead><tr>
       <th style="width:3%">No</th>
-      <th style="width:12%">材料</th>
-      <th style="width:10%">加工仕様</th>
-      <th style="width:15%">寸法T×A×B</th>
-      <th style="width:6%">数量</th>
-      <th style="width:10%">単価</th>
-      <th style="width:11%">金額</th>
-      <th style="width:10%">最短納期</th>
+      <th style="width:10%">材料</th>
+      <th style="width:8%">加工仕様</th>
+      <th style="width:10%">寸法T×A×B</th>
+      <th style="width:5%">公差T</th>
+      <th style="width:5%">公差A</th>
+      <th style="width:5%">公差B</th>
+      <th style="width:4%">4C</th>
+      <th style="width:4%">8C</th>
+      <th style="width:5%">指示T</th>
+      <th style="width:5%">指示A</th>
+      <th style="width:5%">指示B</th>
+      <th style="width:4%">数量</th>
+      <th style="width:8%">単価</th>
+      <th style="width:8%">金額</th>
+      <th style="width:8%">最短納期</th>
     </tr></thead>
     <tbody>${detailRows}</tbody>
     <tfoot>
