@@ -6,6 +6,8 @@ import { formatDimension } from "@/lib/formatNumber"
 
 
 import { useState, useCallback, useEffect } from "react"
+import { useDraftAutoSave } from "@/hooks/useDraftAutoSave"
+import DraftSaveIndicator from "@/components/ui/DraftSaveIndicator"
 import { useRouter } from "next/navigation"
 
 // ──────────────────────────────────────────────────────
@@ -1109,6 +1111,17 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
           </table>
         </div>
       </section>
+
+      {/* Draft 自動保存インジケーター（isDraftOnly の場合のみ表示） */}
+      {estimateData?.isDraftOnly && (
+        <div className="px-5 pt-3 flex justify-end">
+          <DraftSaveIndicator
+            status={saveStatus}
+            savedAt={savedAt}
+            onRetry={() => triggerSave(header, details, true)}
+          />
+        </div>
+      )}
 
       {/* 保存ボタン */}
       <div className="flex items-center gap-3 justify-end pt-2">

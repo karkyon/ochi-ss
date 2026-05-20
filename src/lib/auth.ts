@@ -303,6 +303,29 @@ export const authConfig: NextAuthConfig = {
     }),
   ],
 
+  events: {
+    async signOut(message: Record<string, unknown>) {
+      // ログアウト時に Draft を即時期限切れ（PC共有対策）
+      try {
+        const customerId = (message as any)?.session?.user?.customerId
+          ?? (message as any)?.token?.customerId
+        if (customerId) {
+          const { prisma } = await import("@/lib/prisma")
+          await prisma.estimateHeader.updateMany({
+            where: {
+              customerId,
+              estimateStatus: "draft",
+              isDraftOnly:    true,
+              isDeleted:      false,
+            },
+            data: { draftExpiresAt: new Date() },
+          })
+        }
+      } catch (e) {
+        console.error("[auth signOut] Draft 期限切れ処理エラー:", e)
+      }
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

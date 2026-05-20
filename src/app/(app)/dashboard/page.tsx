@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import DashboardNotificationsClient from "./DashboardNotificationsClient"
+import DraftRestoreBanner from "@/components/ui/DraftRestoreBanner"
 
 // メニューカード定義
 const MENU_CARDS = [
@@ -173,6 +174,9 @@ export default async function DashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Draft 復元バナー */}
+      <DraftRestoreBanner />
 
       {/* お知らせパネル */}
       <DashboardNotificationsClient notifications={notifications} unreadCount={unreadCount} />

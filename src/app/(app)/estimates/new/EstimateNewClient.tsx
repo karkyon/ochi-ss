@@ -1,6 +1,8 @@
 "use client"
 import { formatDimension } from "@/lib/formatNumber"
 import { useState, useCallback, useEffect } from "react"
+import { useDraftAutoSave } from "@/hooks/useDraftAutoSave"
+import DraftSaveIndicator from "@/components/ui/DraftSaveIndicator"
 
 
 // ──────────────────────────────────────────────────────────────────
@@ -318,6 +320,9 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       .catch((e) => { console.error('[加工指示API] エラー:', e) })
   }, [userInfo.customerCode])
 
+  // Draft 自動保存 Hook
+  const { draftId: _draftId, savedAt, saveStatus, triggerSave } = useDraftAutoSave(null)
+
   // ヘッダーフォーム
   const [header, setHeader] = useState<HeaderForm>({
     inputDate:          todayStr(),
@@ -360,6 +365,15 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
       processingCostTotal: number
     } | null
   } | null>(null)
+
+  // ヘッダー変更時に自動保存トリガー
+  const handleHeaderChange = useCallback((updater: (h: HeaderForm) => HeaderForm) => {
+    setHeader(prev => {
+      const next = updater(prev)
+      triggerSave(next, details)
+      return next
+    })
+  }, [details, triggerSave])
 
   // 明細リスト
   const [details, setDetails] = useState<EstimateDetail[]>(() => {
@@ -1385,7 +1399,16 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
             </table>
           </div>
 
-          {/* 保存・注文ボタン */}
+          {/* Draft 自動保存インジケーター */}
+          <div className="px-5 pt-3 flex justify-end">
+            <DraftSaveIndicator
+              status={saveStatus}
+              savedAt={savedAt}
+              onRetry={() => triggerSave(header, details, true)}
+            />
+          </div>
+
+      {/* 保存・注文ボタン */}
           <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3 flex-wrap">
             {savedEstimateId && (
               <a
