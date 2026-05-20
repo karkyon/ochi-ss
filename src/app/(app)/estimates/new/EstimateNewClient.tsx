@@ -839,7 +839,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               type="date"
               value={header.inputDate}
               onChange={e => { console.log("[入力日付]", e.target.value); setHeader(h => ({ ...h, inputDate: e.target.value })) }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
             />
           </div>
 
@@ -892,7 +892,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               onChange={e => { console.log("[お客様注文番号]", e.target.value); setHeader(h => ({ ...h, customerOrderNo: e.target.value })) }}
               maxLength={50}
               placeholder="例: ORD-2026-001"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
             />
           </div>
 
@@ -906,7 +906,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               value={header.endUserNo}
               onChange={e => { console.log("[エンドユーザー番号]", e.target.value); setHeader(h => ({ ...h, endUserNo: e.target.value })) }}
               maxLength={50}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
             />
           </div>
 
@@ -924,7 +924,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationCode}
                 onChange={e => { console.log("[送り先コード]", e.target.value); setHeader(h => ({ ...h, destinationCode: e.target.value })) }}
                 maxLength={20}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -944,7 +944,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationName}
                 onChange={e => { console.log("[送り先名]", e.target.value); setHeader(h => ({ ...h, destinationName: e.target.value })) }}
                 maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -955,7 +955,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationDept}
                 onChange={e => { console.log("[部署名]", e.target.value); setHeader(h => ({ ...h, destinationDept: e.target.value })) }}
                 maxLength={50}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -966,7 +966,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationPerson}
                 onChange={e => { console.log("[担当者名]", e.target.value); setHeader(h => ({ ...h, destinationPerson: e.target.value })) }}
                 maxLength={50}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -978,7 +978,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 onChange={e => { console.log("[郵便番号]", e.target.value); setHeader(h => ({ ...h, destinationZip: e.target.value })) }}
                 maxLength={8}
                 placeholder="000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -989,7 +989,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.destinationAddress}
                 onChange={e => { console.log("[住所]", e.target.value); setHeader(h => ({ ...h, destinationAddress: e.target.value })) }}
                 maxLength={200}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -1001,7 +1001,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 onChange={e => { console.log("[TEL]", e.target.value); setHeader(h => ({ ...h, destinationTel: e.target.value })) }}
                 maxLength={20}
                 placeholder="00-0000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -1013,7 +1013,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 onChange={e => { console.log("[FAX]", e.target.value); setHeader(h => ({ ...h, destinationFax: e.target.value })) }}
                 maxLength={20}
                 placeholder="00-0000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -1023,7 +1023,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 type="date"
                 value={header.requestNouki}
                 onChange={e => { console.log("[希望納期]", e.target.value); setHeader(h => ({ ...h, requestNouki: e.target.value })) }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -1034,7 +1034,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                 value={header.remarks}
                 onChange={e => { console.log("[備考]", e.target.value); setHeader(h => ({ ...h, remarks: e.target.value })) }}
                 maxLength={200}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -1285,7 +1285,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   setCalcResult(null)
                 }}
                 placeholder="1"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               />
             </div>
 
@@ -1367,8 +1367,8 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">No</th>
-                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">材料</th>
-                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">加工仕様</th>
+                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">材料 <span className="text-red-500">*</span></th>
+                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">加工仕様 <span className="text-red-500">*</span></th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">T</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">A</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">B</th>
@@ -1377,7 +1377,7 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差B</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">4C</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">8C</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">数量</th>
+                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">数量 <span className="text-red-500">*</span></th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">単価</th>
                   <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">金額</th>
                   <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap">最短納期</th>

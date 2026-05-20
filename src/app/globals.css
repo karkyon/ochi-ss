@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ─── Ochi-ss ユーティリティ ─── */
+
+/* フォーカス時黄色ハイライト（旧システム踏襲） */
+.ochi-input:focus {
+  background-color: #ffffcc !important;
+  border-color: #f59e0b !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+}
+
+/* 数値カラム等幅フォント */
+.number-cell {
+  font-family: 'Courier New', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 明細テーブル sticky thead */
+.detail-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #1a2744;
+  color: #ffffff;
+}

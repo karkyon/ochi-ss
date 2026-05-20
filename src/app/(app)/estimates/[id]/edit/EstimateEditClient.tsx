@@ -709,7 +709,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                 <input type="text" value={ddSearch.name}
                   onChange={e => setDdSearch(s => ({...s, name: e.target.value}))}
                   onKeyDown={e => e.key === "Enter" && handleDdSearch()}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
                   placeholder="名称で検索" />
               </div>
               <div>
@@ -717,7 +717,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                 <input type="text" value={ddSearch.address}
                   onChange={e => setDdSearch(s => ({...s, address: e.target.value}))}
                   onKeyDown={e => e.key === "Enter" && handleDdSearch()}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
                   placeholder="住所で検索" />
               </div>
               <div>
@@ -725,7 +725,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                 <input type="text" value={ddSearch.code}
                   onChange={e => setDdSearch(s => ({...s, code: e.target.value}))}
                   onKeyDown={e => e.key === "Enter" && handleDdSearch()}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
                   placeholder="コードで検索" />
               </div>
               <div>
@@ -733,7 +733,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                 <input type="text" value={ddSearch.tel}
                   onChange={e => setDdSearch(s => ({...s, tel: e.target.value}))}
                   onKeyDown={e => e.key === "Enter" && handleDdSearch()}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
                   placeholder="電話番号で検索" />
               </div>
             </div>
@@ -804,7 +804,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
             </label>
             <input type="date" value={header.inputDate}
               onChange={e => setHeader(h => ({ ...h, inputDate: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">見積日付 <span className="text-red-500">*</span></label>
@@ -830,13 +830,13 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
             <label className="block text-xs font-medium text-gray-600 mb-1">お客様注文番号</label>
             <input type="text" value={header.customerOrderNo} maxLength={50}
               onChange={e => setHeader(h => ({ ...h, customerOrderNo: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">エンドユーザー番号</label>
             <input type="text" value={header.endUserNo} maxLength={50}
               onChange={e => setHeader(h => ({ ...h, endUserNo: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div className="lg:col-span-3">
             <div className="flex items-center justify-between mb-1">
@@ -849,50 +849,50 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
             </div>
             <input type="text" value={header.destinationName} maxLength={80}
               onChange={e => setHeader(h => ({ ...h, destinationName: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">部署名</label>
             <input type="text" value={header.destinationDept} maxLength={50}
               onChange={e => setHeader(h => ({ ...h, destinationDept: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">担当者名</label>
             <input type="text" value={header.destinationPerson} maxLength={50}
               onChange={e => setHeader(h => ({ ...h, destinationPerson: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
             <input type="text" value={header.destinationZip} maxLength={8}
               onChange={e => setHeader(h => ({ ...h, destinationZip: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               placeholder="000-0000" />
           </div>
           <div className="lg:col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">住所</label>
             <input type="text" value={header.destinationAddress} maxLength={200}
               onChange={e => setHeader(h => ({ ...h, destinationAddress: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">TEL</label>
             <input type="text" value={header.destinationTel} maxLength={15}
               onChange={e => setHeader(h => ({ ...h, destinationTel: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">FAX</label>
             <input type="text" value={header.destinationFax} maxLength={15}
               onChange={e => setHeader(h => ({ ...h, destinationFax: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
             <label className="block text-xs font-medium text-gray-600 mb-1">備考</label>
             <input type="text" value={header.remarks} maxLength={200}
               onChange={e => setHeader(h => ({ ...h, remarks: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input" />
           </div>
         </div>
       </section>
@@ -909,7 +909,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
               <select
                 value={detailForm.materialCode}
                 onChange={e => { console.log('[Edit][材料選択]', e.target.value); setDetailForm(p => ({ ...p, materialCode: e.target.value })); setCalcResult(null) }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               >
                 <option value="">-- 材料を選択 --</option>
                 {materials.map(m => (
@@ -922,7 +922,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
               <select
                 value={detailForm.kakouShiyouCode || ""}
                 onChange={e => { console.log('[Edit][加工仕様選択]', e.target.value); setDetailForm(p => ({ ...p, kakouShiyouCode: parseInt(e.target.value) || 0 })); setCalcResult(null) }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ochi-input"
               >
                 <option value="">-- 加工仕様を選択 --</option>
                 {processingSpecs.map(s => (
@@ -1068,8 +1068,8 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">No</th>
-                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">材料</th>
-                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">加工仕様</th>
+                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">材料 <span className="text-red-500">*</span></th>
+                <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap">加工仕様 <span className="text-red-500">*</span></th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">T</th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">A</th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">B</th>
@@ -1078,7 +1078,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">公差B</th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">4C</th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">8C</th>
-                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">数量</th>
+                <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">数量 <span className="text-red-500">*</span></th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">単価</th>
                 <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">金額</th>
                 <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap">最短納期</th>
