@@ -28,12 +28,33 @@ export async function GET(
 
   const totalAmount = (estimate.details as any[]).reduce((s, d) => s + Number(d.totalPrice ?? 0), 0)
 
+  // 公差フォーマットヘルパー
+  const fmtKousa = (upper: any, lower: any) => {
+    if (upper == null && lower == null) return "—"
+    const u = upper != null ? `+${Number(upper)}` : ""
+    const l = lower != null ? `-${Number(lower)}` : ""
+    return u && l ? `${u}/${l}` : u || l
+  }
+  // 法人格区分テキスト
+  const CORP_TYPE: Record<string, string> = {
+    "1":"株式会社","2":"有限会社","3":"合同会社","4":"合資会社",
+    "5":"合名会社","6":"財団法人","7":"社団法人","8":"協同組合","9":"組合"
+  }
+
   const detailRows = (estimate.details as any[]).map((d, i) => `
     <tr>
       <td>${i + 1}</td>
       <td>${d.materialName ?? d.materialCode ?? ""}</td>
       <td>${d.kakouShiyou ?? ""}</td>
       <td class="num">${Number(d.sizeT)}×${Number(d.sizeA)}×${Number(d.sizeB)}</td>
+      <td class="num dim">${fmtKousa(d.kousaTUpper,d.kousaTLower)}</td>
+      <td class="num dim">${fmtKousa(d.kousaAUpper,d.kousaALower)}</td>
+      <td class="num dim">${fmtKousa(d.kousaBUpper,d.kousaBLower)}</td>
+      <td class="num dim">${d.mentori4 != null ? Number(d.mentori4)+"C" : "—"}</td>
+      <td class="num dim">${d.mentori8 != null ? Number(d.mentori8)+"C" : "—"}</td>
+      <td class="dim">${d.kakouT ?? "—"}</td>
+      <td class="dim">${d.kakouA ?? "—"}</td>
+      <td class="dim">${d.kakouB ?? "—"}</td>
       <td class="num">${d.quantity ?? ""}</td>
       <td class="num">¥${Number(d.unitPrice ?? 0).toLocaleString()}</td>
       <td class="num">¥${Number(d.totalPrice ?? 0).toLocaleString()}</td>
@@ -69,6 +90,7 @@ export async function GET(
     td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
     tr:nth-child(even) td { background: #f8f9fb; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .dim { font-size: 10px; text-align: center; color: #555; }
     .total-row td { font-weight: bold; font-size: 13px; border-top: 2px solid #1a2744; background: #f0f4ff !important; }
     .footer { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .company-info { font-size: 11px; color: #333; }
@@ -106,7 +128,9 @@ export async function GET(
       <div class="info-row"><span class="label">発行日</span><span class="value">${issueDate}</span></div>
       <div class="info-row"><span class="label">有効期限</span><span class="value">${validUntil}</span></div>
       <div class="info-row"><span class="label">お客様注文No</span><span class="value">${estimate.customerOrderNo ?? "—"}</span></div>
+      <div class="info-row"><span class="label">見積日付</span><span class="value">${estimate.estimateDate ? new Date(estimate.estimateDate).toLocaleDateString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit"}) : "—"}</span></div>
       <div class="info-row"><span class="label">希望納期</span><span class="value">${(estimate as any).requestNouki ?? "—"}</span></div>
+      <div class="info-row"><span class="label">担当者名</span><span class="value">${(estimate as any).chargeName ?? "—"}</span></div>
       <div style="margin-top:12px;">
         <div class="seal-area">
           <div class="seal-box">確認</div>
@@ -120,13 +144,21 @@ export async function GET(
     <thead>
       <tr>
         <th style="width:3%">No</th>
-        <th style="width:12%">材料</th>
-        <th style="width:10%">加工仕様</th>
-        <th style="width:15%">寸法T×A×B</th>
-        <th style="width:6%">数量</th>
-        <th style="width:10%">単価</th>
-        <th style="width:11%">金額</th>
-        <th style="width:10%">最短納期</th>
+        <th style="width:10%">材料</th>
+        <th style="width:8%">加工仕様</th>
+        <th style="width:12%">寸法T×A×B</th>
+        <th style="width:5%">公差T</th>
+        <th style="width:5%">公差A</th>
+        <th style="width:5%">公差B</th>
+        <th style="width:4%">4C</th>
+        <th style="width:4%">8C</th>
+        <th style="width:5%">指示T</th>
+        <th style="width:5%">指示A</th>
+        <th style="width:5%">指示B</th>
+        <th style="width:4%">数量</th>
+        <th style="width:8%">単価</th>
+        <th style="width:8%">金額</th>
+        <th style="width:9%">最短納期</th>
       </tr>
     </thead>
     <tbody>
@@ -134,7 +166,7 @@ export async function GET(
     </tbody>
     <tfoot>
       <tr class="total-row">
-        <td colspan="6" class="num">合　計（税抜）</td>
+        <td colspan="12" class="num">合　計（税抜）</td>
         <td class="num">¥${totalAmount.toLocaleString()}</td>
         <td></td>
       </tr>

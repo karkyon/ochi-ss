@@ -30,12 +30,28 @@ export async function GET(
     : "—"
   const totalAmount = details.reduce((s: number, d: any) => s + Number(d.totalPrice ?? 0), 0)
 
+  // 公差フォーマット
+  const fmtK = (upper: any, lower: any) => {
+    if (upper == null && lower == null) return "—"
+    const u = upper != null ? `+${Number(upper)}` : ""
+    const l = lower != null ? `-${Number(lower)}` : ""
+    return u && l ? `${u}/${l}` : u || l
+  }
+
   const detailRows = details.map((d: any, i: number) => `
     <tr>
       <td>${i + 1}</td>
       <td>${d.materialName ?? d.materialCode ?? ""}</td>
       <td>${d.kakouShiyou ?? ""}</td>
       <td class="num">${Number(d.sizeT)}×${Number(d.sizeA)}×${Number(d.sizeB)}</td>
+      <td class="num dim">${fmtK(d.kousaTUpper,d.kousaTLower)}</td>
+      <td class="num dim">${fmtK(d.kousaAUpper,d.kousaALower)}</td>
+      <td class="num dim">${fmtK(d.kousaBUpper,d.kousaBLower)}</td>
+      <td class="num dim">${d.mentori4 != null ? Number(d.mentori4)+"C" : "—"}</td>
+      <td class="num dim">${d.mentori8 != null ? Number(d.mentori8)+"C" : "—"}</td>
+      <td class="dim">${d.kakouT ?? "—"}</td>
+      <td class="dim">${d.kakouA ?? "—"}</td>
+      <td class="dim">${d.kakouB ?? "—"}</td>
       <td class="num">${d.quantity ?? ""}</td>
       <td class="num">¥${Number(d.unitPrice ?? 0).toLocaleString()}</td>
       <td class="num">¥${Number(d.totalPrice ?? 0).toLocaleString()}</td>
@@ -64,6 +80,7 @@ export async function GET(
     .destination .company { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
     th { background: #1a2744; color: #fff; padding: 6px 8px; text-align: left; font-weight: 500; white-space: nowrap; }
+    .dim { font-size: 10px; text-align: center; color: #555; }
     td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
     tr:nth-child(even) td { background: #f8f9fb; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -95,6 +112,9 @@ export async function GET(
       <div class="info-row"><span class="label">注文日</span><span class="value">${orderDate}</span></div>
       <div class="info-row"><span class="label">見積No</span><span class="value">${estimate?.estimateNo ?? "—"}</span></div>
       <div class="info-row"><span class="label">お客様注文No</span><span class="value">${estimate?.customerOrderNo ?? "—"}</span></div>
+      <div class="info-row"><span class="label">見積日付</span><span class="value">${estimate?.estimateDate ? new Date(estimate.estimateDate).toLocaleDateString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit"}) : "—"}</span></div>
+      <div class="info-row"><span class="label">希望納期</span><span class="value">${estimate?.requestNouki ?? "—"}</span></div>
+      <div class="info-row"><span class="label">担当者名</span><span class="value">${estimate?.chargeName ?? "—"}</span></div>
       <div class="info-row"><span class="label">注文状況</span><span class="value">${order.orderStatus ?? "—"}</span></div>
       <div style="margin-top:12px;"><div class="sign-area">
         <div class="sign-box">確認</div>
@@ -103,7 +123,7 @@ export async function GET(
     </div>
   </div>
 
-  <table>
+  <table style="font-size:10px;">
     <thead><tr>
       <th style="width:3%">No</th>
       <th style="width:12%">材料</th>
@@ -117,7 +137,7 @@ export async function GET(
     <tbody>${detailRows}</tbody>
     <tfoot>
       <tr class="total-row">
-        <td colspan="6" class="num">合　計（税抜）</td>
+        <td colspan="12" class="num">合　計（税抜）</td>
         <td class="num">¥${totalAmount.toLocaleString()}</td>
         <td></td>
       </tr>
