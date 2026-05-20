@@ -11,6 +11,8 @@ import DraftSaveIndicator from "@/components/ui/DraftSaveIndicator"
 interface DirectDelivery {
   deliveryCode:   string
   name:           string
+  furigana:       string
+  shortName:      string
   departmentName: string
   chargeName:     string
   postalCode:     string

@@ -13,16 +13,22 @@ export default async function DirectDeliveryPage() {
   })
 
   const deliveries = rows.map(r => ({
-    id:             r.id,
-    deliveryCode:   r.deliveryCode,
-    companyName:    r.companyName,
-    departmentName: r.departmentName ?? "",
-    contactPerson:  r.contactPerson ?? "",
-    postalCode:     r.postalCode ?? "",
-    address1:       r.address1 ?? "",
-    phoneNumber:    r.phoneNumber ?? "",
-    faxNumber:      r.faxNumber ?? "",
-    remarks:        r.remarks ?? "",
+    id:               r.id,
+    deliveryCode:     r.deliveryCode,
+    companyName:      r.companyName,
+    furigana:         r.furigana ?? "",
+    shortName:        r.shortName ?? "",
+    corporateType:    r.corporateType ?? "",
+    corporatePosition: r.corporatePosition ?? "",
+    departmentName:   r.departmentName ?? "",
+    contactPerson:    r.contactPerson ?? "",
+    postalCode:       r.postalCode ?? "",
+    address1:         r.address1 ?? "",
+    address2:         r.address2 ?? "",
+    address3:         r.address3 ?? "",
+    phoneNumber:      r.phoneNumber ?? "",
+    faxNumber:        r.faxNumber ?? "",
+    remarks:          r.remarks ?? "",
   }))
 
   return (

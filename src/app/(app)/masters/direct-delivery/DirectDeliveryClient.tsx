@@ -1,24 +1,32 @@
 // DirectDeliveryClient.tsx — 直送先CRUD UI
 "use client"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 
 type DD = {
   id: string
   deliveryCode: string
   companyName: string
+  furigana: string
+  shortName: string
+  corporateType: string
+  corporatePosition: string
   departmentName: string
   contactPerson: string
   postalCode: string
   address1: string
+  address2: string
+  address3: string
   phoneNumber: string
   faxNumber: string
   remarks: string
 }
 
 const EMPTY: Omit<DD, "id"> = {
-  deliveryCode: "", companyName: "", departmentName: "", contactPerson: "",
-  postalCode: "", address1: "", phoneNumber: "", faxNumber: "", remarks: "",
+  deliveryCode: "", companyName: "", furigana: "", shortName: "",
+  corporateType: "", corporatePosition: "", departmentName: "", contactPerson: "",
+  postalCode: "", address1: "", address2: "", address3: "",
+  phoneNumber: "", faxNumber: "", remarks: "",
 }
 
 interface Props {
@@ -36,9 +44,11 @@ export default function DirectDeliveryClient({ deliveries: initial, customerCode
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
+  const [postalSearching, setPostalSearching] = useState(false)
+  const [postalError, setPostalError] = useState("")
 
   const openNew = () => { setForm(EMPTY); setEditTarget(null); setError(""); setShowModal(true) }
-  const openEdit = (d: DD) => { setForm({ deliveryCode: d.deliveryCode, companyName: d.companyName, departmentName: d.departmentName, contactPerson: d.contactPerson, postalCode: d.postalCode, address1: d.address1, phoneNumber: d.phoneNumber, faxNumber: d.faxNumber, remarks: d.remarks }); setEditTarget(d); setError(""); setShowModal(true) }
+  const openEdit = (d: DD) => { setForm({ deliveryCode: d.deliveryCode, companyName: d.companyName, furigana: d.furigana, shortName: d.shortName, corporateType: d.corporateType, corporatePosition: d.corporatePosition, departmentName: d.departmentName, contactPerson: d.contactPerson, postalCode: d.postalCode, address1: d.address1, address2: d.address2, address3: d.address3, phoneNumber: d.phoneNumber, faxNumber: d.faxNumber, remarks: d.remarks }); setEditTarget(d); setError(""); setShowModal(true) }
 
   const handleSave = useCallback(async () => {
     if (!form.deliveryCode || !form.companyName) { setError("直送先コード・名称は必須です"); return }
@@ -60,6 +70,18 @@ export default function DirectDeliveryClient({ deliveries: initial, customerCode
     if (res.ok) router.refresh()
     else alert("削除失敗")
   }, [router])
+
+  const handlePostalSearch = useCallback(async () => {
+    const zip = form.postalCode.replace(/-/g, "")
+    if (!/^\d{7}$/.test(zip)) { setPostalError("7桁の数字で入力してください"); return }
+    setPostalSearching(true); setPostalError("")
+    try {
+      const res = await fetch(`/api/v1/postal-code?zip=${zip}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "住所取得失敗")
+      setForm(p => ({ ...p, address1: data.address1 + data.address2, address2: data.address3, address3: "" }))
+    } catch (e: any) { setPostalError(e.message) } finally { setPostalSearching(false) }
+  }, [form.postalCode])
 
   const filtered = list.filter(d =>
     !search || d.companyName.includes(search) || d.deliveryCode.includes(search) || d.address1.includes(search)
@@ -138,13 +160,59 @@ export default function DirectDeliveryClient({ deliveries: initial, customerCode
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
             <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 基本情報 */}
               <F label="直送先コード ★" k="deliveryCode" placeholder="例: D001" />
               <F label="会社名 ★" k="companyName" placeholder="例: 越智工業株式会社" />
+              <F label="フリガナ" k="furigana" placeholder="例: オチコウギョウ" />
+              <F label="略称" k="shortName" placeholder="例: 越智工業" />
+              {/* 法人格 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">法人格区分</label>
+                <select value={form.corporateType} onChange={e => setForm(p => ({ ...p, corporateType: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">（なし）</option>
+                  <option value="1">株式会社</option>
+                  <option value="2">有限会社</option>
+                  <option value="3">合同会社</option>
+                  <option value="4">合資会社</option>
+                  <option value="5">合名会社</option>
+                  <option value="6">財団法人</option>
+                  <option value="7">社団法人</option>
+                  <option value="8">協同組合</option>
+                  <option value="9">組合</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">法人格位置</label>
+                <select value={form.corporatePosition} onChange={e => setForm(p => ({ ...p, corporatePosition: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">（指定なし）</option>
+                  <option value="1">前（例: 株式会社○○）</option>
+                  <option value="2">後（例: ○○株式会社）</option>
+                </select>
+              </div>
+              {/* 連絡先 */}
               <F label="部署名" k="departmentName" />
               <F label="担当者名" k="contactPerson" />
-              <F label="郵便番号" k="postalCode" placeholder="000-0000" />
-              <F label="住所" k="address1" />
+              {/* 郵便番号（住所検索ボタン付き） */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
+                <div className="flex gap-2">
+                  <input type="text" value={form.postalCode} onChange={e => setForm(p => ({ ...p, postalCode: e.target.value }))}
+                    placeholder="0000000" maxLength={8}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <button type="button" onClick={handlePostalSearch} disabled={postalSearching}
+                    className="px-3 py-2 text-xs font-medium rounded-lg bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap">
+                    {postalSearching ? "検索中..." : "住所検索"}
+                  </button>
+                </div>
+                {postalError && <p className="mt-1 text-xs text-red-500">{postalError}</p>}
+              </div>
               <F label="TEL" k="phoneNumber" placeholder="00-0000-0000" />
+              {/* 住所 */}
+              <div className="sm:col-span-2"><F label="住所1（都道府県+市区町村）" k="address1" /></div>
+              <div className="sm:col-span-2"><F label="住所2（町域・番地）" k="address2" /></div>
+              <div className="sm:col-span-2"><F label="住所3（建物名など）" k="address3" /></div>
               <F label="FAX" k="faxNumber" placeholder="00-0000-0000" />
               <div className="sm:col-span-2"><F label="備考" k="remarks" /></div>
             </div>

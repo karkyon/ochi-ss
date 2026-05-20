@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const body = await req.json()
-  const { deliveryCode, companyName, departmentName, contactPerson, postalCode, address1, phoneNumber, faxNumber, remarks } = body
+  const { deliveryCode, companyName, furigana, shortName, corporateType, corporatePosition, departmentName, contactPerson, postalCode, address1, address2, address3, phoneNumber, faxNumber, remarks } = body
   const validation = validateWithZod(directDeliverySchema, { deliveryCode, companyName, departmentName, contactPerson, postalCode, address1, phoneNumber, faxNumber, remarks })
   if (!validation.success) return NextResponse.json({ error: validation.errors.join(" / ") }, { status: 422 })
   try {
@@ -23,6 +23,12 @@ export async function POST(req: NextRequest) {
         address1: address1 ?? null,
         phoneNumber: phoneNumber ?? null,
         faxNumber: faxNumber ?? null,
+        furigana: furigana ?? null,
+        shortName: shortName ?? null,
+        corporateType: corporateType ?? null,
+        corporatePosition: corporatePosition ?? null,
+        address2: address2 ?? null,
+        address3: address3 ?? null,
         remarks: remarks ?? null,
       },
     })
