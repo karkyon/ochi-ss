@@ -9,18 +9,20 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
   const sp = await searchParams
 
   const customerId   = (session.user as any).customerId   ?? ""
-  const customerCode = (session.user as any).customerCode ?? ""
-  const userName     = (session.user as any).userName     ?? (session.user as any).chargeName ?? ""
-  const companyName  = (session.user as any).companyName  ?? (session.user as any).customerName ?? ""
+  const customerCode = (session.user as any).companyCode  ?? (session.user as any).customerCode ?? ""
+  const userName     = (session.user as any).chargeName   ?? (session.user as any).userName     ?? ""
+  const companyName  = (session.user as any).customerName ?? (session.user as any).companyName  ?? ""
 
   const [materials, processingSpecs] = await Promise.all([
-    // Material に isActive フィールドは存在しない
-    prisma.material.findMany({ orderBy: { materialCode: "asc" }, select: { materialCode: true, materialName: true } }),
-    prisma.processingSpec.findMany({ orderBy: { processingSpecCode: "asc" }, select: { processingSpecCode: true, processingSpecName: true } }),
+    prisma.material.findMany({
+      orderBy: { materialCode: "asc" },
+      select: { materialCode: true, materialName: true },
+    }),
+    prisma.processingSpec.findMany({
+      orderBy: { processingSpecCode: "asc" },
+      select: { processingSpecCode: true, processingSpecName: true },
+    }),
   ])
-
-  // cuttingMethod はクライアント側でAPIから取得
-  const cuttingMethods: Array<{ methodCode: string; methodName: string }> = []
 
   let copySourceData: any = null
   if (sp.copyFrom) {
@@ -31,25 +33,25 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
       })
       if (src) {
         copySourceData = {
-          estimateId: src.id,
-          destinationCode: src.destinationCode ?? "",
-          destinationName: src.destinationName ?? "",
-          destinationDept: (src as any).destinationDept ?? "",
-          destinationPerson: (src as any).destinationPerson ?? "",
-          destinationZip: (src as any).destinationZip ?? "",
+          estimateId:         src.id,
+          destinationCode:    src.destinationCode    ?? "",
+          destinationName:    src.destinationName    ?? "",
+          destinationDept:    src.destinationDept    ?? "",
+          destinationPerson:  src.destinationPerson  ?? "",
+          destinationZip:     src.destinationZip     ?? "",
           destinationAddress: src.destinationAddress ?? "",
-          destinationTel: src.destinationTel ?? "",
-          destinationFax: src.destinationFax ?? "",
-          contact: src.contact ?? "",
+          destinationTel:     src.destinationTel     ?? "",
+          destinationFax:     src.destinationFax     ?? "",
+          contact:         src.remarks        ?? "",
           customerOrderNo: src.customerOrderNo ?? "",
-          endUserNo: src.endUserNo ?? "",
-          shippingMethod: (src as any).shippingMethod ?? "delivery",
+          endUserNo:       src.endUserNo       ?? "",
+          shippingMethod:  String(src.shippingMethodId ?? 1),
           details: src.details.map(d => ({
-            clientDetailId: d.id,
-            materialCode: d.materialCode ?? "",
-            kakouShiyouCode: d.kakouShiyouCode ?? 0,
+            clientDetailId:   d.id,
+            materialCode:     d.materialCode    ?? "",
+            kakouShiyouCode:  d.kakouShiyouCode ?? 0,
             kakouT: d.kakouT ?? "", kakouB: d.kakouB ?? "", kakouA: d.kakouA ?? "",
-            shiagari: (d as any).shiagari ?? "",
+            shiagari: d.kakouShiyou ?? "",
             sizeT: Number(d.sizeT ?? 0), sizeB: Number(d.sizeB ?? 0), sizeA: Number(d.sizeA ?? 0),
             toleranceTUp:   Number(d.kousaTUpper ?? 0), toleranceTDown: Number(d.kousaTLower ?? 0),
             toleranceBUp:   Number(d.kousaBUpper ?? 0), toleranceBDown: Number(d.kousaBLower ?? 0),
@@ -57,11 +59,13 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
             mentoriShiji: d.mentoriShiji ? parseInt(d.mentoriShiji) : 9,
             mentori4: Number(d.mentori4 ?? 0), mentori8: Number(d.mentori8 ?? 0),
             quantity: d.quantity ?? 1,
-            customerDetailOrderNo: (d as any).customerOrderNo ?? "",
-            destinationDetailOrderNo: (d as any).destinationOrderNo ?? "",
+            customerDetailOrderNo:    (d as any).customerDetailOrderNo    ?? "",
+            destinationDetailOrderNo: (d as any).destinationDetailOrderNo ?? "",
             remarks: (d as any).remarks ?? "",
-            deliveryDeadline: d.deliveryDeadline ? d.deliveryDeadline.toISOString().slice(0, 10) : null,
-          }))
+            deliveryDeadline: d.deliveryDeadline
+              ? d.deliveryDeadline.toISOString().slice(0, 10)
+              : null,
+          })),
         }
       }
     } catch { /* サイレント */ }
@@ -71,7 +75,7 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
     <EstimateNewClient
       materials={materials.map(m => ({ materialCode: m.materialCode, materialName: m.materialName ?? "" }))}
       processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? "" }))}
-      cuttingMethods={cuttingMethods}
+      cuttingMethods={[]}
       userInfo={{ customerId, customerCode, userName, companyName }}
       copySource={copySourceData}
       isCopy={!!sp.copyFrom}

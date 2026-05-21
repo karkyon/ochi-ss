@@ -25,22 +25,31 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       skip: (page - 1) * perPage,
       take: perPage,
       select: {
-        id: true, orderNo: true, orderDate: true,
-        estimateHeaderId: true, destinationName: true,
+        id: true,
+        orderNo: true,
+        orderDate: true,
+        estimateHeaderId: true,
         orderStatus: true,
-        estimateHeader: { select: { estimateNo: true, customerOrderNo: true } },
+        totalAmount: true,
+        estimateHeader: {
+          select: {
+            estimateNo: true,
+            destinationName: true,
+            customerOrderNo: true,
+          },
+        },
       },
     }),
   ])
 
   const orders = rows.map(r => ({
-    id: r.id,
-    orderNo: r.orderNo ?? "—",
-    orderDate: r.orderDate?.toISOString().slice(0, 10) ?? "",
-    estimateNo: r.estimateHeader?.estimateNo ?? "",
-    destinationName: (r as any).destinationName ?? "—",
-    totalAmount: 0,
-    status: r.orderStatus ?? "processing",
+    id:              r.id,
+    orderNo:         r.orderNo ?? "—",
+    orderDate:       r.orderDate?.toISOString().slice(0, 10) ?? "",
+    estimateNo:      r.estimateHeader?.estimateNo ?? "",
+    destinationName: r.estimateHeader?.destinationName ?? "—",
+    totalAmount:     Number(r.totalAmount ?? 0),
+    status:          r.orderStatus ?? "processing",
   }))
 
   return (
