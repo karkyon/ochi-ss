@@ -113,6 +113,8 @@ export default function EstimateNewClient({ materials, processingSpecs, cuttingM
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState("")
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(copySource?.estimateId ?? null)
+  // 加工指示マスタ（API取得）
+  const [cuttingMethodsState, setCuttingMethodsState] = useState<CuttingMethod[]>(cuttingMethods)
   // 材料×加工仕様マップ
   const [matProcMap, setMatProcMap] = useState<Record<string, number[]>>({})
 
@@ -120,6 +122,14 @@ export default function EstimateNewClient({ materials, processingSpecs, cuttingM
   const isAllSelected = allDetailIds.length > 0 && allDetailIds.every(id => selectedIds.has(id))
 
   // 初期化
+  useEffect(() => {
+    // 加工指示マスタをAPIから取得
+    fetch("/api/v1/cutting-methods?customerCode=" + userInfo.customerCode)
+      .then(r => r.json())
+      .then(d => { if (d.methods) setCuttingMethodsState(d.methods) })
+      .catch(() => {})
+  }, [userInfo.customerCode])
+
   useEffect(() => {
     fetch("/api/v1/masters/material-processing-map")
       .then(r => r.json())
@@ -356,9 +366,9 @@ export default function EstimateNewClient({ materials, processingSpecs, cuttingM
                 {materials.map(m => <option key={m.materialCode} value={m.materialCode}>{m.materialCode}</option>)}
               </select>
             </td>
-            <td style={TD}><select style={SEL} value={form.kakouT} onChange={e => setForm(f => ({ ...f, kakouT: e.target.value, calculated: false }))} {...focusHandlers}><option value="">—</option>{cuttingMethods.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
-            <td style={TD}><select style={SEL} value={form.kakouB} onChange={e => setForm(f => ({ ...f, kakouB: e.target.value }))} {...focusHandlers}><option value="">—</option>{cuttingMethods.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
-            <td style={TD}><select style={SEL} value={form.kakouA} onChange={e => setForm(f => ({ ...f, kakouA: e.target.value }))} {...focusHandlers}><option value="">—</option>{cuttingMethods.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
+            <td style={TD}><select style={SEL} value={form.kakouT} onChange={e => setForm(f => ({ ...f, kakouT: e.target.value, calculated: false }))} {...focusHandlers}><option value="">—</option>{cuttingMethodsState.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
+            <td style={TD}><select style={SEL} value={form.kakouB} onChange={e => setForm(f => ({ ...f, kakouB: e.target.value }))} {...focusHandlers}><option value="">—</option>{cuttingMethodsState.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
+            <td style={TD}><select style={SEL} value={form.kakouA} onChange={e => setForm(f => ({ ...f, kakouA: e.target.value }))} {...focusHandlers}><option value="">—</option>{cuttingMethodsState.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
             <td style={TD}>
               <select style={SEL} value={form.kakouShiyouCode} onChange={e => setForm(f => ({ ...f, kakouShiyouCode: Number(e.target.value), calculated: false }))} {...focusHandlers}>
                 <option value={0}>選択</option>

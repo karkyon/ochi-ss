@@ -8,21 +8,24 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
   if (!session) redirect("/login")
   const sp = await searchParams
 
-  const customerId     = (session.user as any).customerId     ?? ""
-  const customerCode   = (session.user as any).customerCode   ?? ""
-  const userName       = (session.user as any).userName       ?? ""
-  const companyName    = (session.user as any).companyName    ?? ""
+  const customerId   = (session.user as any).customerId   ?? ""
+  const customerCode = (session.user as any).customerCode ?? ""
+  const userName     = (session.user as any).userName     ?? (session.user as any).chargeName ?? ""
+  const companyName  = (session.user as any).companyName  ?? (session.user as any).customerName ?? ""
 
-  const [materials, processingSpecs, cuttingMethods] = await Promise.all([
-    prisma.material.findMany({ where: { isActive: true }, orderBy: { materialCode: "asc" }, select: { materialCode: true, materialName: true } }),
+  const [materials, processingSpecs] = await Promise.all([
+    // Material に isActive フィールドは存在しない
+    prisma.material.findMany({ orderBy: { materialCode: "asc" }, select: { materialCode: true, materialName: true } }),
     prisma.processingSpec.findMany({ orderBy: { processingSpecCode: "asc" }, select: { processingSpecCode: true, processingSpecName: true } }),
-    prisma.cuttingMethod.findMany({ where: { customerCode }, orderBy: { sortOrder: "asc" }, select: { methodCode: true, methodName: true } }),
   ])
+
+  // cuttingMethod はクライアント側でAPIから取得
+  const cuttingMethods: Array<{ methodCode: string; methodName: string }> = []
 
   let copySourceData: any = null
   if (sp.copyFrom) {
     try {
-      const src = await prisma.estimate.findFirst({
+      const src = await prisma.estimateHeader.findFirst({
         where: { id: sp.copyFrom, customerId, isDeleted: false },
         include: { details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } } },
       })
@@ -31,9 +34,9 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
           estimateId: src.id,
           destinationCode: src.destinationCode ?? "",
           destinationName: src.destinationName ?? "",
-          destinationDept: src.destinationDept ?? "",
-          destinationPerson: src.destinationPerson ?? "",
-          destinationZip: src.destinationZip ?? "",
+          destinationDept: (src as any).destinationDept ?? "",
+          destinationPerson: (src as any).destinationPerson ?? "",
+          destinationZip: (src as any).destinationZip ?? "",
           destinationAddress: src.destinationAddress ?? "",
           destinationTel: src.destinationTel ?? "",
           destinationFax: src.destinationFax ?? "",
@@ -43,27 +46,19 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
           shippingMethod: (src as any).shippingMethod ?? "delivery",
           details: src.details.map(d => ({
             clientDetailId: d.id,
-            materialCode: (d as any).materialCode ?? "",
-            kakouShiyouCode: (d as any).kakouShiyouCode ?? 0,
-            kakouT: (d as any).kakouT ?? "",
-            kakouB: (d as any).kakouB ?? "",
-            kakouA: (d as any).kakouA ?? "",
+            materialCode: d.materialCode ?? "",
+            kakouShiyouCode: d.kakouShiyouCode ?? 0,
+            kakouT: d.kakouT ?? "", kakouB: d.kakouB ?? "", kakouA: d.kakouA ?? "",
             shiagari: (d as any).shiagari ?? "",
-            sizeT: Number(d.sizeT ?? 0),
-            sizeB: Number(d.sizeB ?? 0),
-            sizeA: Number(d.sizeA ?? 0),
-            toleranceTUp: Number((d as any).toleranceTUp ?? 0),
-            toleranceTDown: Number((d as any).toleranceTDown ?? 0),
-            toleranceBUp: Number((d as any).toleranceBUp ?? 0),
-            toleranceBDown: Number((d as any).toleranceBDown ?? 0),
-            toleranceAUp: Number((d as any).toleranceAUp ?? 0),
-            toleranceADown: Number((d as any).toleranceADown ?? 0),
-            mentoriShiji: Number((d as any).mentoriShiji ?? 9),
-            mentori4: Number((d as any).mentori4 ?? 0),
-            mentori8: Number((d as any).mentori8 ?? 0),
-            quantity: Number(d.quantity ?? 1),
-            customerDetailOrderNo: (d as any).customerDetailOrderNo ?? "",
-            destinationDetailOrderNo: (d as any).destinationDetailOrderNo ?? "",
+            sizeT: Number(d.sizeT ?? 0), sizeB: Number(d.sizeB ?? 0), sizeA: Number(d.sizeA ?? 0),
+            toleranceTUp:   Number(d.kousaTUpper ?? 0), toleranceTDown: Number(d.kousaTLower ?? 0),
+            toleranceBUp:   Number(d.kousaBUpper ?? 0), toleranceBDown: Number(d.kousaBLower ?? 0),
+            toleranceAUp:   Number(d.kousaAUpper ?? 0), toleranceADown: Number(d.kousaALower ?? 0),
+            mentoriShiji: d.mentoriShiji ? parseInt(d.mentoriShiji) : 9,
+            mentori4: Number(d.mentori4 ?? 0), mentori8: Number(d.mentori8 ?? 0),
+            quantity: d.quantity ?? 1,
+            customerDetailOrderNo: (d as any).customerOrderNo ?? "",
+            destinationDetailOrderNo: (d as any).destinationOrderNo ?? "",
             remarks: (d as any).remarks ?? "",
             deliveryDeadline: d.deliveryDeadline ? d.deliveryDeadline.toISOString().slice(0, 10) : null,
           }))
@@ -76,7 +71,7 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
     <EstimateNewClient
       materials={materials.map(m => ({ materialCode: m.materialCode, materialName: m.materialName ?? "" }))}
       processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? "" }))}
-      cuttingMethods={cuttingMethods.map(c => ({ methodCode: c.methodCode, methodName: c.methodName ?? "" }))}
+      cuttingMethods={cuttingMethods}
       userInfo={{ customerId, customerCode, userName, companyName }}
       copySource={copySourceData}
       isCopy={!!sp.copyFrom}

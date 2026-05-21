@@ -10,19 +10,27 @@ export default async function NotificationsPage() {
   const customerId = (session.user as any).customerId ?? ""
   const now = new Date()
   const rows = await prisma.notification.findMany({
-    where: { isDeleted: false, isActive: true, OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
-    orderBy: [{ priority: "desc" }, { publishedAt: "desc" }],
+    where: {
+      isDeleted: false,
+      publishedAt: { lte: now },
+      OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+    },
+    orderBy: { publishedAt: "desc" },
     take: 100,
-    select: { id: true, subject: true, notifyType: true, priority: true, publishedAt: true, body: true },
+    select: { id: true, title: true, notifType: true, publishedAt: true },
   })
-  const reads = await prisma.notificationRead.findMany({
-    where: { customerId, notificationId: { in: rows.map(r => r.id) } },
-    select: { notificationId: true },
-  })
+  const reads = customerId
+    ? await prisma.notificationRead.findMany({
+        where: { customerId, notificationId: { in: rows.map(r => r.id) } },
+        select: { notificationId: true },
+      })
+    : []
   const readSet = new Set(reads.map(r => r.notificationId))
   const notifications = rows.map(r => ({
-    id: r.id, subject: r.subject ?? "（タイトルなし）",
-    notifyType: r.notifyType ?? "info", priority: r.priority,
+    id: r.id,
+    subject: r.title,
+    notifyType: r.notifType,
+    priority: 0,
     publishedAt: r.publishedAt?.toISOString() ?? null,
     isRead: readSet.has(r.id),
   }))

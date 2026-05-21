@@ -1134,7 +1134,7 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
               ) : details.map((d, i) => (
                 <tr
               key={d.clientDetailId}
-              className={isDeliveryExpired(d.deliveryDeadline) ? "bg-red-50 border-l-4 border-red-400" : ""} className={i % 2 === 1 ? "bg-gray-50" : ""}>
+              className={`${isDeliveryExpired(d.deliveryDeadline) ? "bg-red-50 border-l-4 border-red-400" : ""} ${i % 2 === 1 ? "bg-gray-50" : ""}`}>
                   <td className="px-3 py-2 text-gray-500">{i + 1}</td>
                   <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">
                     {d.materialName || d.materialCode}
