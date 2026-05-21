@@ -1,165 +1,85 @@
 import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import Link from "next/link"
 import EstimateNewClient from "./EstimateNewClient"
 
-interface Props {
-  searchParams: Promise<{ copyFrom?: string }>
-}
-
-export default async function EstimateNewPage({ searchParams }: Props) {
+export default async function EstimateNewPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const session = await auth()
-  const { copyFrom } = await searchParams
+  if (!session) redirect("/login")
+  const sp = await searchParams
 
-  // マスタデータをサーバーサイドで取得（ドロップダウン用）
-  const [materials, processingSpecs] = await Promise.all([
-    prisma.material.findMany({
-      orderBy: { materialCode: "asc" },
-      select: { materialCode: true, materialName: true },
-    }),
-    prisma.processingSpec.findMany({
-      orderBy: { processingSpecCode: "asc" },
-      select: { processingSpecCode: true, processingSpecName: true },
-    }),
+  const customerId     = (session.user as any).customerId     ?? ""
+  const customerCode   = (session.user as any).customerCode   ?? ""
+  const userName       = (session.user as any).userName       ?? ""
+  const companyName    = (session.user as any).companyName    ?? ""
+
+  const [materials, processingSpecs, cuttingMethods] = await Promise.all([
+    prisma.material.findMany({ where: { isActive: true }, orderBy: { materialCode: "asc" }, select: { materialCode: true, materialName: true } }),
+    prisma.processingSpec.findMany({ orderBy: { processingSpecCode: "asc" }, select: { processingSpecCode: true, processingSpecName: true } }),
+    prisma.cuttingMethod.findMany({ where: { customerCode }, orderBy: { sortOrder: "asc" }, select: { methodCode: true, methodName: true } }),
   ])
 
-  // セッション情報をクライアントに渡す
-  const userInfo = {
-    customerCode: session!.user.companyCode ?? "",
-    customerName:  session!.user.customerName ?? "",
-    chargeName:    session!.user.chargeName ?? "",
-    userId:        session!.user.userId ?? "",
-  }
-
-  // copyFrom: コピー元見積データを取得
-  let copySourceData: {
-    customerOrderNo: string
-    endUserNo: string
-    destinationCode: string
-    destinationName: string
-    destinationDept: string
-    destinationPerson: string
-    destinationZip: string
-    destinationAddress: string
-    destinationTel: string
-    destinationFax: string
-    remarks: string
-    details: {
-      materialCode: string
-      materialName: string
-      kakouShiyouCode: number
-      kakouShiyou: string
-      kakouShijiCodeT: string
-      kakouShijiCodeA: string
-      kakouShijiCodeB: string
-      kakouT: string
-      kakouA: string
-      kakouB: string
-      sizeT: number
-      sizeA: number
-      sizeB: number
-      kousaTUpper: number | null
-      kousaTLower: number | null
-      kousaAUpper: number | null
-      kousaALower: number | null
-      kousaBUpper: number | null
-      kousaBLower: number | null
-      mentori4: number | null
-      mentori8: number | null
-      quantity: number
-      unitPrice: number | null
-      totalPrice: number | null
-      shortestDelivery: string
-      deliveryDeadline: string | null
-    }[]
-  } | null = null
-
-  if (copyFrom) {
-    console.log('[/estimates/new] copyFrom:', copyFrom)
-    const src = await prisma.estimateHeader.findFirst({
-      where: {
-        id: copyFrom,
-        customerId: session!.user.customerId!,
-        isDeleted: false,
-      },
-      include: {
-        details: {
-          where: { isDeleted: false },
-          orderBy: { rowNo: "asc" },
-        },
-      },
-    })
-    if (src) {
-      copySourceData = {
-        customerOrderNo:  src.customerOrderNo ?? "",
-        endUserNo:        src.endUserNo ?? "",
-        destinationCode:  src.destinationCode ?? "",
-        destinationName:  src.destinationName ?? "",
-        destinationDept:  src.destinationDept ?? "",
-        destinationPerson: src.destinationPerson ?? "",
-        destinationZip:   src.destinationZip ?? "",
-        destinationAddress: src.destinationAddress ?? "",
-        destinationTel:   src.destinationTel ?? "",
-        destinationFax:   src.destinationFax ?? "",
-        remarks:          src.remarks ?? "",
-        details: src.details.map(d => ({
-          materialCode:    d.materialCode,
-          materialName:    d.materialName ?? "",
-          kakouShiyouCode: d.kakouShiyouCode,
-          kakouShiyou:     d.kakouShiyou ?? "",
-          kakouShijiCodeT: d.kakouShijiCodeT ?? "",
-          kakouShijiCodeA: d.kakouShijiCodeA ?? "",
-          kakouShijiCodeB: d.kakouShijiCodeB ?? "",
-          kakouT:          d.kakouT ?? "",
-          kakouA:          d.kakouA ?? "",
-          kakouB:          d.kakouB ?? "",
-          sizeT:           Number(d.sizeT),
-          sizeA:           Number(d.sizeA),
-          sizeB:           Number(d.sizeB),
-          kousaTUpper:     d.kousaTUpper != null ? Number(d.kousaTUpper) : null,
-          kousaTLower:     d.kousaTLower != null ? Number(d.kousaTLower) : null,
-          kousaAUpper:     d.kousaAUpper != null ? Number(d.kousaAUpper) : null,
-          kousaALower:     d.kousaALower != null ? Number(d.kousaALower) : null,
-          kousaBUpper:     d.kousaBUpper != null ? Number(d.kousaBUpper) : null,
-          kousaBLower:     d.kousaBLower != null ? Number(d.kousaBLower) : null,
-          mentori4:        d.mentori4 != null ? Number(d.mentori4) : null,
-          mentori8:        d.mentori8 != null ? Number(d.mentori8) : null,
-          quantity:        d.quantity,
-          unitPrice:       d.unitPrice != null ? Number(d.unitPrice) : null,
-          totalPrice:      d.totalPrice != null ? Number(d.totalPrice) : null,
-          shortestDelivery: d.shortestDelivery ?? "",
-          deliveryDeadline: d.deliveryDeadline ? d.deliveryDeadline.toISOString().slice(0, 10) : null,
-        })),
+  let copySourceData: any = null
+  if (sp.copyFrom) {
+    try {
+      const src = await prisma.estimate.findFirst({
+        where: { id: sp.copyFrom, customerId, isDeleted: false },
+        include: { details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } } },
+      })
+      if (src) {
+        copySourceData = {
+          estimateId: src.id,
+          destinationCode: src.destinationCode ?? "",
+          destinationName: src.destinationName ?? "",
+          destinationDept: src.destinationDept ?? "",
+          destinationPerson: src.destinationPerson ?? "",
+          destinationZip: src.destinationZip ?? "",
+          destinationAddress: src.destinationAddress ?? "",
+          destinationTel: src.destinationTel ?? "",
+          destinationFax: src.destinationFax ?? "",
+          contact: src.contact ?? "",
+          customerOrderNo: src.customerOrderNo ?? "",
+          endUserNo: src.endUserNo ?? "",
+          shippingMethod: (src as any).shippingMethod ?? "delivery",
+          details: src.details.map(d => ({
+            clientDetailId: d.id,
+            materialCode: (d as any).materialCode ?? "",
+            kakouShiyouCode: (d as any).kakouShiyouCode ?? 0,
+            kakouT: (d as any).kakouT ?? "",
+            kakouB: (d as any).kakouB ?? "",
+            kakouA: (d as any).kakouA ?? "",
+            shiagari: (d as any).shiagari ?? "",
+            sizeT: Number(d.sizeT ?? 0),
+            sizeB: Number(d.sizeB ?? 0),
+            sizeA: Number(d.sizeA ?? 0),
+            toleranceTUp: Number((d as any).toleranceTUp ?? 0),
+            toleranceTDown: Number((d as any).toleranceTDown ?? 0),
+            toleranceBUp: Number((d as any).toleranceBUp ?? 0),
+            toleranceBDown: Number((d as any).toleranceBDown ?? 0),
+            toleranceAUp: Number((d as any).toleranceAUp ?? 0),
+            toleranceADown: Number((d as any).toleranceADown ?? 0),
+            mentoriShiji: Number((d as any).mentoriShiji ?? 9),
+            mentori4: Number((d as any).mentori4 ?? 0),
+            mentori8: Number((d as any).mentori8 ?? 0),
+            quantity: Number(d.quantity ?? 1),
+            customerDetailOrderNo: (d as any).customerDetailOrderNo ?? "",
+            destinationDetailOrderNo: (d as any).destinationDetailOrderNo ?? "",
+            remarks: (d as any).remarks ?? "",
+            deliveryDeadline: d.deliveryDeadline ? d.deliveryDeadline.toISOString().slice(0, 10) : null,
+          }))
+        }
       }
-      console.log('[/estimates/new] コピー元取得完了, 明細件数:', copySourceData.details.length)
-    }
+    } catch { /* サイレント */ }
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      {/* ページタイトル */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-6 rounded-full bg-[#1a2744]" />
-          <h1 className="font-bold text-gray-800 text-lg">
-            {copyFrom ? "お見積り複写" : "お見積り入力"}
-          </h1>
-        </div>
-        <Link
-          href="/dashboard"
-          className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
-        >
-          ← メインメニュー
-        </Link>
-      </div>
-
-      {/* Client Component にマスタデータを渡す */}
-      <EstimateNewClient
-        materials={materials}
-        processingSpecs={processingSpecs}
-        userInfo={userInfo}
-        copySource={copySourceData}
-      />
-    </div>
+    <EstimateNewClient
+      materials={materials.map(m => ({ materialCode: m.materialCode, materialName: m.materialName ?? "" }))}
+      processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? "" }))}
+      cuttingMethods={cuttingMethods.map(c => ({ methodCode: c.methodCode, methodName: c.methodName ?? "" }))}
+      userInfo={{ customerId, customerCode, userName, companyName }}
+      copySource={copySourceData}
+      isCopy={!!sp.copyFrom}
+    />
   )
 }

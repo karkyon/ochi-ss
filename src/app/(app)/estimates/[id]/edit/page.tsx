@@ -1,150 +1,76 @@
-// src/app/(app)/estimates/[id]/edit/page.tsx
-// STEP 14: 見積編集ページ（保存後のリダイレクト先）
-
 import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { notFound, redirect } from "next/navigation"
-import Link from "next/link"
-import EstimateEditClient from "./EstimateEditClient"
+import EstimateNewClient from "../../new/EstimateNewClient"
 
-interface Props {
-  params: Promise<{ id: string }>
-}
-
-export default async function EstimateEditPage({ params }: Props) {
+export default async function EstimateEditPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
+  if (!session) redirect("/login")
   const { id } = await params
 
-  // ── DB から見積データ取得 ──
-  const estimate = await prisma.estimateHeader.findFirst({
-    where: {
-      id,
-      customerId: session!.user.customerId!,
-      isDeleted: false,
-    },
-    include: {
-      details: {
-        where: { isDeleted: false },
-        orderBy: { rowNo: "asc" },
-      },
-    },
-  })
+  const customerId   = (session.user as any).customerId   ?? ""
+  const customerCode = (session.user as any).customerCode ?? ""
+  const userName     = (session.user as any).userName     ?? ""
+  const companyName  = (session.user as any).companyName  ?? ""
 
-  if (!estimate) notFound()
-
-  // 注文済みは編集不可 → 一覧へ
-  if (estimate.estimateStatus === "ordered") {
-    redirect("/estimates")
-  }
-
-  // マスタデータ取得
-  const [materials, processingSpecs] = await Promise.all([
-    prisma.material.findMany({
-      orderBy: { materialCode: "asc" },
-      select: { materialCode: true, materialName: true },
-    }),
-    prisma.processingSpec.findMany({
-      orderBy: { processingSpecCode: "asc" },
-      select: { processingSpecCode: true, processingSpecName: true },
-    }),
+  const [materials, processingSpecs, cuttingMethods] = await Promise.all([
+    prisma.material.findMany({ where: { isActive: true }, orderBy: { materialCode: "asc" }, select: { materialCode: true, materialName: true } }),
+    prisma.processingSpec.findMany({ orderBy: { processingSpecCode: "asc" }, select: { processingSpecCode: true, processingSpecName: true } }),
+    prisma.cuttingMethod.findMany({ where: { customerCode }, orderBy: { sortOrder: "asc" }, select: { methodCode: true, methodName: true } }),
   ])
 
-  const userInfo = {
-    customerCode: session!.user.companyCode ?? "",
-    customerName: session!.user.customerName ?? "",
-    chargeName:   session!.user.chargeName ?? "",
-    userId:       session!.user.userId ?? "",
-  }
+  const estimate = await prisma.estimate.findFirst({
+    where: { id, customerId, isDeleted: false },
+    include: { details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } } },
+  })
+  if (!estimate) redirect("/estimates")
 
-  // Prisma の Decimal を number に変換してクライアントに渡す
-  const estimateData = {
-    id:               estimate.id,
-    estimateNo:       estimate.estimateNo ?? "",
-    estimateStatus:   estimate.estimateStatus,
-    inputDate:        estimate.inputDate.toISOString().slice(0, 10),
-    customerOrderNo:  estimate.customerOrderNo ?? "",
-    endUserNo:        estimate.endUserNo ?? "",
-    destinationCode:  estimate.destinationCode ?? "",
-    destinationName:  estimate.destinationName ?? "",
-    destinationDept:  estimate.destinationDept ?? "",
+  const copySource = {
+    estimateId: estimate.id,
+    estimateNo: estimate.estimateNo ?? "",
+    destinationCode: estimate.destinationCode ?? "",
+    destinationName: estimate.destinationName ?? "",
+    destinationDept: estimate.destinationDept ?? "",
     destinationPerson: estimate.destinationPerson ?? "",
-    destinationZip:   estimate.destinationZip ?? "",
+    destinationZip: estimate.destinationZip ?? "",
     destinationAddress: estimate.destinationAddress ?? "",
-    destinationTel:   estimate.destinationTel ?? "",
-    destinationFax:   estimate.destinationFax ?? "",
-    requestNouki:     (estimate as any).requestNouki ?? "",
-    chargeName:       (estimate as any).chargeName ?? "",
-    estimateDate:     estimate.estimateDate?.toISOString().slice(0, 10) ?? estimate.inputDate.toISOString().slice(0, 10),
-    remarks:          estimate.remarks ?? "",
+    destinationTel: estimate.destinationTel ?? "",
+    destinationFax: estimate.destinationFax ?? "",
+    contact: estimate.contact ?? "",
+    customerOrderNo: estimate.customerOrderNo ?? "",
+    endUserNo: estimate.endUserNo ?? "",
+    shippingMethod: (estimate as any).shippingMethod ?? "delivery",
     details: estimate.details.map(d => ({
-      id:              d.id,
-      rowNo:           d.rowNo,
-      materialCode:    d.materialCode,
-      materialName:    d.materialName ?? "",
-      kakouShiyouCode: d.kakouShiyouCode,
-      kakouShiyou:     d.kakouShiyou ?? "",
-      kakouShijiCodeT: d.kakouShijiCodeT ?? "",
-      kakouShijiCodeA: d.kakouShijiCodeA ?? "",
-      kakouShijiCodeB: d.kakouShijiCodeB ?? "",
-      kakouT:          d.kakouT ?? "",
-      kakouA:          d.kakouA ?? "",
-      kakouB:          d.kakouB ?? "",
-      sizeT:           Number(d.sizeT),
-      sizeA:           Number(d.sizeA),
-      sizeB:           Number(d.sizeB),
-      kousaTUpper:     d.kousaTUpper != null ? Number(d.kousaTUpper) : null,
-      kousaTLower:     d.kousaTLower != null ? Number(d.kousaTLower) : null,
-      kousaAUpper:     d.kousaAUpper != null ? Number(d.kousaAUpper) : null,
-      kousaALower:     d.kousaALower != null ? Number(d.kousaALower) : null,
-      kousaBUpper:     d.kousaBUpper != null ? Number(d.kousaBUpper) : null,
-      kousaBLower:     d.kousaBLower != null ? Number(d.kousaBLower) : null,
-      mentori4:        d.mentori4 != null ? Number(d.mentori4) : null,
-      mentori8:        d.mentori8 != null ? Number(d.mentori8) : null,
-      quantity:        d.quantity,
-      unitPrice:       d.unitPrice != null ? Number(d.unitPrice) : null,
-      totalPrice:      d.totalPrice != null ? Number(d.totalPrice) : null,
-      shortestDelivery: d.shortestDelivery ?? "",
-      deliveryDeadline: d.deliveryDeadline?.toISOString() ?? null,
-    })),
+      clientDetailId: d.id,
+      materialCode: (d as any).materialCode ?? "",
+      kakouShiyouCode: (d as any).kakouShiyouCode ?? 0,
+      kakouT: (d as any).kakouT ?? "", kakouB: (d as any).kakouB ?? "", kakouA: (d as any).kakouA ?? "",
+      shiagari: (d as any).shiagari ?? "",
+      sizeT: Number(d.sizeT ?? 0), sizeB: Number(d.sizeB ?? 0), sizeA: Number(d.sizeA ?? 0),
+      toleranceTUp: Number((d as any).toleranceTUp ?? 0), toleranceTDown: Number((d as any).toleranceTDown ?? 0),
+      toleranceBUp: Number((d as any).toleranceBUp ?? 0), toleranceBDown: Number((d as any).toleranceBDown ?? 0),
+      toleranceAUp: Number((d as any).toleranceAUp ?? 0), toleranceADown: Number((d as any).toleranceADown ?? 0),
+      mentoriShiji: Number((d as any).mentoriShiji ?? 9), mentori4: Number((d as any).mentori4 ?? 0), mentori8: Number((d as any).mentori8 ?? 0),
+      quantity: Number(d.quantity ?? 1),
+      customerDetailOrderNo: (d as any).customerDetailOrderNo ?? "",
+      destinationDetailOrderNo: (d as any).destinationDetailOrderNo ?? "",
+      remarks: (d as any).remarks ?? "",
+      unitPrice: Number((d as any).unitPrice ?? 0),
+      totalPrice: Number(d.totalPrice ?? 0),
+      deliveryDate: (d as any).deliveryDate ? String((d as any).deliveryDate).slice(0, 10) : undefined,
+      deliveryDeadline: d.deliveryDeadline ? d.deliveryDeadline.toISOString().slice(0, 10) : null,
+      calculated: true,
+    }))
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-6 rounded-full bg-[#1a2744]" />
-          <h1 className="font-bold text-gray-800 text-lg">
-            見積編集
-            {estimate.estimateNo && (
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                （見積No: {estimate.estimateNo}）
-              </span>
-            )}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/estimates"
-            className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
-          >
-            ← 見積一覧
-          </Link>
-          <Link
-            href="/dashboard"
-            className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
-          >
-            メインメニュー
-          </Link>
-        </div>
-      </div>
-
-      <EstimateEditClient
-        estimateId={id}
-        estimateData={estimateData}
-        materials={materials}
-        processingSpecs={processingSpecs}
-        userInfo={userInfo}
-      />
-    </div>
+    <EstimateNewClient
+      materials={materials.map(m => ({ materialCode: m.materialCode, materialName: m.materialName ?? "" }))}
+      processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? "" }))}
+      cuttingMethods={cuttingMethods.map(c => ({ methodCode: c.methodCode, methodName: c.methodName ?? "" }))}
+      userInfo={{ customerId, customerCode, userName, companyName }}
+      copySource={copySource}
+      isCopy={false}
+    />
   )
 }

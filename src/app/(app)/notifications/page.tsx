@@ -1,172 +1,38 @@
-// /notifications — お知らせ一覧（フィルタ+ページネーション+未読フィルタ）
 import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import Link from "next/link"
+import NotificationsClient from "./NotificationsClient"
 
-const TYPE_LABEL: Record<string, { label: string; color: string }> = {
-  info:    { label: "お知らせ", color: "bg-blue-100 text-blue-700" },
-  warning: { label: "重要",     color: "bg-amber-100 text-amber-700" },
-  urgent:  { label: "緊急",     color: "bg-red-100 text-red-600" },
-}
-const PER_PAGE = 20
-
-interface Props {
-  searchParams: Promise<{ type?: string; page?: string; readFilter?: string }>
-}
-
-export default async function NotificationsPage({ searchParams }: Props) {
+export default async function NotificationsPage() {
   const session = await auth()
-  const { type, page: pageStr, readFilter } = await searchParams
-  const page = Math.max(1, parseInt(pageStr ?? "1", 10))
-  const customerId = session?.user?.customerId!
-
+  if (!session) redirect("/login")
+  const customerId = (session.user as any).customerId ?? ""
   const now = new Date()
-  const where: any = {
-    isDeleted: false,
-    publishedAt: { lte: now },
-    OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
-    ...(type ? { notifType: type } : {}),
-  }
-
-  // 既読IDを取得
-  let readIds = new Set<string>()
-  try {
-    const reads = await (prisma as any).notificationRead.findMany({
-      where: { customerId },
-      select: { notificationId: true },
-    })
-    readIds = new Set(reads.map((r: any) => r.notificationId))
-  } catch { /* silent */ }
-
-  const [total, notifications] = await Promise.all([
-    prisma.notification.count({ where }),
-    prisma.notification.findMany({
-      where,
-      orderBy: { publishedAt: "desc" },
-      skip: (page - 1) * PER_PAGE,
-      take: PER_PAGE,
-    }),
-  ])
-
-  // 未読フィルタ適用
-  const notificationsWithRead = notifications.map((n: any) => ({
-    ...n,
-    isRead: readIds.has(n.id),
+  const rows = await prisma.notification.findMany({
+    where: { isDeleted: false, isActive: true, OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
+    orderBy: [{ priority: "desc" }, { publishedAt: "desc" }],
+    take: 100,
+    select: { id: true, subject: true, notifyType: true, priority: true, publishedAt: true, body: true },
+  })
+  const reads = await prisma.notificationRead.findMany({
+    where: { customerId, notificationId: { in: rows.map(r => r.id) } },
+    select: { notificationId: true },
+  })
+  const readSet = new Set(reads.map(r => r.notificationId))
+  const notifications = rows.map(r => ({
+    id: r.id, subject: r.subject ?? "（タイトルなし）",
+    notifyType: r.notifyType ?? "info", priority: r.priority,
+    publishedAt: r.publishedAt?.toISOString() ?? null,
+    isRead: readSet.has(r.id),
   }))
-  const filtered = readFilter === "unread"
-    ? notificationsWithRead.filter((n: any) => !n.isRead)
-    : readFilter === "read"
-    ? notificationsWithRead.filter((n: any) => n.isRead)
-    : notificationsWithRead
-
-  const totalPages = Math.ceil(total / PER_PAGE)
-
-  const buildUrl = (p: number, t?: string, rf?: string) => {
-    const params = new URLSearchParams()
-    if (t)  params.set("type", t)
-    if (rf) params.set("readFilter", rf)
-    if (p > 1) params.set("page", String(p))
-    return `/notifications${params.toString() ? "?" + params.toString() : ""}`
-  }
-
-  const unreadCount = notificationsWithRead.filter((n: any) => !n.isRead).length
-
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-6 rounded-full bg-[#1a2744]" />
-          <h1 className="font-bold text-gray-800 text-lg">お知らせ一覧</h1>
-          <span className="text-xs text-gray-400 ml-1">{total}件</span>
-          {unreadCount > 0 && (
-            <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-              {unreadCount}件の未読
-            </span>
-          )}
-        </div>
-        <Link href="/dashboard" className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">
-          メインメニュー
-        </Link>
+    <div style={{ maxWidth: "960px", margin: "0 auto", padding: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, borderLeft: "3px solid #1d4ed8", paddingLeft: "8px" }}>お知らせ一覧</div>
+        <Link href="/dashboard" className="btn-ochi btn-outline" style={{ fontSize: "11px" }}>← メインメニュー</Link>
       </div>
-
-      {/* フィルタ行 */}
-      <div className="flex gap-2 mb-4 flex-wrap items-center">
-        {/* 通知区分 */}
-        {[
-          { value: "", label: "すべて" },
-          { value: "info",    label: "お知らせ" },
-          { value: "warning", label: "重要" },
-          { value: "urgent",  label: "緊急" },
-        ].map(({ value, label }) => (
-          <Link key={value} href={buildUrl(1, value || undefined, readFilter)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              (type ?? "") === value
-                ? "bg-[#1a2744] text-white border-[#1a2744]"
-                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-            }`}>
-            {label}
-          </Link>
-        ))}
-        <div className="w-px h-4 bg-gray-300 mx-1" />
-        {/* 既読フィルタ */}
-        {[
-          { value: "",       label: "全て" },
-          { value: "unread", label: "未読のみ" },
-          { value: "read",   label: "既読のみ" },
-        ].map(({ value, label }) => (
-          <Link key={value} href={buildUrl(1, type, value || undefined)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              (readFilter ?? "") === value
-                ? "bg-indigo-600 text-white border-indigo-600"
-                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-            }`}>
-            {label}
-          </Link>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-16 text-center text-gray-400 text-sm">
-            {total === 0 ? "現在お知らせはありません" : "条件に一致するお知らせはありません"}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {filtered.map((n: any) => {
-              const t = TYPE_LABEL[n.notifType] ?? { label: n.notifType, color: "bg-gray-100 text-gray-600" }
-              return (
-                <Link key={n.id} href={`/notifications/${n.id}`}
-                  className="flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
-                  <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.isRead ? "bg-transparent" : "bg-blue-500"}`} />
-                  <span className={`mt-0.5 inline-block px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap flex-shrink-0 ${t.color}`}>
-                    {t.label}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm truncate ${n.isRead ? "text-gray-500" : "font-medium text-gray-800"}`}>{n.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {n.publishedAt ? new Date(n.publishedAt).toLocaleDateString("ja-JP") : "—"}
-                    </p>
-                  </div>
-                  <span className="text-gray-300 text-sm flex-shrink-0">›</span>
-                </Link>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ページネーション */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          {page > 1 && (
-            <Link href={buildUrl(page - 1, type, readFilter)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">← 前へ</Link>
-          )}
-          <span className="px-3 py-1.5 text-sm text-gray-600">{page} / {totalPages}</span>
-          {page < totalPages && (
-            <Link href={buildUrl(page + 1, type, readFilter)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">次へ →</Link>
-          )}
-        </div>
-      )}
+      <NotificationsClient notifications={notifications} />
     </div>
   )
 }

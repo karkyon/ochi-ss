@@ -1,56 +1,197 @@
 @import "tailwindcss";
 
+/* ─── Ochi-ss デザイントークン ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --ochi-navy:      #1e3a5f;
+  --ochi-navy-dark: #152b47;
+  --ochi-blue:      #1d4ed8;
+  --ochi-blue-lt:   #dbeafe;
+  --ochi-header-bg: #1e3a5f;
+  --ochi-title-bg:  #d8e9f5;
+  --ochi-title-txt: #1e3a5f;
+  --ochi-tlbl-bg:   linear-gradient(to right, #f1f5f9, #e8eef4);
+  --ochi-focus-bg:  #ffffcc;
+  --ochi-focus-bd:  #f59e0b;
+  --ochi-expired-bg:#fee2e2;
+  --ochi-expired-bd:#dc2626;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', Arial, sans-serif;
+  font-size: 13px;
+  background: #f1f5f9;
+  color: #1e293b;
 }
 
-/* ─── Ochi-ss ユーティリティ ─── */
-
-/* フォーカス時黄色ハイライト（旧システム踏襲） */
+/* ─── フォーカス黄色ハイライト（全 input/select 共通） ─── */
 @layer utilities {
-  .ochi-input:focus {
-    background-color: #ffffcc !important;
-    border-color: #f59e0b !important;
-    outline: none !important;
-    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
-    /* Tailwind v4: ring をリセットして黄色背景を確実に表示 */
-    --tw-ring-shadow: 0 0 0 0 transparent !important;
+  .ochi-input {
+    height: 26px;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    padding: 0 6px;
+    font-size: 11px;
+    width: 100%;
+    background: #fff;
+    transition: background 0.1s, border-color 0.1s;
   }
-}
+  .ochi-input:focus {
+    background: var(--ochi-focus-bg) !important;
+    border-color: var(--ochi-focus-bd) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
+    --tw-ring-shadow: none !important;
+  }
+  .ochi-select {
+    height: 26px;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 11px;
+    width: 100%;
+    background: #fff;
+  }
+  .ochi-select:focus {
+    background: var(--ochi-focus-bg) !important;
+    border-color: var(--ochi-focus-bd) !important;
+    outline: none !important;
+  }
 
-/* 数値カラム等幅フォント */
-.number-cell {
-  font-family: 'Courier New', 'Consolas', monospace;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
+  /* タイトルバー（青） */
+  .section-title-blue {
+    background: var(--ochi-title-bg);
+    color: var(--ochi-title-txt);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px 4px 0 0;
+    border-bottom: 1px solid #b3d4ed;
+  }
+  .section-title-green {
+    background: #dcfce7;
+    color: #166534;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px 4px 0 0;
+    border-bottom: 1px solid #86efac;
+  }
 
-/* 明細テーブル sticky thead */
-.detail-thead th {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: #1a2744;
-  color: #ffffff;
+  /* ラベルセル */
+  .tlbl {
+    background: linear-gradient(to right, #f1f5f9, #e8eef4);
+    font-weight: 600;
+    color: #475569;
+    font-size: 10px;
+    text-align: center;
+    white-space: nowrap;
+    padding: 2px 4px;
+    border: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  .tbody-cell {
+    background: #fff;
+    padding: 2px 4px;
+    border: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+
+  /* 数値セル */
+  .number-cell {
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  /* 明細テーブル */
+  .detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+  .detail-table th {
+    background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
+    border: 1px solid #cbd5e1;
+    padding: 3px 4px;
+    text-align: center;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .detail-table td {
+    border: 1px solid #e2e8f0;
+    padding: 2px 4px;
+    vertical-align: middle;
+    background: #fff;
+  }
+  .detail-table tr:nth-child(even) td { background: #f8fafc; }
+  .detail-table tr:hover td { background: #eff6ff !important; }
+  .detail-table .expired-row td {
+    background: var(--ochi-expired-bg) !important;
+    border-left: 3px solid var(--ochi-expired-bd);
+  }
+
+  /* 検索セクション */
+  .search-section {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .search-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e40af;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #bfdbfe;
+  }
+  .result-bar {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 11px;
+    color: #166534;
+    margin-bottom: 8px;
+  }
+
+  /* ボタン共通 */
+  .btn-ochi {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn-ochi:hover { opacity: 0.85; }
+  .btn-ochi:active { transform: scale(0.97); }
+  .btn-ochi:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .btn-navy    { background: #1e3a5f; color: #fff; }
+  .btn-blue    { background: #1d4ed8; color: #fff; }
+  .btn-green   { background: #16a34a; color: #fff; }
+  .btn-amber   { background: #d97706; color: #fff; }
+  .btn-red     { background: #dc2626; color: #fff; }
+  .btn-info    { background: #0891b2; color: #fff; }
+  .btn-gray    { background: #64748b; color: #fff; }
+  .btn-outline { background: #fff; color: #374151; border: 1px solid #cbd5e1; }
+  .btn-outline:hover { background: #f8fafc; }
+
+  /* バッジ */
+  .badge-blue   { background: #dbeafe; color: #1e40af; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+  .badge-green  { background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+  .badge-amber  { background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+  .badge-red    { background: #fee2e2; color: #991b1b; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+  .badge-gray   { background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
 }

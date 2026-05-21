@@ -1,1514 +1,575 @@
+// src/app/(app)/estimates/new/EstimateNewClient.tsx
+// 見積入力画面 — ワイヤーフレーム確定版に基づく全面リデザイン
 "use client"
-import { formatDimension } from "@/lib/formatNumber"
-import { useState, useCallback, useEffect } from "react"
-import { useDraftAutoSave } from "@/hooks/useDraftAutoSave"
-import DraftSaveIndicator from "@/components/ui/DraftSaveIndicator"
+import { useState, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
 
+// ─── 型定義 ───────────────────────────────────────────────────
+interface Material    { materialCode: string; materialName: string }
+interface ProcSpec    { processingSpecCode: number; processingSpecName: string }
+interface CuttingMethod { methodCode: string; methodName: string }
+interface UserInfo    { customerId: string; customerCode: string; userName: string; companyName: string }
 
-// ──────────────────────────────────────────────────────────────────
-// 直送先検索モーダルコンポーネント
-// ──────────────────────────────────────────────────────────────────
-interface DirectDelivery {
-  deliveryCode:   string
-  name:           string
-  furigana:       string
-  shortName:      string
-  departmentName: string
-  chargeName:     string
-  postalCode:     string
-  address1:       string
-  address2:       string
-  address3:       string
-  tel:            string
-  fax:            string
-}
-
-interface DirectDeliveryModalProps {
-  customerCode: string
-  onSelect: (dd: DirectDelivery) => void
-  onClose:  () => void
-}
-
-function DirectDeliveryModal({ customerCode, onSelect, onClose }: DirectDeliveryModalProps) {
-  const [query,    setQuery]    = useState("")
-  const [results,  setResults]  = useState<DirectDelivery[]>([])
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState("")
-  const [searched, setSearched] = useState(false)
-
-  const handleSearch = async () => {
-    console.log("[直送先モーダル] 検索 query:", query)
-    if (query.trim().length < 2) { setError("2文字以上入力してください"); return }
-    setError(""); setLoading(true)
-    try {
-      const res = await fetch(`/api/v1/direct-deliveries/search?q=${encodeURIComponent(query)}`)
-      const data = await res.json()
-      console.log("[直送先モーダル] 検索レスポンス:", data)
-      if (!res.ok) throw new Error(data.error ?? "検索失敗")
-      setResults(data.results ?? [])
-      setSearched(true)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSelect = (dd: DirectDelivery) => {
-    console.log("[直送先モーダル] 選択:", dd)
-    onSelect(dd)
-    onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-
-        {/* モーダルヘッダー */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-800">🔍 直送先検索</h2>
-          <button
-            onClick={() => { console.log("[直送先モーダル] ×ボタン"); onClose() }}
-            className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none px-1"
-          >×</button>
-        </div>
-
-        {/* 検索フォーム */}
-        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={query}
-              onChange={e => { console.log("[直送先モーダル] 入力:", e.target.value); setQuery(e.target.value) }}
-              onKeyDown={e => e.key === "Enter" && handleSearch()}
-              placeholder="直送先名・コード・住所・電話番号（2文字以上）"
-              autoFocus
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={() => { console.log("[直送先モーダル] 検索ボタン"); handleSearch() }}
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-            >
-              {loading ? "検索中..." : "🔍 検索"}
-            </button>
-            <button
-              onClick={() => { console.log("[直送先モーダル] クリアボタン"); setQuery(""); setResults([]); setSearched(false); setError("") }}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100"
-            >クリア</button>
-          </div>
-          {error && <p className="mt-2 text-xs text-red-600">⚠ {error}</p>}
-        </div>
-
-        {/* 検索結果 */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {!searched && (
-            <p className="text-sm text-gray-400 text-center py-8">検索条件を入力して「検索」ボタンを押してください</p>
-          )}
-          {searched && results.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-8">該当する直送先が見つかりませんでした</p>
-          )}
-          {results.length > 0 && (
-            <>
-              <p className="text-xs text-gray-500 mb-3">{results.length}件見つかりました</p>
-              <div className="space-y-2">
-                {results.map((dd, i) => (
-                  <div key={i} className="border border-gray-200 rounded-lg p-3 hover:bg-blue-50 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{dd.deliveryCode}</span>
-                          <span className="text-sm font-semibold text-gray-800 truncate">{dd.name}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {dd.departmentName && <span className="mr-3">部署: {dd.departmentName}</span>}
-                          {dd.chargeName     && <span className="mr-3">担当: {dd.chargeName}</span>}
-                          {dd.postalCode     && <span className="mr-3">〒{dd.postalCode}</span>}
-                          <span>{[dd.address1, dd.address2, dd.address3].filter(Boolean).join("")}</span>
-                          {dd.tel            && <span className="ml-3">☎ {dd.tel}</span>}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleSelect(dd)}
-                        className="shrink-0 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                      >選択</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* フッター */}
-        <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100"
-          >閉じる</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
-// ────────────────────────────────────────────────
-// 型定義
-// ────────────────────────────────────────────────
-
-type Material = { materialCode: string; materialName: string }
-type ProcessingSpec = { processingSpecCode: number; processingSpecName: string }
-
-// 加工指示の選択肢
-type CuttingMethod = { code: number; label: string }
-
-type EstimateDetail = {
-  clientDetailId: string  // クライアント側UUID
-  rowNo: number
-  materialCode: string
-  materialName: string
-  kakouShiyouCode: number
-  kakouShiyou: string
-  kakouShijiCodeT: string
-  kakouShijiCodeA: string
-  kakouShijiCodeB: string
-  kakouT: string
-  kakouA: string
-  kakouB: string
-  sizeT: string
-  sizeA: string
-  sizeB: string
-  kousaTUpper: string; kousaTLower: string
-  kousaAUpper: string; kousaALower: string
-  kousaBUpper: string; kousaBLower: string
-  mentori4: string; mentori8: string
-  quantity: string
-  // 計算結果
-  unitPrice: number | null
-  totalPrice: number | null
-  shortestDelivery: string | null
-  deliveryDeadline: string | null
-  calculated: boolean
-  // ▼ 追加: 計算中間値（保存時にDBへ送る）
-  intermediate: {
-    materialSizeT: number
-    materialSizeA: number
-    materialSizeB: number
-    materialUnitWeight: number
-    materialTotalWeight: number
-    productUnitWeight: number
-    productTotalWeight: number
-    processingCost6f: number
-    processingCostTotal: number
-  } | null
-}
-
-type HeaderForm = {
-  inputDate: string
-  estimateDate: string
-  chargeName: string
-  customerOrderNo: string
-  endUserNo: string
-  destinationCode: string
-  destinationName: string
-  destinationDept: string
-  destinationPerson: string
-  destinationZip: string
-  destinationAddress: string
-  destinationTel: string
-  destinationFax: string
-  requestNouki: string
-  remarks: string
-}
-
-type DetailForm = Omit<EstimateDetail,
-  "clientDetailId" | "rowNo" | "materialName" | "kakouShiyou" |
-  "kakouT" | "kakouA" | "kakouB" |
-  "unitPrice" | "totalPrice" | "shortestDelivery" | "deliveryDeadline" | "calculated" | "intermediate"
->
-
-// ────────────────────────────────────────────────
-// 初期値
-// ────────────────────────────────────────────────
-
-// 納期有効期限切れチェック
-function isDeliveryExpired(deliveryDeadline: string | null | undefined): boolean {
-  if (!deliveryDeadline) return false
-  return new Date(deliveryDeadline) < new Date()
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-const EMPTY_DETAIL_FORM: DetailForm = {
-  materialCode: "",
-  kakouShiyouCode: 0,
-  kakouShijiCodeT: "", kakouShijiCodeA: "", kakouShijiCodeB: "",
-  sizeT: "", sizeA: "", sizeB: "",
-  kousaTUpper: "", kousaTLower: "",
-  kousaAUpper: "", kousaALower: "",
-  kousaBUpper: "", kousaBLower: "",
-  mentori4: "", mentori8: "",
-  quantity: "",
-}
-
-// ────────────────────────────────────────────────
-// メインコンポーネント
-// ────────────────────────────────────────────────
-
-interface CopySourceDetail {
-  materialCode: string
-  materialName: string
-  kakouShiyouCode: number
-  kakouShiyou: string
-  kakouShijiCodeT: string
-  kakouShijiCodeA: string
-  kakouShijiCodeB: string
-  kakouT: string
-  kakouA: string
-  kakouB: string
-  sizeT: number
-  sizeA: number
-  sizeB: number
-  kousaTUpper: number | null
-  kousaTLower: number | null
-  kousaAUpper: number | null
-  kousaALower: number | null
-  kousaBUpper: number | null
-  kousaBLower: number | null
-  mentori4: number | null
-  mentori8: number | null
+interface DetailForm {
+  clientDetailId: string
+  materialCode: string; kakouShiyouCode: number
+  kakouT: string; kakouB: string; kakouA: string
+  shiagari: string
+  sizeT: number; sizeB: number; sizeA: number
+  toleranceTUp: number; toleranceTDown: number
+  toleranceBUp: number; toleranceBDown: number
+  toleranceAUp: number; toleranceADown: number
+  mentoriShiji: number
+  mentori4: number; mentori8: number
   quantity: number
-  unitPrice: number | null
-  totalPrice: number | null
-  shortestDelivery: string
-  deliveryDeadline: string | null
-}
-
-interface CopySource {
-  customerOrderNo: string
-  endUserNo: string
-  destinationCode: string
-  destinationName: string
-  destinationDept: string
-  destinationPerson: string
-  destinationZip: string
-  destinationAddress: string
-  destinationTel: string
-  destinationFax: string
-  remarks: string
-  details: CopySourceDetail[]
+  customerDetailOrderNo: string; destinationDetailOrderNo: string; remarks: string
+  // 計算結果
+  unitPrice?: number; totalPrice?: number; deliveryDate?: string
+  deliveryDeadline?: string | null
+  fastDeliveryDate?: string; fastDeliveryDeadline?: string
+  calculated?: boolean
 }
 
 interface Props {
-  materials: Material[]
-  processingSpecs: ProcessingSpec[]
-  userInfo: {
-    customerCode: string
-    customerName: string
-    chargeName: string
-    userId: string
-  }
-  copySource?: CopySource | null
+  materials: Material[]; processingSpecs: ProcSpec[]; cuttingMethods: CuttingMethod[]
+  userInfo: UserInfo; copySource?: any; isCopy?: boolean
 }
 
-export default function EstimateNewClient({ materials, processingSpecs, userInfo, copySource }: Props) {
-  // 加工指示マスタ（SQL Serverからバインド）
-  const [cuttingMethods, setCuttingMethods] = useState<CuttingMethod[]>([])
-  // 材料コード → 加工仕様コード[] マップ（動的フィルタ用）
-  const [materialProcessingMap, setMaterialProcessingMap] = useState<Record<string, number[]>>({})
-  
-  useEffect(() => {
-    fetch(`/api/v1/cutting-methods?customerCode=${userInfo.customerCode}`)
-      .then(r => r.json())
-      .then(data => {
-        console.log('[加工指示API] レスポンス:', data)
-        if (data.methods) setCuttingMethods(data.methods)
-      })
-      .catch((e) => { console.error('[加工指示API] エラー:', e) })
-  }, [userInfo.customerCode])
+// ─── ヘルパー ──────────────────────────────────────────────────
+function newDetailForm(): DetailForm {
+  return {
+    clientDetailId: crypto.randomUUID(),
+    materialCode: "", kakouShiyouCode: 0,
+    kakouT: "", kakouB: "", kakouA: "", shiagari: "",
+    sizeT: 0, sizeB: 0, sizeA: 0,
+    toleranceTUp: 0, toleranceTDown: 0,
+    toleranceBUp: 0, toleranceBDown: 0,
+    toleranceAUp: 0, toleranceADown: 0,
+    mentoriShiji: 9, mentori4: 0, mentori8: 0,
+    quantity: 1,
+    customerDetailOrderNo: "", destinationDetailOrderNo: "", remarks: "",
+    calculated: false,
+  }
+}
 
-  // 材料×加工仕様マップ取得
+function isExpired(deadline?: string | null): boolean {
+  if (!deadline) return false
+  return new Date(deadline) < new Date()
+}
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return ""
+  return iso.slice(0, 10)
+}
+
+// ─── スタイル定数 ──────────────────────────────────────────────
+const TH: React.CSSProperties  = { background: "linear-gradient(to bottom,#f1f5f9,#e2e8f0)", border: "1px solid #cbd5e1", padding: "3px 4px", textAlign: "center", fontWeight: 600, fontSize: "10px", color: "#334155", whiteSpace: "nowrap", verticalAlign: "middle" }
+const TD: React.CSSProperties  = { border: "1px solid #e2e8f0", padding: "2px 4px", verticalAlign: "middle", background: "#fff", fontSize: "11px" }
+const LBL: React.CSSProperties = { background: "linear-gradient(to right,#f1f5f9,#e8eef4)", fontWeight: 600, color: "#475569", fontSize: "10px", textAlign: "center" as const, whiteSpace: "nowrap" as const, padding: "2px 6px", border: "1px solid #e2e8f0", verticalAlign: "middle" as const }
+const INP: React.CSSProperties = { height: "22px", border: "1px solid #cbd5e1", borderRadius: "3px", padding: "0 4px", fontSize: "11px", width: "100%", background: "#fff" }
+const SEL: React.CSSProperties = { height: "22px", border: "1px solid #cbd5e1", borderRadius: "3px", padding: "0 2px", fontSize: "11px", width: "100%", background: "#fff" }
+const FOCUS_STYLE = { background: "#ffffcc", borderColor: "#f59e0b", outline: "none" }
+
+const focusHandlers = {
+  onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => { e.target.style.background = "#ffffcc"; e.target.style.borderColor = "#f59e0b"; e.target.style.outline = "none" },
+  onBlur:  (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => { e.target.style.background = "#fff"; e.target.style.borderColor = "#cbd5e1" },
+}
+
+// ─── メインコンポーネント ──────────────────────────────────────
+export default function EstimateNewClient({ materials, processingSpecs, cuttingMethods, userInfo, copySource, isCopy }: Props) {
+  const today = new Date().toISOString().slice(0, 10)
+
+  // ヘッダー
+  const [estimateNo,    setEstimateNo]    = useState(isCopy ? "" : (copySource?.estimateNo ?? ""))
+  const [orderNo,       setOrderNo]       = useState("")
+  const [inputDate,     setInputDate]     = useState(today)
+  const [estimateDate,  setEstimateDate]  = useState(today)
+  const [shippingMethod, setShippingMethod] = useState(copySource?.shippingMethod ?? "delivery")
+  // 送り先
+  const [distCode,      setDistCode]     = useState(copySource?.destinationCode ?? "")
+  const [distName,      setDistName]     = useState(copySource?.destinationName ?? "")
+  const [distDept,      setDistDept]     = useState(copySource?.destinationDept ?? "")
+  const [distPerson,    setDistPerson]   = useState(copySource?.destinationPerson ?? "")
+  const [distZip,       setDistZip]      = useState(copySource?.destinationZip ?? "")
+  const [distAddr,      setDistAddr]     = useState(copySource?.destinationAddress ?? "")
+  const [distTel,       setDistTel]      = useState(copySource?.destinationTel ?? "")
+  const [distFax,       setDistFax]      = useState(copySource?.destinationFax ?? "")
+  const [contact,       setContact]      = useState(copySource?.contact ?? "")
+  const [custOrderNo,   setCustOrderNo]  = useState(copySource?.customerOrderNo ?? "")
+  const [endUserNo,     setEndUserNo]    = useState(copySource?.endUserNo ?? "")
+
+  // 明細入力フォーム
+  const [form, setForm] = useState<DetailForm>(newDetailForm())
+  // 登録済み明細
+  const [details, setDetails] = useState<DetailForm[]>(copySource?.details ?? [])
+  // 直送先検索モーダル
+  const [showModal, setShowModal] = useState(false)
+  const [modalSearch, setModalSearch] = useState({ name: "", address: "", code: "", tel: "" })
+  const [modalResults, setModalResults] = useState<any[]>([])
+  const [modalLoading, setModalLoading] = useState(false)
+  // 選択行（注文用）
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // 保存状態
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState("")
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(copySource?.estimateId ?? null)
+  // 材料×加工仕様マップ
+  const [matProcMap, setMatProcMap] = useState<Record<string, number[]>>({})
+
+  const allDetailIds = details.map(d => d.clientDetailId)
+  const isAllSelected = allDetailIds.length > 0 && allDetailIds.every(id => selectedIds.has(id))
+
+  // 初期化
   useEffect(() => {
     fetch("/api/v1/masters/material-processing-map")
       .then(r => r.json())
-      .then(data => {
-        console.log('[材料×加工仕様マップ] レスポンス件数:', Object.keys(data.map ?? {}).length)
-        if (data.map) setMaterialProcessingMap(data.map)
-      })
-      .catch((e) => { console.warn('[材料×加工仕様マップ] エラー:', e) })
+      .then(d => { if (d.map) setMatProcMap(d.map) })
+      .catch(() => {})
   }, [])
 
-  // Draft 自動保存 Hook
-  const { draftId: _draftId, savedAt, saveStatus, triggerSave } = useDraftAutoSave(null)
+  const filteredSpecs = matProcMap[form.materialCode]
+    ? processingSpecs.filter(s => matProcMap[form.materialCode].includes(s.processingSpecCode))
+    : processingSpecs
 
-  // ヘッダーフォーム
-  const [header, setHeader] = useState<HeaderForm>({
-    inputDate:          todayStr(),
-    estimateDate:       todayStr(),
-    chargeName:         userInfo.chargeName ?? "",
-    customerOrderNo:    copySource?.customerOrderNo ?? "",
-    endUserNo:          copySource?.endUserNo ?? "",
-    destinationCode:    copySource?.destinationCode ?? "",
-    destinationName:    copySource?.destinationName ?? "",
-    destinationDept:    copySource?.destinationDept ?? "",
-    destinationPerson:  copySource?.destinationPerson ?? "",
-    destinationZip:     copySource?.destinationZip ?? "",
-    destinationAddress: copySource?.destinationAddress ?? "",
-    destinationTel:     copySource?.destinationTel ?? "",
-    destinationFax:     copySource?.destinationFax ?? "",
-    requestNouki:       "",
-    remarks:            copySource?.remarks ?? "",
-  })
-  const [showDDModal, setShowDDModal] = useState(false)
-
-  // 明細入力フォーム（1行分）
-  const [detailForm, setDetailForm] = useState<DetailForm>(EMPTY_DETAIL_FORM)
-
-  // 計算結果（計算ボタン押下後）
-  // ▼ 変更: sumPrice → totalPrice にマッピング。intermediate を追加
-  const [calcResult, setCalcResult] = useState<{
-    unitPrice: number
-    totalPrice: number
-    shortestDelivery: string
-    deliveryDeadline: string
-    intermediate: {
-      materialSizeT: number
-      materialSizeA: number
-      materialSizeB: number
-      materialUnitWeight: number
-      materialTotalWeight: number
-      productUnitWeight: number
-      productTotalWeight: number
-      processingCost6f: number
-      processingCostTotal: number
-    } | null
-  } | null>(null)
-
-  // 明細リスト
-  const [details, setDetails] = useState<EstimateDetail[]>(() => {
-    if (!copySource?.details?.length) return []
-    return copySource.details.map((d, i) => ({
-      clientDetailId:   crypto.randomUUID(),
-      rowNo:            i + 1,
-      materialCode:     d.materialCode,
-      materialName:     d.materialName,
-      kakouShiyouCode:  d.kakouShiyouCode,
-      kakouShiyou:      d.kakouShiyou,
-      kakouShijiCodeT:  d.kakouShijiCodeT,
-      kakouShijiCodeA:  d.kakouShijiCodeA,
-      kakouShijiCodeB:  d.kakouShijiCodeB,
-      kakouT:           d.kakouT,
-      kakouA:           d.kakouA,
-      kakouB:           d.kakouB,
-      sizeT:            String(d.sizeT),
-      sizeA:            String(d.sizeA),
-      sizeB:            String(d.sizeB),
-      kousaTUpper:      d.kousaTUpper != null ? String(d.kousaTUpper) : "",
-      kousaTLower:      d.kousaTLower != null ? String(d.kousaTLower) : "",
-      kousaAUpper:      d.kousaAUpper != null ? String(d.kousaAUpper) : "",
-      kousaALower:      d.kousaALower != null ? String(d.kousaALower) : "",
-      kousaBUpper:      d.kousaBUpper != null ? String(d.kousaBUpper) : "",
-      kousaBLower:      d.kousaBLower != null ? String(d.kousaBLower) : "",
-      mentori4:         d.mentori4 != null ? String(d.mentori4) : "",
-      mentori8:         d.mentori8 != null ? String(d.mentori8) : "",
-      quantity:         String(d.quantity),
-      unitPrice:        d.unitPrice,
-      totalPrice:       d.totalPrice,
-      shortestDelivery: d.shortestDelivery ?? null,
-      deliveryDeadline: d.deliveryDeadline ?? null,
-      calculated:       d.unitPrice != null && d.unitPrice > 0,
-      intermediate:     null,
-    }))
-  })
-
-  // 明細行 選択状態管理（全選択/個別選択）
-  const [selectedDetails, setSelectedDetails] = useState<Set<string>>(new Set())
-  const allDetailIds = details.map(d => d.clientDetailId)
-  const isAllSelected = allDetailIds.length > 0 && allDetailIds.every(id => selectedDetails.has(id))
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedDetails(new Set(allDetailIds))
-    else setSelectedDetails(new Set())
-  }
-  const handleSelectOne = (id: string, checked: boolean) => {
-    setSelectedDetails(prev => {
-      const next = new Set(prev)
-      if (checked) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }
-
-  // Draft 用: EstimateDetail（sizeT=string）→ DetailItem（sizeT=number）変換
-  const toDetailItems = (dets: EstimateDetail[]) =>
-    dets.map(d => ({
-      materialCode:    d.materialCode,
-      kakouShiyouCode: d.kakouShiyouCode,
-      kakouShijiCodeT: d.kakouShijiCodeT || undefined,
-      kakouShijiCodeA: d.kakouShijiCodeA || undefined,
-      kakouShijiCodeB: d.kakouShijiCodeB || undefined,
-      sizeT:           d.sizeT ? parseFloat(d.sizeT) : 0,
-      sizeA:           d.sizeA ? parseFloat(d.sizeA) : 0,
-      sizeB:           d.sizeB ? parseFloat(d.sizeB) : 0,
-      kousaTUpper:     d.kousaTUpper ? parseFloat(d.kousaTUpper) : null,
-      kousaTLower:     d.kousaTLower ? parseFloat(d.kousaTLower) : null,
-      kousaAUpper:     d.kousaAUpper ? parseFloat(d.kousaAUpper) : null,
-      kousaALower:     d.kousaALower ? parseFloat(d.kousaALower) : null,
-      kousaBUpper:     d.kousaBUpper ? parseFloat(d.kousaBUpper) : null,
-      kousaBLower:     d.kousaBLower ? parseFloat(d.kousaBLower) : null,
-      mentori4:        d.mentori4 ? parseFloat(d.mentori4) : null,
-      mentori8:        d.mentori8 ? parseFloat(d.mentori8) : null,
-      quantity:        d.quantity ? parseInt(d.quantity) : 0,
-      unitPrice:       d.unitPrice,
-      totalPrice:      d.totalPrice,
-      shortestDelivery: d.shortestDelivery ?? null,
-      deliveryDeadline: d.deliveryDeadline ?? null,
-    }))
-
-  // ヘッダー変更時に自動保存トリガー
-  const handleHeaderChange = useCallback((updater: (h: HeaderForm) => HeaderForm) => {
-    setHeader(prev => {
-      const next = updater(prev)
-      triggerSave(next, toDetailItems(details))
-      return next
-    })
-  }, [details, triggerSave]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // UI状態
-  const [calcLoading, setCalcLoading]   = useState(false)
-  const [saveLoading, setSaveLoading]   = useState(false)
-  const [calcError, setCalcError]       = useState("")
-  const [saveMessage, setSaveMessage]   = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const [savedEstimateId, setSavedEstimateId] = useState<string | null>(null)
-
-  // ────────────────────────────────────────────────
-  // 標準公差・面取の取得
-  // ────────────────────────────────────────────────
-  const fetchStandardTolerance = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/v1/tolerance/standard?customerCode=${userInfo.customerCode}`)
-      if (!res.ok) return
-      const data = await res.json()
-      if (data.success) {
-        // ▼ 変更: APIレスポンスフィールド名修正 TUpper→tUpper, AUpper→aUpper, BUpper→bUpper 等
-        setDetailForm(prev => ({
-          ...prev,
-          kousaTUpper: String(data.tolerance.tUpper ?? ""),
-          kousaTLower: String(data.tolerance.tLower ?? ""),
-          kousaAUpper: String(data.tolerance.aUpper ?? ""),
-          kousaALower: String(data.tolerance.aLower ?? ""),
-          kousaBUpper: String(data.tolerance.bUpper ?? ""),
-          kousaBLower: String(data.tolerance.bLower ?? ""),
-        }))
-      }
-    } catch { /* silent */ }
-  }, [userInfo.customerCode])
-
-  const fetchStandardChamfer = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/v1/chamfer/standard?customerCode=${userInfo.customerCode}`)
-      if (!res.ok) return
-      const data = await res.json()
-      if (data.success) {
-        // ▼ 変更: APIレスポンスフィールド名修正 Chamfer4→chamfer4, Chamfer8→chamfer8
-        setDetailForm(prev => ({
-          ...prev,
-          mentori4: String(data.chamfer.chamfer4 ?? ""),
-          mentori8: String(data.chamfer.chamfer8 ?? ""),
-        }))
-      }
-    } catch { /* silent */ }
-  }, [userInfo.customerCode])
-
-  // ────────────────────────────────────────────────
-  // 見積計算
-  // ────────────────────────────────────────────────
+  // ─── 見積計算 ───────────────────────────────────────────────
   const handleCalculate = async () => {
-    console.log('[計算] detailForm:', JSON.stringify(detailForm))
-    console.log('[計算] cuttingMethods:', JSON.stringify(cuttingMethods))
-    setCalcError("")
-    setCalcResult(null)
-
-    // バリデーション
-    if (!detailForm.materialCode)    { setCalcError("材料を選択してください"); return }
-    if (!detailForm.kakouShiyouCode) { setCalcError("加工仕様を選択してください"); return }
-    if (!detailForm.sizeT || !detailForm.sizeA || !detailForm.sizeB) {
-      setCalcError("仕上りサイズ T・A・B を入力してください"); return
-    }
-    if (!detailForm.quantity || parseInt(detailForm.quantity) < 1) {
-      setCalcError("数量を1以上で入力してください"); return
-    }
-
-    setCalcLoading(true)
+    if (!form.materialCode || !form.kakouShiyouCode) { alert("材料と加工仕様を選択してください"); return }
+    if (!form.sizeT || !form.sizeB || !form.sizeA) { alert("寸法T・B・Aを入力してください"); return }
     try {
-      const material = materials.find(m => m.materialCode === detailForm.materialCode)
-      const spec     = processingSpecs.find(s => s.processingSpecCode === detailForm.kakouShiyouCode)
-
-      const payload = {
-        customerCode:    userInfo.customerCode,
-        materialCode:    detailForm.materialCode,
-        materialName:    material?.materialName ?? "",
-        kakouShiyouCode: detailForm.kakouShiyouCode,
-        kakouShiyou:     spec?.processingSpecName ?? "",
-        kakouShijiCodeT: detailForm.kakouShijiCodeT,
-        kakouShijiCodeA: detailForm.kakouShijiCodeA,
-        kakouShijiCodeB: detailForm.kakouShijiCodeB,
-        kakouT: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeT)?.label ?? "",
-        kakouA: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeA)?.label ?? "",
-        kakouB: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeB)?.label ?? "",
-        sizeT: parseFloat(detailForm.sizeT),
-        sizeA: parseFloat(detailForm.sizeA),
-        sizeB: parseFloat(detailForm.sizeB),
-        kousaTUpper: parseFloat(detailForm.kousaTUpper) || 0,
-        kousaTLower: parseFloat(detailForm.kousaTLower) || 0,
-        kousaAUpper: parseFloat(detailForm.kousaAUpper) || 0,
-        kousaALower: parseFloat(detailForm.kousaALower) || 0,
-        kousaBUpper: parseFloat(detailForm.kousaBUpper) || 0,
-        kousaBLower: parseFloat(detailForm.kousaBLower) || 0,
-        mentori4: parseFloat(detailForm.mentori4) || 0,
-        mentori8: parseFloat(detailForm.mentori8) || 0,
-        quantity: parseInt(detailForm.quantity),
-        requestNouki: header.requestNouki,
-        editMode: "New",
-      }
-
-      console.log("[フロント] 計算リクエスト payload:", JSON.stringify(payload, null, 2))
       const res = await fetch("/api/v1/estimates/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...form, customerCode: userInfo.customerCode }),
       })
-
-      if (!res.ok) {
-        const err = await res.json()
-        setCalcError(err.error ?? "計算に失敗しました")
-        return
-      }
-
-      const result = await res.json()
-      console.log("[フロント] 計算レスポンス:", JSON.stringify(result, null, 2))
-      // ▼ 変更: APIレスポンス { unitPrice, sumPrice, shortestDelivery, deliveryDeadline, intermediate }
-      //         sumPrice → totalPrice としてstateに格納、intermediate を保持
-      setCalcResult({
-        unitPrice:        result.unitPrice,
-        totalPrice:       result.sumPrice,
-        shortestDelivery: result.shortestDelivery,
-        deliveryDeadline: result.deliveryDeadline,
-        intermediate:     result.intermediate ?? null,
-      })
-    } catch {
-      setCalcError("通信エラーが発生しました")
-    } finally {
-      setCalcLoading(false)
-    }
+      if (!res.ok) throw new Error("計算APIエラー")
+      const data = await res.json()
+      setForm(f => ({
+        ...f,
+        unitPrice: data.unitPrice, totalPrice: data.totalPrice,
+        deliveryDate: data.deliveryDate, deliveryDeadline: data.deliveryDeadline,
+        fastDeliveryDate: data.fastDeliveryDate, fastDeliveryDeadline: data.fastDeliveryDeadline,
+        calculated: true,
+      }))
+    } catch (e: any) { alert("見積計算に失敗しました: " + e.message) }
   }
 
-  // ────────────────────────────────────────────────
-  // 明細追加
-  // ────────────────────────────────────────────────
-  const canAddDetail = !!(
-    detailForm.materialCode &&
-    detailForm.kakouShiyouCode &&
-    detailForm.sizeT && detailForm.sizeA && detailForm.sizeB &&
-    detailForm.quantity &&
-    calcResult
-  )
-
+  // ─── 明細追加 ───────────────────────────────────────────────
   const handleAddDetail = () => {
-    console.log('[明細追加] canAddDetail:', canAddDetail, 'calcResult:', JSON.stringify(calcResult))
-    if (!canAddDetail || !calcResult) return
-    const material = materials.find(m => m.materialCode === detailForm.materialCode)
-    const spec     = processingSpecs.find(s => s.processingSpecCode === detailForm.kakouShiyouCode)
-
-    const newDetail: EstimateDetail = {
-      clientDetailId:  crypto.randomUUID(),
-      rowNo:           details.length + 1,
-      materialCode:    detailForm.materialCode,
-      materialName:    material?.materialName ?? "",
-      kakouShiyouCode: detailForm.kakouShiyouCode,
-      kakouShiyou:     spec?.processingSpecName ?? "",
-      kakouShijiCodeT: detailForm.kakouShijiCodeT,
-      kakouShijiCodeA: detailForm.kakouShijiCodeA,
-      kakouShijiCodeB: detailForm.kakouShijiCodeB,
-      kakouT: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeT)?.label ?? "",
-      kakouA: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeA)?.label ?? "",
-      kakouB: cuttingMethods.find(m => String(m.code) === detailForm.kakouShijiCodeB)?.label ?? "",
-      sizeT: detailForm.sizeT,
-      sizeA: detailForm.sizeA,
-      sizeB: detailForm.sizeB,
-      kousaTUpper: detailForm.kousaTUpper, kousaTLower: detailForm.kousaTLower,
-      kousaAUpper: detailForm.kousaAUpper, kousaALower: detailForm.kousaALower,
-      kousaBUpper: detailForm.kousaBUpper, kousaBLower: detailForm.kousaBLower,
-      mentori4:    detailForm.mentori4,
-      mentori8:    detailForm.mentori8,
-      quantity:    detailForm.quantity,
-      unitPrice:        calcResult.unitPrice,
-      totalPrice:       calcResult.totalPrice,
-      shortestDelivery: calcResult.shortestDelivery,
-      deliveryDeadline: calcResult.deliveryDeadline,
-      calculated:       true,
-      // ▼ 追加: 計算中間値を明細に保持
-      intermediate:     calcResult.intermediate,
-    }
-
-    setDetails(prev => {
-      const next = [...prev, newDetail]
-      triggerSave(header, toDetailItems(next), true) // 明細追加時は即時保存
-      return next
-    })
-    setDetailForm(EMPTY_DETAIL_FORM)
-    setCalcResult(null)
-    setCalcError("")
+    if (!form.calculated) return
+    setDetails(prev => [...prev, { ...form }])
+    setForm(newDetailForm())
   }
 
-  // ────────────────────────────────────────────────
-  // 明細削除
-  // ────────────────────────────────────────────────
-  const handleDeleteDetail = (clientDetailId: string) => {
-    setDetails(prev =>
-      prev
-        .filter(d => d.clientDetailId !== clientDetailId)
-        .map((d, i) => ({ ...d, rowNo: i + 1 }))
-    )
+  // ─── 明細削除 ───────────────────────────────────────────────
+  const handleDeleteDetail = (id: string) => {
+    setDetails(prev => prev.filter(d => d.clientDetailId !== id))
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n })
   }
 
-  // ── 明細行 編集（Task 2-5）──
-  const handleEditDetail = (clientDetailId: string) => {
-    const target = details.find(d => d.clientDetailId === clientDetailId)
-    if (!target) return
-    // フォームに値をセット
-    setDetailForm({
-      materialCode:    target.materialCode,
-      kakouShiyouCode: target.kakouShiyouCode,
-      kakouShijiCodeT: target.kakouShijiCodeT,
-      kakouShijiCodeA: target.kakouShijiCodeA,
-      kakouShijiCodeB: target.kakouShijiCodeB,
-      sizeT: target.sizeT, sizeA: target.sizeA, sizeB: target.sizeB,
-      kousaTUpper: target.kousaTUpper, kousaTLower: target.kousaTLower,
-      kousaAUpper: target.kousaAUpper, kousaALower: target.kousaALower,
-      kousaBUpper: target.kousaBUpper, kousaBLower: target.kousaBLower,
-      mentori4: target.mentori4, mentori8: target.mentori8,
-      quantity: target.quantity,
-    })
-    // 対象行を一覧から削除（再計算→追加の流れ）
-    setDetails(prev => prev.filter(d => d.clientDetailId !== clientDetailId).map((d, i) => ({ ...d, rowNo: i + 1 })))
-    setCalcResult(null)
-    setCalcError("")
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  // ─── 全選択 ────────────────────────────────────────────────
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(new Set(allDetailIds))
+    else setSelectedIds(new Set())
+  }
+  const handleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds(prev => { const n = new Set(prev); if (checked) n.add(id); else n.delete(id); return n })
   }
 
-  // ────────────────────────────────────────────────
-  // 合計金額
-  // ────────────────────────────────────────────────
-  const grandTotal = details.reduce((s, d) => s + (d.totalPrice ?? 0), 0)
-
-  // ────────────────────────────────────────────────
-  // 保存
-  // ────────────────────────────────────────────────
+  // ─── 保存 ──────────────────────────────────────────────────
   const handleSave = async () => {
-    console.log('[保存] header:', JSON.stringify(header))
-    console.log('[保存] details:', JSON.stringify(details))
-    setSaveMessage(null)
-    if (!header.inputDate)    { setSaveMessage({ type: "error", text: "入力日付は必須です" }); return }
-    if (details.length === 0) { setSaveMessage({ type: "error", text: "明細を1件以上追加してください" }); return }
-
-    setSaveLoading(true)
+    setSaving(true); setSaveMsg("保存中...")
     try {
-      // ▼ 変更: route.ts の SaveHeaderRequest 形式に合わせたペイロード構造
-      //         + intermediate を各明細に含める
       const payload = {
-        inputDate:         header.inputDate,
-        customerOrderNo:   header.customerOrderNo || undefined,
-        endUserNo:         header.endUserNo || undefined,
-        destinationCode:   header.destinationCode || undefined,
-        destinationName:   header.destinationName || undefined,
-        destinationDept:   header.destinationDept || undefined,
-        destinationPerson:  header.destinationPerson || undefined,
-        destinationZip:     header.destinationZip || undefined,
-        destinationAddress: header.destinationAddress || undefined,
-        destinationTel:     header.destinationTel || undefined,
-        destinationFax:     header.destinationFax || undefined,
-        estimateDate:      header.estimateDate || header.inputDate,
-        requestNouki:      header.requestNouki || undefined,
-        chargeName:        header.chargeName || undefined,
-        remarks:           header.remarks || undefined,
-        editMode:          "New" as const,
-        details: details.map((d, idx) => ({
-          clientDetailId:      d.clientDetailId,
-          rowNo:               idx + 1,
-          materialCode:        d.materialCode,
-          materialName:        d.materialName,
-          kakouShiyouCode:     d.kakouShiyouCode,
-          kakouShiyou:         d.kakouShiyou,
-          kakouShijiCodeT:     d.kakouShijiCodeT || undefined,
-          kakouShijiCodeA:     d.kakouShijiCodeA || undefined,
-          kakouShijiCodeB:     d.kakouShijiCodeB || undefined,
-          kakouT:              d.kakouT,
-          kakouA:              d.kakouA,
-          kakouB:              d.kakouB,
-          sizeT:               parseFloat(d.sizeT),
-          sizeA:               parseFloat(d.sizeA),
-          sizeB:               parseFloat(d.sizeB),
-          kousaTUpper: d.kousaTUpper ? parseFloat(d.kousaTUpper) : null,
-          kousaTLower: d.kousaTLower ? parseFloat(d.kousaTLower) : null,
-          kousaAUpper: d.kousaAUpper ? parseFloat(d.kousaAUpper) : null,
-          kousaALower: d.kousaALower ? parseFloat(d.kousaALower) : null,
-          kousaBUpper: d.kousaBUpper ? parseFloat(d.kousaBUpper) : null,
-          kousaBLower: d.kousaBLower ? parseFloat(d.kousaBLower) : null,
-          mentori4:    d.mentori4 ? parseFloat(d.mentori4) : null,
-          mentori8:    d.mentori8 ? parseFloat(d.mentori8) : null,
-          quantity:            parseInt(d.quantity),
-          unitPrice:           d.unitPrice!,
-          totalPrice:          d.totalPrice!,
-          shortestDelivery:    d.shortestDelivery ?? undefined,
-          deliveryDeadline:    d.deliveryDeadline ?? null,
-          // ▼ 追加: 計算中間値
-          materialSizeT:       d.intermediate?.materialSizeT,
-          materialSizeA:       d.intermediate?.materialSizeA,
-          materialSizeB:       d.intermediate?.materialSizeB,
-          materialUnitWeight:  d.intermediate?.materialUnitWeight,
-          materialTotalWeight: d.intermediate?.materialTotalWeight,
-          productUnitWeight:   d.intermediate?.productUnitWeight,
-          productTotalWeight:  d.intermediate?.productTotalWeight,
-          processingCost6f:    d.intermediate?.processingCost6f,
-          processingCostTotal: d.intermediate?.processingCostTotal,
-        })),
+        estimateId: currentDraftId,
+        header: { inputDate, estimateDate, shippingMethod, destinationCode: distCode, destinationName: distName, destinationDept: distDept, destinationPerson: distPerson, destinationZip: distZip, destinationAddress: distAddr, destinationTel: distTel, destinationFax: distFax, contact, customerOrderNo: custOrderNo, endUserNo },
+        details: details.map((d, i) => ({ ...d, rowNo: i + 1 })),
       }
-
-      const res = await fetch("/api/v1/estimates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        setSaveMessage({ type: "error", text: err.error ?? "保存に失敗しました" })
-        return
-      }
-
-      const saved = await res.json()
-      console.log('[保存API] レスポンス:', JSON.stringify(saved))
-      setSaveMessage({ type: "success", text: `✅ 見積を保存しました　見積No: ${saved.estimateNo ?? saved.estimateId?.slice(0,8)}` })
-      setSavedEstimateId(saved.estimateId)
-      // 保存後は編集画面へ遷移せず、注文ボタンを表示する
-    } catch {
-      setSaveMessage({ type: "error", text: "通信エラーが発生しました" })
-    } finally {
-      setSaveLoading(false)
-    }
+      const res = await fetch("/api/v1/estimates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+      if (!res.ok) throw new Error("保存失敗")
+      const data = await res.json()
+      setCurrentDraftId(data.estimateId)
+      setEstimateNo(data.estimateNo ?? "")
+      setSaveMsg(`✅ 保存完了！見積番号: ${data.estimateNo}`)
+    } catch (e: any) { setSaveMsg("❌ 保存失敗: " + e.message) }
+    finally { setSaving(false); setTimeout(() => setSaveMsg(""), 4000) }
   }
 
-  // ────────────────────────────────────────────────
-  // render
-  // ────────────────────────────────────────────────
+  // ─── 注文ボタン ──────────────────────────────────────────────
+  const handleOrder = async () => {
+    const sel = details.filter(d => selectedIds.has(d.clientDetailId))
+    if (sel.length === 0) { alert("注文する明細を選択してください"); return }
+    await handleSave()
+    if (currentDraftId) window.location.href = `/orders/confirm?estimateId=${currentDraftId}`
+  }
 
+  // ─── 直送先検索 ────────────────────────────────────────────
+  const handleModalSearch = async () => {
+    setModalLoading(true)
+    try {
+      const q = new URLSearchParams({ name: modalSearch.name, address: modalSearch.address, code: modalSearch.code, tel: modalSearch.tel, customerCode: userInfo.customerCode })
+      const res = await fetch("/api/v1/direct-delivery?" + q)
+      const data = await res.json()
+      setModalResults(data.destinations ?? [])
+    } catch { setModalResults([]) }
+    finally { setModalLoading(false) }
+  }
+  const handleModalSelect = (row: any) => {
+    setDistCode(row.destinationCode ?? ""); setDistName(row.destinationName ?? "")
+    setDistDept(row.departmentName ?? ""); setDistPerson(row.personName ?? "")
+    setDistZip(row.postalCode ?? ""); setDistAddr(row.address ?? "")
+    setDistTel(row.tel ?? ""); setDistFax(row.fax ?? "")
+    setShowModal(false)
+  }
+
+  // ─── 標準公差 ─────────────────────────────────────────────
+  const handleStdTolerance = async () => {
+    try {
+      const res = await fetch(`/api/v1/tolerance/standard?kakouShiyouCode=${form.kakouShiyouCode}&sizeT=${form.sizeT}&sizeB=${form.sizeB}&sizeA=${form.sizeA}`)
+      const d = await res.json()
+      setForm(f => ({ ...f, toleranceTUp: d.tUp ?? 0, toleranceTDown: d.tDown ?? 0, toleranceBUp: d.bUp ?? 0, toleranceBDown: d.bDown ?? 0, toleranceAUp: d.aUp ?? 0, toleranceADown: d.aDown ?? 0 }))
+    } catch { /* サイレント */ }
+  }
+  const handleStdChamfer = async () => {
+    try {
+      const res = await fetch(`/api/v1/chamfer/standard?kakouShiyouCode=${form.kakouShiyouCode}&sizeT=${form.sizeT}&sizeB=${form.sizeB}&sizeA=${form.sizeA}`)
+      const d = await res.json()
+      setForm(f => ({ ...f, mentori4: d.chamfer4C ?? 0, mentori8: d.chamfer8C ?? 0 }))
+    } catch { /* サイレント */ }
+  }
+
+  const totalAmount = details.reduce((s, d) => s + (d.totalPrice ?? 0), 0)
+  const selectedTotal = details.filter(d => selectedIds.has(d.clientDetailId)).reduce((s, d) => s + (d.totalPrice ?? 0), 0)
+
+  // ─── レンダリング ─────────────────────────────────────────
   return (
-    <div className="space-y-5">
-
-      {/* メッセージエリア */}
-      {saveMessage && (
-        <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
-          saveMessage.type === "success"
-            ? "bg-green-50 border border-green-200 text-green-800"
-            : "bg-red-50 border border-red-200 text-red-700"
-        }`}>
-          {saveMessage.type === "success" ? "✅ " : "✕ "}
-          {saveMessage.text}
+    <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "10px 12px" }}>
+      {/* ─ トップボタンバー ─ */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <div style={{ fontSize: "13px", fontWeight: 600, borderLeft: "3px solid #1e3a5f", paddingLeft: "8px" }}>
+          {isCopy ? "お見積り複写" : (estimateNo ? `お見積り入力 — ${estimateNo}` : "お見積り入力")}
         </div>
-      )}
-
-      {/* 直送先検索モーダル */}
-      {showDDModal && (
-        <DirectDeliveryModal
-          customerCode={userInfo.customerCode}
-          onSelect={(dd) => {
-            console.log("[直送先選択] 自動入力:", dd)
-            setHeader(h => ({
-              ...h,
-              destinationCode:    dd.deliveryCode,
-              destinationName:    dd.name,
-              destinationDept:    dd.departmentName,
-              destinationPerson:  dd.chargeName,
-              destinationZip:     dd.postalCode,
-              destinationAddress: [dd.address1, dd.address2, dd.address3].filter(Boolean).join(""),
-              destinationTel:     dd.tel,
-              destinationFax:     dd.fax,
-            }))
-          }}
-          onClose={() => setShowDDModal(false)}
-        />
-      )}
-
-      {/* ──────── ヘッダー情報 ──────── */}
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <p className="text-xs font-semibold text-gray-500 mb-4 uppercase tracking-wide">
-          ヘッダー情報
-        </p>
-
-        {/* 得意先情報（読取専用） */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-          <div>
-            <p className="text-[10px] text-gray-400">得意先コード</p>
-            <p className="text-sm font-medium text-gray-700">{userInfo.customerCode}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-[10px] text-gray-400">得意先名</p>
-            <p className="text-sm font-medium text-gray-700">{userInfo.customerName}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-400">担当者名</p>
-            <p className="text-sm font-medium text-gray-700">{userInfo.chargeName}</p>
-          </div>
+        <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+          <button className="btn-ochi btn-outline" style={{ fontSize: "10px" }} onClick={() => window.location.reload()}>新規</button>
+          <button className="btn-ochi btn-green"   style={{ fontSize: "10px" }} onClick={handleSave} disabled={saving}>この見積りを保存</button>
+          {currentDraftId && <a href={`/estimates/${currentDraftId}/pdf`} target="_blank" className="btn-ochi btn-info" style={{ fontSize: "10px" }}>見積書発行</a>}
+          <button className="btn-ochi btn-amber"   style={{ fontSize: "10px" }} onClick={handleOrder} disabled={saving}>この見積りを注文</button>
+          <Link href="/dashboard" className="btn-ochi btn-gray" style={{ fontSize: "10px" }}>← メインメニュー</Link>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {saveMsg && <div style={{ background: saveMsg.startsWith("✅") ? "#f0fdf4" : "#fee2e2", border: `1px solid ${saveMsg.startsWith("✅") ? "#86efac" : "#fca5a5"}`, borderRadius: "4px", padding: "5px 10px", fontSize: "11px", marginBottom: "8px" }}>{saveMsg}</div>}
 
-          {/* 入力日付 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              入力日付 <span className="text-red-500">★</span>
-            </label>
-            <input
-              type="date"
-              value={header.inputDate}
-              onChange={e => { console.log("[入力日付]", e.target.value); setHeader(h => ({ ...h, inputDate: e.target.value })) }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-            />
-          </div>
+      {/* ─ ヘッダーテーブル ─ */}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", marginBottom: "0" }}>
+        <tbody>
+          <tr>
+            <td style={LBL}>見積No</td>
+            <td style={{ ...TD, width: "130px" }}><input style={{ ...INP, background: "#f8fafc", color: "#94a3b8" }} value={estimateNo} readOnly /></td>
+            <td style={LBL}>注文No</td>
+            <td style={{ ...TD, width: "130px" }}><input style={INP} value={orderNo} onChange={e => setOrderNo(e.target.value)} {...focusHandlers} /></td>
+            <td style={LBL}>入力日付</td>
+            <td style={{ ...TD, width: "120px" }}><input style={INP} type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} {...focusHandlers} /></td>
+            <td style={LBL}>見積日付</td>
+            <td style={{ ...TD, width: "120px" }}><input style={INP} type="date" value={estimateDate} onChange={e => setEstimateDate(e.target.value)} {...focusHandlers} /></td>
+          </tr>
+          <tr>
+            <td style={LBL}>お客様名</td>
+            <td colSpan={3} style={TD}><input style={{ ...INP, background: "#f8fafc", color: "#64748b" }} value={userInfo.companyName} readOnly /></td>
+            <td style={LBL}>ご担当者</td>
+            <td colSpan={3} style={TD}><input style={{ ...INP, background: "#f8fafc", color: "#64748b" }} value={userInfo.userName} readOnly /></td>
+          </tr>
+        </tbody>
+      </table>
 
-          {/* 見積日付 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              見積日付 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={header.estimateDate}
-              onChange={e => setHeader(h => ({ ...h, estimateDate: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-yellow-50"
-            />
-          </div>
+      {/* 発送方法 */}
+      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderTop: "none", padding: "4px 10px", display: "flex", alignItems: "center", gap: "8px", marginBottom: "0" }}>
+        <span style={{ fontSize: "10px", color: "#64748b" }}>発送方法</span>
+        <select style={{ ...SEL, width: "100px" }} value={shippingMethod} onChange={e => setShippingMethod(e.target.value)} {...focusHandlers}>
+          <option value="delivery">発送</option>
+          <option value="direct">直送</option>
+        </select>
+        <span style={{ fontSize: "10px", color: "#94a3b8" }}>リストよりお選びください</span>
+      </div>
 
-          {/* 希望納期 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">希望納期</label>
-            <input
-              type="text"
-              value={header.requestNouki}
-              onChange={e => setHeader(h => ({ ...h, requestNouki: e.target.value }))}
-              placeholder="例: 2026-06-30"
-              maxLength={20}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-yellow-50"
-            />
-          </div>
+      {/* ─ 送り先テーブル ─ */}
+      <div style={{ fontSize: "11px", fontWeight: 600, background: "#d8e9f5", color: "#1e3a5f", padding: "3px 8px", borderRadius: "4px 4px 0 0", marginTop: "8px" }}>送り先情報</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+        <tbody>
+          <tr>
+            <td style={LBL}>出荷先</td>
+            <td style={{ ...TD, width: "70px" }}><input style={INP} value={distCode} onChange={e => setDistCode(e.target.value)} {...focusHandlers} /></td>
+            <td style={{ ...TD, width: "28px", textAlign: "center", padding: "2px" }}>
+              <button className="btn-ochi btn-info" style={{ fontSize: "10px", padding: "1px 6px" }} onClick={() => setShowModal(true)}>🔍</button>
+            </td>
+            <td colSpan={2} style={TD}><input style={INP} value={distName} onChange={e => setDistName(e.target.value)} {...focusHandlers} /></td>
+            <td style={LBL}>出荷先部署</td>
+            <td colSpan={2} style={TD}><input style={INP} value={distDept} onChange={e => setDistDept(e.target.value)} {...focusHandlers} /></td>
+            <td style={LBL}>出荷先ご担当者</td>
+            <td colSpan={2} style={TD}><input style={INP} value={distPerson} onChange={e => setDistPerson(e.target.value)} {...focusHandlers} /></td>
+            <td style={{ ...TD, width: "16px", fontSize: "10px" }}>様</td>
+          </tr>
+          <tr>
+            <td style={LBL}>出荷先住所</td>
+            <td style={{ ...TD, width: "70px" }}><input style={INP} value={distZip} onChange={e => setDistZip(e.target.value)} {...focusHandlers} /></td>
+            <td colSpan={5} style={TD}><input style={INP} value={distAddr} onChange={e => setDistAddr(e.target.value)} {...focusHandlers} /></td>
+            <td style={LBL}>TEL</td>
+            <td colSpan={2} style={TD}><input style={INP} value={distTel} onChange={e => setDistTel(e.target.value)} {...focusHandlers} /></td>
+            <td style={LBL}>FAX</td>
+            <td style={TD}><input style={INP} value={distFax} onChange={e => setDistFax(e.target.value)} {...focusHandlers} /></td>
+          </tr>
+          <tr>
+            <td style={LBL}>通信欄</td>
+            <td colSpan={11} style={TD}><input style={INP} value={contact} onChange={e => setContact(e.target.value)} {...focusHandlers} /></td>
+          </tr>
+        </tbody>
+      </table>
 
-          {/* 担当者名 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">担当者名</label>
-            <input
-              type="text"
-              value={header.chargeName}
-              onChange={e => setHeader(h => ({ ...h, chargeName: e.target.value }))}
-              maxLength={50}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-yellow-50"
-            />
-          </div>
-
-          {/* お客様注文番号 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              お客様注文番号
-            </label>
-            <input
-              type="text"
-              value={header.customerOrderNo}
-              onChange={e => { console.log("[お客様注文番号]", e.target.value); setHeader(h => ({ ...h, customerOrderNo: e.target.value })) }}
-              maxLength={50}
-              placeholder="例: ORD-2026-001"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-            />
-          </div>
-
-          {/* エンドユーザー番号 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              エンドユーザー番号
-            </label>
-            <input
-              type="text"
-              value={header.endUserNo}
-              onChange={e => { console.log("[エンドユーザー番号]", e.target.value); setHeader(h => ({ ...h, endUserNo: e.target.value })) }}
-              maxLength={50}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-            />
-          </div>
-
-        </div>
-
-        {/* 送り先情報 */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 mb-3">── 送り先情報</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">送り先コード</label>
-              <input
-                type="text"
-                value={header.destinationCode}
-                onChange={e => { console.log("[送り先コード]", e.target.value); setHeader(h => ({ ...h, destinationCode: e.target.value })) }}
-                maxLength={20}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div className="lg:col-span-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-gray-600">送り先名称</label>
-                <button
-                  type="button"
-                  onClick={() => { console.log("[直送先検索ボタン(New)] クリック"); setShowDDModal(true) }}
-                  className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1"
-                >
-                  🔍 直送先検索
-                </button>
+      {/* ─ 明細入力エリア ─ */}
+      <div style={{ fontSize: "11px", fontWeight: 600, background: "#d8e9f5", color: "#1e3a5f", padding: "3px 8px", borderRadius: "4px 4px 0 0", marginTop: "10px" }}>見積明細編集</div>
+      <div style={{ overflowX: "auto", border: "1px solid #e2e8f0" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px", minWidth: "900px" }}>
+        <thead>
+          <tr>
+            <th style={TH} rowSpan={2}>No</th>
+            <th style={{ ...TH, width: "90px" }} rowSpan={2}>材料</th>
+            <th style={TH} colSpan={3}>加工仕様</th>
+            <th style={{ ...TH, width: "80px" }} rowSpan={2}>仕上り</th>
+            <th style={TH} colSpan={3}>寸法</th>
+            <th style={TH} colSpan={4}>公差</th>
+            <th style={TH} colSpan={3}>面取り</th>
+            <th style={{ ...TH, width: "50px" }} rowSpan={2}>数量</th>
+          </tr>
+          <tr>
+            <th style={{ ...TH, width: "40px" }}>厚み</th><th style={{ ...TH, width: "40px" }}>巾</th><th style={{ ...TH, width: "40px" }}>長さ</th>
+            <th style={{ ...TH, width: "55px" }}>厚み</th><th style={{ ...TH, width: "60px" }}>巾</th><th style={{ ...TH, width: "65px" }}>長さ</th>
+            <th style={{ ...TH, width: "50px" }}>標準</th><th style={{ ...TH, width: "40px" }}>厚み</th><th style={{ ...TH, width: "40px" }}>巾</th><th style={{ ...TH, width: "40px" }}>長さ</th>
+            <th style={{ ...TH, width: "70px" }}>面取図</th><th style={{ ...TH, width: "40px" }}>4角</th><th style={{ ...TH, width: "40px" }}>8辺</th>
+          </tr>
+        </thead>
+        <tbody>
+          {/* 入力行1 */}
+          <tr>
+            <td style={{ ...TD, textAlign: "center", color: "#94a3b8" }}>—</td>
+            <td style={TD}>
+              <select style={SEL} value={form.materialCode} onChange={e => setForm(f => ({ ...f, materialCode: e.target.value, kakouShiyouCode: 0, calculated: false }))} {...focusHandlers}>
+                <option value="">選択</option>
+                {materials.map(m => <option key={m.materialCode} value={m.materialCode}>{m.materialCode}</option>)}
+              </select>
+            </td>
+            <td style={TD}><select style={SEL} value={form.kakouT} onChange={e => setForm(f => ({ ...f, kakouT: e.target.value, calculated: false }))} {...focusHandlers}><option value="">—</option>{cuttingMethods.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
+            <td style={TD}><select style={SEL} value={form.kakouB} onChange={e => setForm(f => ({ ...f, kakouB: e.target.value }))} {...focusHandlers}><option value="">—</option>{cuttingMethods.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
+            <td style={TD}><select style={SEL} value={form.kakouA} onChange={e => setForm(f => ({ ...f, kakouA: e.target.value }))} {...focusHandlers}><option value="">—</option>{cuttingMethods.map(c => <option key={c.methodCode} value={c.methodCode}>{c.methodCode}</option>)}</select></td>
+            <td style={TD}>
+              <select style={SEL} value={form.kakouShiyouCode} onChange={e => setForm(f => ({ ...f, kakouShiyouCode: Number(e.target.value), calculated: false }))} {...focusHandlers}>
+                <option value={0}>選択</option>
+                {filteredSpecs.map(s => <option key={s.processingSpecCode} value={s.processingSpecCode}>{s.processingSpecName}</option>)}
+              </select>
+            </td>
+            <td style={TD}><input style={{ ...INP, textAlign: "right" }} type="number" value={form.sizeT || ""} onChange={e => setForm(f => ({ ...f, sizeT: parseFloat(e.target.value) || 0, calculated: false }))} {...focusHandlers} /></td>
+            <td style={TD}><input style={{ ...INP, textAlign: "right" }} type="number" value={form.sizeB || ""} onChange={e => setForm(f => ({ ...f, sizeB: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></td>
+            <td style={TD}><input style={{ ...INP, textAlign: "right" }} type="number" value={form.sizeA || ""} onChange={e => setForm(f => ({ ...f, sizeA: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></td>
+            {/* 公差 標準ボタン */}
+            <td style={{ ...TD, textAlign: "center" }}><button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={handleStdTolerance}>標準</button></td>
+            {/* 公差 厚み */}
+            <td style={TD}><div style={{ display: "flex", flexDirection: "column", gap: "1px" }}><input style={{ ...INP, height: "11px", fontSize: "9px", textAlign: "right" }} placeholder="+0" value={form.toleranceTUp || ""} onChange={e => setForm(f => ({ ...f, toleranceTUp: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /><input style={{ ...INP, height: "11px", fontSize: "9px", textAlign: "right" }} placeholder="-0" value={form.toleranceTDown || ""} onChange={e => setForm(f => ({ ...f, toleranceTDown: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></div></td>
+            <td style={TD}><div style={{ display: "flex", flexDirection: "column", gap: "1px" }}><input style={{ ...INP, height: "11px", fontSize: "9px", textAlign: "right" }} placeholder="+0" value={form.toleranceBUp || ""} onChange={e => setForm(f => ({ ...f, toleranceBUp: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /><input style={{ ...INP, height: "11px", fontSize: "9px", textAlign: "right" }} placeholder="-0" value={form.toleranceBDown || ""} onChange={e => setForm(f => ({ ...f, toleranceBDown: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></div></td>
+            <td style={TD}><div style={{ display: "flex", flexDirection: "column", gap: "1px" }}><input style={{ ...INP, height: "11px", fontSize: "9px", textAlign: "right" }} placeholder="+0" value={form.toleranceAUp || ""} onChange={e => setForm(f => ({ ...f, toleranceAUp: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /><input style={{ ...INP, height: "11px", fontSize: "9px", textAlign: "right" }} placeholder="-0" value={form.toleranceADown || ""} onChange={e => setForm(f => ({ ...f, toleranceADown: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></div></td>
+            {/* 面取り */}
+            <td style={{ ...TD, textAlign: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                <select style={{ ...SEL, fontSize: "9px", height: "20px" }} value={form.mentoriShiji} onChange={e => setForm(f => ({ ...f, mentoriShiji: parseInt(e.target.value) }))} {...focusHandlers}>
+                  <option value={1}>面取図参照</option><option value={2}>面取不可</option><option value={9}>---</option>
+                </select>
+                <button className="btn-ochi btn-outline" style={{ fontSize: "8px", padding: "1px 4px" }} onClick={handleStdChamfer}>標準</button>
               </div>
-              <input
-                type="text"
-                value={header.destinationName}
-                onChange={e => { console.log("[送り先名]", e.target.value); setHeader(h => ({ ...h, destinationName: e.target.value })) }}
-                maxLength={100}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">部署名</label>
-              <input
-                type="text"
-                value={header.destinationDept}
-                onChange={e => { console.log("[部署名]", e.target.value); setHeader(h => ({ ...h, destinationDept: e.target.value })) }}
-                maxLength={50}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">担当者名</label>
-              <input
-                type="text"
-                value={header.destinationPerson}
-                onChange={e => { console.log("[担当者名]", e.target.value); setHeader(h => ({ ...h, destinationPerson: e.target.value })) }}
-                maxLength={50}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
-              <input
-                type="text"
-                value={header.destinationZip}
-                onChange={e => { console.log("[郵便番号]", e.target.value); setHeader(h => ({ ...h, destinationZip: e.target.value })) }}
-                maxLength={8}
-                placeholder="000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">住所</label>
-              <input
-                type="text"
-                value={header.destinationAddress}
-                onChange={e => { console.log("[住所]", e.target.value); setHeader(h => ({ ...h, destinationAddress: e.target.value })) }}
-                maxLength={200}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">TEL</label>
-              <input
-                type="text"
-                value={header.destinationTel}
-                onChange={e => { console.log("[TEL]", e.target.value); setHeader(h => ({ ...h, destinationTel: e.target.value })) }}
-                maxLength={20}
-                placeholder="00-0000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">FAX</label>
-              <input
-                type="text"
-                value={header.destinationFax}
-                onChange={e => { console.log("[FAX]", e.target.value); setHeader(h => ({ ...h, destinationFax: e.target.value })) }}
-                maxLength={20}
-                placeholder="00-0000-0000"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">希望納期</label>
-              <input
-                type="date"
-                value={header.requestNouki}
-                onChange={e => { console.log("[希望納期]", e.target.value); setHeader(h => ({ ...h, requestNouki: e.target.value })) }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">備考</label>
-              <input
-                type="text"
-                value={header.remarks}
-                onChange={e => { console.log("[備考]", e.target.value); setHeader(h => ({ ...h, remarks: e.target.value })) }}
-                maxLength={200}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ──────── 明細入力エリア ──────── */}
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <p className="text-xs font-semibold text-gray-500 mb-4 uppercase tracking-wide">
-          明細入力
-        </p>
-
-        {/* 計算エラー */}
-        {calcError && (
-          <div className="mb-3 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-            ✕ {calcError}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          {/* 材料 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              材料 <span className="text-red-500">★</span>
-            </label>
-            <select
-              value={detailForm.materialCode}
-              onChange={e => {
-                console.log("[材料選択]", e.target.value)
-                setDetailForm(p => ({ ...p, materialCode: e.target.value }))
-                setCalcResult(null)
-              }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">選択してください</option>
-              {materials.map(m => (
-                <option key={m.materialCode} value={m.materialCode}>
-                  {m.materialCode} — {m.materialName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 加工仕様 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              加工仕様 <span className="text-red-500">★</span>
-            </label>
-            <select
-              value={detailForm.kakouShiyouCode || ""}
-              onChange={e => {
-                console.log("[加工仕様選択]", e.target.value)
-                setDetailForm(p => ({ ...p, kakouShiyouCode: parseInt(e.target.value) || 0 }))
-                setCalcResult(null)
-              }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">選択してください</option>
-              {(materialProcessingMap[detailForm.materialCode]
-                ? processingSpecs.filter(s =>
-                    materialProcessingMap[detailForm.materialCode].includes(s.processingSpecCode))
-                : processingSpecs
-              ).map(s => (
-                <option key={s.processingSpecCode} value={s.processingSpecCode}>
-                  {s.processingSpecName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 加工指示T */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">加工指示（T面）</label>
-            <select
-              value={detailForm.kakouShijiCodeT}
-              onChange={e => { console.log("[加工指示T]", e.target.value); setDetailForm(p => ({ ...p, kakouShijiCodeT: e.target.value })) }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">（なし）</option>
-              {cuttingMethods.map(m => (
-                <option key={m.code} value={String(m.code)}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 加工指示A */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">加工指示（A面）</label>
-            <select
-              value={detailForm.kakouShijiCodeA}
-              onChange={e => { console.log("[加工指示A]", e.target.value); setDetailForm(p => ({ ...p, kakouShijiCodeA: e.target.value })) }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">（なし）</option>
-              {cuttingMethods.map(m => (
-                <option key={m.code} value={String(m.code)}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 加工指示B */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">加工指示（B面）</label>
-            <select
-              value={detailForm.kakouShijiCodeB}
-              onChange={e => { console.log("[加工指示B]", e.target.value); setDetailForm(p => ({ ...p, kakouShijiCodeB: e.target.value })) }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">（なし）</option>
-              {cuttingMethods.map(m => (
-                <option key={m.code} value={String(m.code)}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-
-        </div>
-
-        {/* 仕上りサイズ */}
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 mb-3">── 仕上りサイズ</p>
-          <div className="grid grid-cols-3 gap-3">
-            {(["T", "A", "B"] as const).map(axis => (
-              <div key={axis}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  {axis === "T" ? "厚み T" : axis === "A" ? "幅 A" : "長さ B"}
-                  {" "}<span className="text-red-500">★</span>
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0.001"
-                    max="9999.999"
-                    value={detailForm[`size${axis}` as keyof DetailForm]}
-                    onChange={e => {
-                      console.log(`[寸法${axis}]`, e.target.value)
-                      setDetailForm(p => ({ ...p, [`size${axis}`]: e.target.value }))
-                      setCalcResult(null)
-                    }}
-                    onBlur={e => setDetailForm(p => ({ ...p, [`size${axis}`]: formatDimension(e.target.value) }))}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="0.000"
-                  />
-                  <span className="text-xs text-gray-400">mm</span>
-                </div>
+            </td>
+            <td style={TD}><input style={{ ...INP, textAlign: "right" }} type="number" value={form.mentori4 || ""} onChange={e => setForm(f => ({ ...f, mentori4: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></td>
+            <td style={TD}><input style={{ ...INP, textAlign: "right" }} type="number" value={form.mentori8 || ""} onChange={e => setForm(f => ({ ...f, mentori8: parseFloat(e.target.value) || 0 }))} {...focusHandlers} /></td>
+            <td style={TD}><input style={{ ...INP, textAlign: "right" }} type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: parseInt(e.target.value) || 1 }))} {...focusHandlers} /></td>
+          </tr>
+          {/* 入力行2: お客様注文番号等 */}
+          <tr>
+            <td colSpan={17} style={TD}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: "180px" }}><span style={{ fontSize: "9px", color: "#64748b" }}>お客様注文番号</span><input style={INP} value={form.customerDetailOrderNo} onChange={e => setForm(f => ({ ...f, customerDetailOrderNo: e.target.value }))} {...focusHandlers} /></div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: "180px" }}><span style={{ fontSize: "9px", color: "#64748b" }}>送り先注文番号</span><input style={INP} value={form.destinationDetailOrderNo} onChange={e => setForm(f => ({ ...f, destinationDetailOrderNo: e.target.value }))} {...focusHandlers} /></div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: 1 }}><span style={{ fontSize: "9px", color: "#64748b" }}>備考</span><input style={INP} value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} {...focusHandlers} /></div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 公差 */}
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-400">── 公差</p>
-            <button
-              type="button"
-              onClick={() => { console.log("[標準公差ボタン] クリック"); fetchStandardTolerance() }}
-              className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
-            >
-              標準公差
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {(["T", "A", "B"] as const).map(axis => (
-              <div key={axis}>
-                <p className="text-[10px] text-gray-500 mb-1">{axis}面</p>
-                <div className="flex gap-1.5">
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={detailForm[`kousa${axis}Upper` as keyof DetailForm]}
-                    onChange={e => { console.log(`[公差${axis}上限]`, e.target.value); setDetailForm(p => ({ ...p, [`kousa${axis}Upper`]: e.target.value })) }}
-                    placeholder="上限"
-                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={detailForm[`kousa${axis}Lower` as keyof DetailForm]}
-                    onChange={e => { console.log(`[公差${axis}下限]`, e.target.value); setDetailForm(p => ({ ...p, [`kousa${axis}Lower`]: e.target.value })) }}
-                    placeholder="下限"
-                    className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 面取り */}
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-400">── 面取り</p>
-            <button
-              type="button"
-              onClick={() => { console.log("[標準面取ボタン] クリック"); fetchStandardChamfer() }}
-              className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
-            >
-              標準面取
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">4C 面取り量</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={detailForm.mentori4}
-                  onChange={e => { console.log('[4C面取り]', e.target.value); setDetailForm(p => ({ ...p, mentori4: e.target.value })) }}
-                  placeholder="0.00"
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-xs text-gray-400">mm</span>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">8C 面取り量</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={detailForm.mentori8}
-                  onChange={e => { console.log('[8C面取り]', e.target.value); setDetailForm(p => ({ ...p, mentori8: e.target.value })) }}
-                  placeholder="0.00"
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-xs text-gray-400">mm</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 数量 */}
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                数量 <span className="text-red-500">★</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={detailForm.quantity}
-                onChange={e => {
-                  console.log('[数量]', e.target.value)
-                  console.log('[数量]', e.target.value)
-                  setDetailForm(p => ({ ...p, quantity: e.target.value }))
-                  setCalcResult(null)
-                }}
-                placeholder="1"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none ochi-input"
-              />
-            </div>
-
-            {/* 計算結果表示 */}
-            {calcResult && (
-              <div className="sm:col-span-3 p-3 rounded-lg bg-blue-50 border border-blue-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            </td>
+          </tr>
+          {/* 入力行3: 計算結果・ボタン */}
+          <tr>
+            <td colSpan={2} style={{ ...TD, padding: "4px" }}>
+              <div style={{ fontSize: "9px", color: "#64748b" }}>最短納期</div>
+              <input style={{ ...INP, background: "#f8fafc", color: "#64748b", fontSize: "10px" }} value={form.fastDeliveryDate ?? ""} readOnly />
+            </td>
+            <td colSpan={6} style={{ ...TD, padding: "4px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 <div>
-                  <p className="text-blue-400">見積単価</p>
-                  <p className="font-bold text-blue-800">¥{calcResult.unitPrice.toLocaleString()}</p>
+                  <div style={{ fontSize: "9px", color: "#64748b" }}>納期保証期限</div>
+                  <input style={{ ...INP, width: "130px", background: form.fastDeliveryDeadline ? "#ffffcc" : "#fff", borderColor: form.fastDeliveryDeadline ? "#f59e0b" : "#cbd5e1" }} value={form.fastDeliveryDeadline ? fmtDate(form.fastDeliveryDeadline) : ""} readOnly />
                 </div>
                 <div>
-                  <p className="text-blue-400">見積金額</p>
-                  <p className="font-bold text-blue-800">¥{calcResult.totalPrice.toLocaleString()}</p>
+                  <div style={{ fontSize: "9px", color: "#64748b" }}>送料込みプレート単価</div>
+                  <input style={{ ...INP, width: "100px", textAlign: "right", background: "#f8fafc", fontFamily: "monospace" }} value={form.unitPrice != null ? `¥${form.unitPrice.toLocaleString()}` : ""} readOnly />
                 </div>
                 <div>
-                  <p className="text-blue-400">最短納期</p>
-                  <p className="font-bold text-blue-800">{calcResult.shortestDelivery}</p>
-                </div>
-                <div>
-                  <p className="text-blue-400">有効期限</p>
-                  <p className="font-bold text-blue-800">
-                    {calcResult.deliveryDeadline
-                      ? new Date(calcResult.deliveryDeadline).toLocaleDateString("ja-JP")
-                      : "—"}
-                  </p>
+                  <div style={{ fontSize: "9px", color: "#64748b" }}>送料込みプレート金額</div>
+                  <input style={{ ...INP, width: "100px", textAlign: "right", background: "#f8fafc", fontFamily: "monospace" }} value={form.totalPrice != null ? `¥${form.totalPrice.toLocaleString()}` : ""} readOnly />
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </td>
+            <td colSpan={9} style={{ ...TD, textAlign: "right", padding: "4px 8px" }}>
+              <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center" }}>
+                <button className="btn-ochi btn-blue" style={{ fontSize: "11px" }} onClick={handleCalculate}>🧮 見積計算</button>
+                <div>
+                  <button className="btn-ochi btn-green" style={{ fontSize: "11px" }} onClick={handleAddDetail} disabled={!form.calculated}>＋ 明細に追加</button>
+                  {!form.calculated && <div style={{ fontSize: "9px", color: "#d97706", marginTop: "2px" }}>⚠ 先に「見積計算」を実行してください</div>}
+                </div>
+                <button className="btn-ochi btn-outline" style={{ fontSize: "10px" }} onClick={() => setForm(newDetailForm())}>クリア</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
 
-        {/* ボタン行 */}
-        <div className="mt-4 flex flex-wrap gap-2 justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              console.log("[入力クリアボタン] クリック")
-              setDetailForm(EMPTY_DETAIL_FORM)
-              setCalcResult(null)
-              setCalcError("")
-            }}
-            className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            入力クリア
-          </button>
-          <button
-            type="button"
-            onClick={() => { console.log("[見積計算ボタン] クリック"); handleCalculate() }}
-            disabled={calcLoading}
-            className="px-5 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {calcLoading ? "計算中..." : "📊 見積計算"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { console.log("[明細追加ボタン] クリック"); handleAddDetail() }}
-            disabled={!canAddDetail}
-            className="px-5 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            ＋ 明細に追加
-          </button>
-          {!canAddDetail && (
-            <p className="text-xs text-amber-600 mt-1">
-              ⚠ 先に「見積計算」を実行してください
-            </p>
+      {/* ─ 登録済み明細 ─ */}
+      <div style={{ fontSize: "11px", fontWeight: 600, background: "#dcfce7", color: "#166534", padding: "3px 8px", borderRadius: "4px 4px 0 0", marginTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>登録済み明細 <span style={{ background: "#86efac", color: "#166534", borderRadius: "10px", padding: "1px 7px", fontSize: "10px", marginLeft: "6px" }}>{details.length}件 / 合計 ¥{totalAmount.toLocaleString()}</span></span>
+        {selectedIds.size > 0 && <span style={{ fontSize: "10px" }}>選択中 {selectedIds.size}件 ¥{selectedTotal.toLocaleString()}</span>}
+      </div>
+      <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderTop: "none", borderRadius: "0 0 6px 6px" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px", minWidth: "1000px" }}>
+        <thead>
+          <tr>
+            <th style={{ ...TH, width: "25px" }}><input type="checkbox" checked={isAllSelected} onChange={e => handleSelectAll(e.target.checked)} style={{ width: "12px", height: "12px" }} /></th>
+            <th style={{ ...TH, width: "25px" }} rowSpan={3}>No</th>
+            <th style={{ ...TH, width: "60px" }} rowSpan={3}>材料</th>
+            <th style={TH} colSpan={2}>厚み</th>
+            <th style={TH} colSpan={2}>幅</th>
+            <th style={TH} colSpan={2}>長さ</th>
+            <th style={TH} colSpan={3}>面取り</th>
+            <th style={{ ...TH, width: "35px" }} rowSpan={3}>数量</th>
+            <th style={{ ...TH, width: "90px" }} rowSpan={3}>納期</th>
+            <th style={{ ...TH, width: "75px" }} rowSpan={3}>ご注文番号</th>
+            <th style={TH} colSpan={2}>プレート金額</th>
+            <th style={{ ...TH, width: "38px" }} rowSpan={3}>操作</th>
+          </tr>
+          <tr>
+            <th style={TH} rowSpan={2}>加工</th><th style={{ ...TH, width: "45px" }} rowSpan={2}>公差</th>
+            <th style={TH} rowSpan={2}>加工</th><th style={{ ...TH, width: "45px" }} rowSpan={2}>公差</th>
+            <th style={TH} rowSpan={2}>加工</th><th style={{ ...TH, width: "45px" }} rowSpan={2}>公差</th>
+            <th style={{ ...TH, width: "40px" }} rowSpan={2}>詳細</th>
+            <th style={{ ...TH, width: "32px" }} rowSpan={2}>4角</th>
+            <th style={{ ...TH, width: "32px" }} rowSpan={2}>8辺</th>
+            <th style={{ ...TH, width: "65px", textAlign: "right" }} rowSpan={2}>単価</th>
+            <th style={{ ...TH, width: "70px", textAlign: "right" }} rowSpan={2}>金額</th>
+          </tr>
+          <tr><th style={{ ...TH, width: "25px" }}><input type="checkbox" checked={isAllSelected} onChange={e => handleSelectAll(e.target.checked)} style={{ width: "12px", height: "12px" }} /></th></tr>
+        </thead>
+        <tbody>
+          {details.length === 0 ? (
+            <tr><td colSpan={17} style={{ ...TD, textAlign: "center", padding: "16px", color: "#94a3b8" }}>明細がありません。上のフォームで入力後「明細に追加」してください。</td></tr>
+          ) : details.map((d, i) => {
+            const expired = isExpired(d.deliveryDeadline)
+            const rowStyle: React.CSSProperties = expired ? { background: "#fee2e2", borderLeft: "3px solid #dc2626" } : {}
+            return (
+              <tr key={d.clientDetailId}>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}><input type="checkbox" checked={selectedIds.has(d.clientDetailId)} onChange={e => handleSelectOne(d.clientDetailId, e.target.checked)} style={{ width: "12px", height: "12px" }} /></td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}>{expired && <span style={{ color: "#dc2626", marginRight: "2px" }}>⚠</span>}{i+1}</td>
+                <td style={{ ...TD, ...rowStyle }}>{d.materialCode}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}>{d.kakouT || "—"}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right", fontSize: "9px" }}>{d.sizeT}<br /><span style={{ color: "#888" }}>+{d.toleranceTUp}/-{Math.abs(d.toleranceTDown)}</span></td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}>{d.kakouB || "—"}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right", fontSize: "9px" }}>{d.sizeB}<br /><span style={{ color: "#888" }}>+{d.toleranceBUp}/-{Math.abs(d.toleranceBDown)}</span></td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}>{d.kakouA || "—"}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right", fontSize: "9px" }}>{d.sizeA}<br /><span style={{ color: "#888" }}>+{d.toleranceAUp}/-{Math.abs(d.toleranceADown)}</span></td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center", fontSize: "9px" }}>{d.mentoriShiji === 1 ? "図参照" : d.mentoriShiji === 2 ? "不可" : "---"}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right" }}>{d.mentori4}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right" }}>{d.mentori8}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}>{d.quantity}</td>
+                <td style={{ ...TD, ...rowStyle, fontSize: "9px" }}>
+                  <div style={{ color: expired ? "#dc2626" : "#1e293b" }}>{d.deliveryDate ?? "—"}</div>
+                  {d.deliveryDeadline && <div style={{ color: "#dc2626", fontWeight: 600 }}>期限: {fmtDate(d.deliveryDeadline).slice(5)}</div>}
+                </td>
+                <td style={{ ...TD, ...rowStyle, fontSize: "9px" }}>{d.customerDetailOrderNo}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right", fontFamily: "monospace" }}>{d.unitPrice != null ? `¥${d.unitPrice.toLocaleString()}` : ""}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "right", fontFamily: "monospace" }}>{d.totalPrice != null ? `¥${d.totalPrice.toLocaleString()}` : ""}</td>
+                <td style={{ ...TD, ...rowStyle, textAlign: "center" }}>
+                  <button className="btn-ochi btn-red" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleDeleteDetail(d.clientDetailId)}>削除</button>
+                </td>
+              </tr>
+            )
+          })}
+          {details.length > 0 && (
+            <tr>
+              <td colSpan={16} style={{ ...TD, textAlign: "right", fontWeight: 600, background: "#f0fdf4", fontSize: "11px" }}>合計金額</td>
+              <td style={{ ...TD, textAlign: "right", fontWeight: 700, fontSize: "12px", fontFamily: "monospace", background: "#f0fdf4" }}>¥{totalAmount.toLocaleString()}</td>
+              <td style={{ ...TD, background: "#f0fdf4" }}></td>
+            </tr>
           )}
-        </div>
-      </section>
+        </tbody>
+      </table>
+      </div>
 
-      {/* ──────── 明細テーブル ──────── */}
-      {details.length > 0 && (
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              見積明細
-            </p>
-            <p className="text-sm font-bold text-gray-700">
-              合計：<span className="text-lg text-blue-700">¥{grandTotal.toLocaleString()}</span>
-              <span className="text-xs text-gray-400 ml-1">（税抜）</span>
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">No</th>
-                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">材料 <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 text-left text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">加工仕様 <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">T</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">A</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">B</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">公差T</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">公差A</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">公差B</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">4C</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">8C</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">数量 <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">単価</th>
-                  <th className="px-3 py-2 text-right text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">金額</th>
-                  <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">最短納期</th>
-                  <th className="px-3 py-2 text-center text-gray-500 whitespace-nowrap sticky top-0 bg-gray-50 z-10">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {details.map((d, i) => (
-                  <tr
-              key={d.clientDetailId}
-              className={isDeliveryExpired(d.deliveryDeadline) ? "bg-red-50 border-l-4 border-red-400" : ""} className={i % 2 === 1 ? "bg-gray-50/50" : ""}>
-                    <td className="px-3 py-2.5 text-gray-500">{d.rowNo}</td>
-                    <td className="px-3 py-2.5 font-medium text-gray-700 whitespace-nowrap">
-                      {d.materialName}
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{d.kakouShiyou}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-600">{d.sizeT}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-600">{d.sizeA}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-600">{d.sizeB}</td>
-                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">
-                      {d.kousaTUpper || d.kousaTLower ? `+${d.kousaTUpper||0}/-${d.kousaTLower||0}` : "–"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">
-                      {d.kousaAUpper || d.kousaALower ? `+${d.kousaAUpper||0}/-${d.kousaALower||0}` : "–"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">
-                      {d.kousaBUpper || d.kousaBLower ? `+${d.kousaBUpper||0}/-${d.kousaBLower||0}` : "–"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">{d.mentori4 || "–"}</td>
-                    <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap text-[10px]">{d.mentori8 || "–"}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-600">{d.quantity}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-700">
-                      {d.unitPrice != null ? `¥${d.unitPrice.toLocaleString()}` : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-gray-800">
-                      {d.totalPrice != null ? `¥${d.totalPrice.toLocaleString()}` : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-center text-gray-600 whitespace-nowrap">
-                      {d.shortestDelivery ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <button
-                        type="button"
-                        onClick={() => { console.log("[削除ボタン] clientDetailId:", d.clientDetailId); handleDeleteDetail(d.clientDetailId) }}
-                        className="px-2 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+      {/* ─ 直送先検索モーダル ─ */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "60px" }}>
+          <div style={{ background: "#fff", borderRadius: "8px", border: "1px solid #e2e8f0", width: "90%", maxWidth: "750px", maxHeight: "80vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "#1e3a5f", color: "#fff", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", fontWeight: 600 }}>
+              <span>🔍 直送先検索</span>
+              <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: "16px", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ padding: "14px", borderBottom: "1px solid #e2e8f0" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                <div><div style={{ fontSize: "10px", color: "#64748b", marginBottom: "2px" }}>直送先名</div><input className="ochi-input" style={INP} value={modalSearch.name} onChange={e => setModalSearch(s => ({ ...s, name: e.target.value }))} placeholder="直送先名を入力" {...focusHandlers} /></div>
+                <div><div style={{ fontSize: "10px", color: "#64748b", marginBottom: "2px" }}>住所</div><input className="ochi-input" style={INP} value={modalSearch.address} onChange={e => setModalSearch(s => ({ ...s, address: e.target.value }))} {...focusHandlers} /></div>
+                <div><div style={{ fontSize: "10px", color: "#64748b", marginBottom: "2px" }}>直送先コード</div><input className="ochi-input" style={INP} value={modalSearch.code} onChange={e => setModalSearch(s => ({ ...s, code: e.target.value }))} {...focusHandlers} /></div>
+                <div><div style={{ fontSize: "10px", color: "#64748b", marginBottom: "2px" }}>電話番号</div><input className="ochi-input" style={INP} value={modalSearch.tel} onChange={e => setModalSearch(s => ({ ...s, tel: e.target.value }))} {...focusHandlers} /></div>
+              </div>
+              <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                <button className="btn-ochi btn-blue" onClick={handleModalSearch} disabled={modalLoading}>🔍 検索</button>
+                <button className="btn-ochi btn-outline" onClick={() => setModalSearch({ name: "", address: "", code: "", tel: "" })}>クリア</button>
+              </div>
+            </div>
+            <div style={{ overflowY: "auto", padding: "10px" }}>
+              {modalResults.length > 0 ? (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+                  <thead>
+                    <tr>
+                      {["得意先コード","直送先コード","直送先名","部署名","担当者名","郵便番号","住所","電話番号","選択"].map(h => (
+                        <th key={h} style={TH}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalResults.map(row => (
+                      <tr key={row.id}
+                        onMouseEnter={e => { Array.from((e.currentTarget as HTMLTableRowElement).cells).forEach(c => c.style.background = "#eff6ff") }}
+                        onMouseLeave={e => { Array.from((e.currentTarget as HTMLTableRowElement).cells).forEach(c => c.style.background = "") }}
                       >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <td style={TD}>{row.customerCode}</td>
+                        <td style={TD}>{row.destinationCode}</td>
+                        <td style={TD}>{row.destinationName}</td>
+                        <td style={TD}>{row.departmentName ?? ""}</td>
+                        <td style={TD}>{row.personName ?? ""}</td>
+                        <td style={TD}>{row.postalCode ?? ""}</td>
+                        <td style={{ ...TD, fontSize: "9px" }}>{row.address ?? ""}</td>
+                        <td style={TD}>{row.tel ?? ""}</td>
+                        <td style={{ ...TD, textAlign: "center" }}><button className="btn-ochi btn-green" style={{ fontSize: "9px", padding: "1px 8px" }} onClick={() => handleModalSelect(row)}>選択</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <div style={{ textAlign: "center", padding: "20px", color: "#94a3b8", fontSize: "12px" }}>{modalLoading ? "検索中..." : "検索ボタンを押してください"}</div>}
+            </div>
+            <div style={{ padding: "8px 14px", borderTop: "1px solid #e2e8f0", textAlign: "right" }}>
+              <button className="btn-ochi btn-outline" onClick={() => setShowModal(false)}>✕ 閉じる</button>
+            </div>
           </div>
-
-          {/* Draft 自動保存インジケーター */}
-          <div className="px-5 pt-3 flex justify-end">
-            <DraftSaveIndicator
-              status={saveStatus}
-              savedAt={savedAt}
-              onRetry={() => triggerSave(header, toDetailItems(details), true)}
-            />
-          </div>
-
-      {/* 保存・注文ボタン */}
-          <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3 flex-wrap">
-            {savedEstimateId && (
-              <a
-                href={`/orders/confirm?estimateId=${savedEstimateId}`}
-                className="px-5 py-2.5 text-sm rounded-lg font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-              >
-                🛒 注文する
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => { console.log("[保存ボタン] クリック"); handleSave() }}
-              disabled={saveLoading}
-              className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#1a2744] text-white hover:bg-[#1a3a6e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {saveLoading ? "保存中..." : "💾 保存"}
-            </button>
-          </div>
-        </section>
+        </div>
       )}
-
     </div>
   )
 }

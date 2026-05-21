@@ -1,62 +1,16 @@
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
-import { SessionProvider } from "next-auth/react"
-import Header from "@/components/layout/Header"
-import { ToastProvider } from "@/components/ui/Toast"
+import OchiHeader from "@/components/ui/OchiHeader"
 
-export default async function AppLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session) redirect("/login")
-
-  // 未読お知らせ件数（ヘッダーバッジ用）
-  let notificationCount = 0
-  try {
-    const session2 = await auth()
-    const customerId = session2?.user?.customerId
-    const now = new Date()
-    const allNotifs = await prisma.notification.findMany({
-      where: {
-        isDeleted: false,
-        publishedAt: { lte: now },
-        OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
-      },
-      select: { id: true },
-    })
-    if (customerId && allNotifs.length > 0) {
-      try {
-        const reads = await (prisma as any).notificationRead.findMany({
-          where: { customerId, notificationId: { in: allNotifs.map((n: any) => n.id) } },
-          select: { notificationId: true },
-        })
-        notificationCount = allNotifs.length - reads.length
-      } catch {
-        notificationCount = allNotifs.length
-      }
-    } else {
-      notificationCount = allNotifs.length
-    }
-  } catch { /* silent */ }
-
+  const userName    = (session.user as any).userName    ?? ""
+  const companyName = (session.user as any).companyName ?? ""
   return (
-    <SessionProvider session={session}>
-      <ToastProvider>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Skip to main content（アクセシビリティ） */}
-        <a href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[999] focus:px-4 focus:py-2 focus:bg-white focus:text-[#1a2744] focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-medium">
-          メインコンテンツへスキップ
-        </a>
-        <Header notificationCount={notificationCount} />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-      </div>
-      </ToastProvider>
-    </SessionProvider>
+    <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
+      <OchiHeader userName={userName} companyName={companyName} />
+      <div>{children}</div>
+    </div>
   )
 }
