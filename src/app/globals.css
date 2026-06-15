@@ -9,7 +9,6 @@
   --ochi-header-bg: #1e3a5f;
   --ochi-title-bg:  #d8e9f5;
   --ochi-title-txt: #1e3a5f;
-  --ochi-tlbl-bg:   linear-gradient(to right, #f1f5f9, #e8eef4);
   --ochi-focus-bg:  #ffffcc;
   --ochi-focus-bd:  #f59e0b;
   --ochi-expired-bg:#fee2e2;
@@ -23,41 +22,104 @@ body {
   color: #1e293b;
 }
 
-/* ─── フォーカス黄色ハイライト（全 input/select 共通） ─── */
+/* ─── フォーカス黄色ハイライト ─── */
 @layer utilities {
-  .ochi-input {
-    height: 26px;
-    border: 1px solid #cbd5e1;
-    border-radius: 3px;
-    padding: 0 6px;
-    font-size: 11px;
-    width: 100%;
-    background: #fff;
-    transition: background 0.1s, border-color 0.1s;
-  }
-  .ochi-input:focus {
+  .ochi-input:focus,
+  input.ochi-input:focus,
+  select.ochi-input:focus {
     background: var(--ochi-focus-bg) !important;
     border-color: var(--ochi-focus-bd) !important;
     outline: none !important;
-    box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
+    box-shadow: 0 0 0 2px rgba(245,158,11,0.15) !important;
     --tw-ring-shadow: none !important;
   }
-  .ochi-select {
-    height: 26px;
-    border: 1px solid #cbd5e1;
-    border-radius: 3px;
-    padding: 0 4px;
-    font-size: 11px;
-    width: 100%;
-    background: #fff;
-  }
-  .ochi-select:focus {
-    background: var(--ochi-focus-bg) !important;
-    border-color: var(--ochi-focus-bd) !important;
-    outline: none !important;
-  }
 
-  /* タイトルバー（青） */
+  /* ══════════════════════════════════════════
+     業務用ボタン — シンプル・洗練・フラット
+     色分け: 役割で明確に区別
+     サイズ: sm(デフォルト) / md / lg
+  ══════════════════════════════════════════ */
+  .btn-ochi {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 12px;
+    height: 30px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    text-decoration: none;
+    line-height: 1;
+    transition: filter 0.12s ease, transform 0.1s ease, box-shadow 0.12s ease;
+    -webkit-font-smoothing: antialiased;
+  }
+  .btn-ochi:hover  { filter: brightness(1.08); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+  .btn-ochi:active { transform: scale(0.97); filter: brightness(0.95); box-shadow: none; }
+  .btn-ochi:disabled,
+  .btn-ochi[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+
+  /* サイズバリアント */
+  .btn-ochi-sm  { height: 26px; padding: 0 10px; font-size: 11px; border-radius: 3px; }
+  .btn-ochi-md  { height: 32px; padding: 0 14px; font-size: 12px; }
+  .btn-ochi-lg  { height: 38px; padding: 0 20px; font-size: 13px; font-weight: 600; border-radius: 5px; }
+
+  /* ─── カラーバリアント ─── */
+  /* ネイビー: 主要アクション（保存・決定） */
+  .btn-navy {
+    background: #1e3a5f;
+    color: #fff;
+    border-color: #152b47;
+  }
+  /* ブルー: セカンダリアクション（計算・検索・PDF） */
+  .btn-blue {
+    background: #1d4ed8;
+    color: #fff;
+    border-color: #1a44c2;
+  }
+  /* グリーン: 追加・完了・保存 */
+  .btn-green {
+    background: #15803d;
+    color: #fff;
+    border-color: #126a33;
+  }
+  /* アンバー: 注文・重要アクション */
+  .btn-amber {
+    background: #b45309;
+    color: #fff;
+    border-color: #9a4607;
+  }
+  /* レッド: 削除・取消 */
+  .btn-red {
+    background: #b91c1c;
+    color: #fff;
+    border-color: #991b1b;
+  }
+  /* シアン: 情報・PDF・閲覧 */
+  .btn-info {
+    background: #0e7490;
+    color: #fff;
+    border-color: #0c6478;
+  }
+  /* グレー: サブ操作・戻る */
+  .btn-gray {
+    background: #475569;
+    color: #fff;
+    border-color: #3b4a5c;
+  }
+  /* アウトライン: 補助操作（クリア・キャンセル） */
+  .btn-outline {
+    background: #fff;
+    color: #334155;
+    border-color: #cbd5e1;
+  }
+  .btn-outline:hover { background: #f8fafc; border-color: #94a3b8; }
+
+  /* ─── セクションタイトル ─── */
   .section-title-blue {
     background: var(--ochi-title-bg);
     color: var(--ochi-title-txt);
@@ -77,7 +139,7 @@ body {
     border-bottom: 1px solid #86efac;
   }
 
-  /* ラベルセル */
+  /* ─── ラベルセル / 入力セル ─── */
   .tlbl {
     background: linear-gradient(to right, #f1f5f9, #e8eef4);
     font-weight: 600;
@@ -96,36 +158,25 @@ body {
     vertical-align: middle;
   }
 
-  /* 数値セル */
+  /* ─── 数値セル ─── */
   .number-cell {
     font-family: 'Courier New', 'Consolas', monospace;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
 
-  /* 明細テーブル */
-  .detail-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 10px;
-  }
+  /* ─── 明細テーブル ─── */
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 10px; }
   .detail-table th {
     background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
     border: 1px solid #cbd5e1;
-    padding: 3px 4px;
-    text-align: center;
-    font-weight: 600;
-    color: #334155;
-    white-space: nowrap;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    padding: 3px 4px; text-align: center;
+    font-weight: 600; color: #334155; white-space: nowrap;
+    position: sticky; top: 0; z-index: 10;
   }
   .detail-table td {
-    border: 1px solid #e2e8f0;
-    padding: 2px 4px;
-    vertical-align: middle;
-    background: #fff;
+    border: 1px solid #e2e8f0; padding: 2px 4px;
+    vertical-align: middle; background: #fff;
   }
   .detail-table tr:nth-child(even) td { background: #f8fafc; }
   .detail-table tr:hover td { background: #eff6ff !important; }
@@ -134,64 +185,26 @@ body {
     border-left: 3px solid var(--ochi-expired-bd);
   }
 
-  /* 検索セクション */
+  /* ─── 検索セクション ─── */
   .search-section {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 12px;
+    background: #eff6ff; border: 1px solid #bfdbfe;
+    border-radius: 6px; padding: 12px; margin-bottom: 12px;
   }
   .search-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: #1e40af;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
+    font-size: 11px; font-weight: 600; color: #1e40af;
+    margin-bottom: 8px; padding-bottom: 4px;
     border-bottom: 1px solid #bfdbfe;
   }
   .result-bar {
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-    border-radius: 4px;
-    padding: 5px 10px;
-    font-size: 11px;
-    color: #166534;
-    margin-bottom: 8px;
+    background: #f0fdf4; border: 1px solid #86efac;
+    border-radius: 4px; padding: 5px 10px;
+    font-size: 11px; color: #166534; margin-bottom: 8px;
   }
 
-  /* ボタン共通 */
-  .btn-ochi {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    white-space: nowrap;
-    transition: opacity 0.15s, transform 0.1s;
-  }
-  .btn-ochi:hover { opacity: 0.85; }
-  .btn-ochi:active { transform: scale(0.97); }
-  .btn-ochi:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  .btn-navy    { background: #1e3a5f; color: #fff; }
-  .btn-blue    { background: #1d4ed8; color: #fff; }
-  .btn-green   { background: #16a34a; color: #fff; }
-  .btn-amber   { background: #d97706; color: #fff; }
-  .btn-red     { background: #dc2626; color: #fff; }
-  .btn-info    { background: #0891b2; color: #fff; }
-  .btn-gray    { background: #64748b; color: #fff; }
-  .btn-outline { background: #fff; color: #374151; border: 1px solid #cbd5e1; }
-  .btn-outline:hover { background: #f8fafc; }
-
-  /* バッジ */
-  .badge-blue   { background: #dbeafe; color: #1e40af; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
-  .badge-green  { background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
-  .badge-amber  { background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
-  .badge-red    { background: #fee2e2; color: #991b1b; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
-  .badge-gray   { background: #f1f5f9; color: #475569; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+  /* ─── バッジ ─── */
+  .badge-blue  { background:#dbeafe;color:#1e40af;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap; }
+  .badge-green { background:#dcfce7;color:#166534;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap; }
+  .badge-amber { background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap; }
+  .badge-red   { background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap; }
+  .badge-gray  { background:#f1f5f9;color:#475569;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap; }
 }

@@ -1,21 +1,19 @@
 // GET /api/v1/cutting-methods?customerCode=xxxxx
-// SQL Server から加工指示マスタを取得。接続失敗時は PostgreSQL fallback
+// SQL Server の usp_ASP_CuttingMethod_get から加工指示マスタを取得
+// 加工指示（W研削/G研削/レーザー等）と加工仕様（6F/6F2G等）は別物
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
 
-// PostgreSQL fallback 用デフォルト加工指示
+// 旧システム usp_ASP_CuttingMethod_get 相当の正しい加工指示デフォルト
+// 加工指示表示 = "W", "G", "レーザー" など（旧ASPの加工指示コード体系）
 const DEFAULT_CUTTING_METHODS = [
-  { code: 0,  label: "（なし）" },
-  { code: 1,  label: "平行" },
-  { code: 2,  label: "垂直" },
-  { code: 3,  label: "斜め45°" },
-  { code: 4,  label: "斜め30°" },
-  { code: 5,  label: "斜め60°" },
-  { code: 6,  label: "R加工" },
-  { code: 7,  label: "テーパー" },
-  { code: 8,  label: "段付き" },
-  { code: 9,  label: "その他" },
+  { code: "W",  label: "W" },
+  { code: "G",  label: "G" },
+  { code: "L",  label: "レーザー" },
+  { code: "P",  label: "プラズマ" },
+  { code: "S",  label: "ショット" },
+  { code: "H",  label: "H" },
+  { code: "N",  label: "（なし）" },
 ]
 
 export async function GET(req: NextRequest) {
@@ -25,40 +23,26 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const customerCode = searchParams.get("customerCode") ?? ""
 
-  // SQL Server から取得試行
+  // SQL Server から取得試行（usp_ASP_CuttingMethod_get）
   try {
     const { getSqlServerPool } = await import("@/lib/sqlserver").catch(() => ({ getSqlServerPool: null }))
     if (getSqlServerPool) {
       const pool = await (getSqlServerPool as Function)()
       const result = await pool.request()
-        .input("CustomerCode", customerCode)
-        .query(`
-          SELECT 加工指示コード AS code, 加工指示名称 AS label
-          FROM 加工指示マスタ
-          WHERE 有効フラグ = 1
-          ORDER BY 加工指示コード
-        `)
-      return NextResponse.json({ methods: result.recordset, source: "sqlserver" })
+        .input("CostomerCd", customerCode)
+        .execute("usp_ASP_CuttingMethod_get")
+      if (result.recordset && result.recordset.length > 0) {
+        const methods = result.recordset.map((r: any) => ({
+          code: String(r["加工指示コード"] ?? r.code ?? ""),
+          label: String(r["加工指示表示"] ?? r["加工指示名称"] ?? r.label ?? ""),
+        })).filter((m: any) => m.code && m.label)
+        return NextResponse.json({ methods, source: "sqlserver" })
+      }
     }
   } catch (err: any) {
-    console.error("[cutting-methods] SQL Serverエラー:", err.message)
+    console.warn("[cutting-methods] SQL Server接続失敗、デフォルト使用:", err.message)
   }
 
-  // PostgreSQL ProcessingSpec fallback
-  try {
-    const specs = await prisma.processingSpec.findMany({
-      where: {},
-      orderBy: { processingSpecCode: "asc" },
-      select: { processingSpecCode: true, processingSpecName: true },
-    })
-    if (specs.length > 0) {
-      return NextResponse.json({
-        methods: specs.map(s => ({ code: s.processingSpecCode, label: s.processingSpecName })),
-        source: "postgres_fallback",
-      })
-    }
-  } catch { /* silent */ }
-
-  // 最終 fallback: ハードコードデフォルト
-  return NextResponse.json({ methods: DEFAULT_CUTTING_METHODS, source: "default_fallback" })
+  // fallback: 正しい加工指示デフォルト（加工仕様ではない）
+  return NextResponse.json({ methods: DEFAULT_CUTTING_METHODS, source: "default" })
 }
