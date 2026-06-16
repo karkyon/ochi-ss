@@ -1,5 +1,5 @@
 // =============================================================
-//  src/lib/prisma.ts  v3 — Prisma 6 $extends 暗号化実装
+//  src/lib/prisma.ts  v4 — 暗号化 $extends + RLS withTenant対応
 // =============================================================
 import { PrismaClient } from "@prisma/client"
 import { encrypt, decrypt } from "./crypto"
@@ -88,3 +88,6 @@ export const prisma = basePrisma.$extends({
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = basePrisma
 }
+
+// withTenant はここではなく src/lib/with-tenant.ts から import すること
+// （循環インポート回避のため分離）

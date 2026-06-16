@@ -442,3 +442,23 @@ model SystemSetting {
 
   @@map("system_settings")
 }
+
+/// 操作監査ログ（追記専用・削除禁止）
+model AuditLog {
+  id          String   @id @default(uuid())
+  customerId  String   @map("customer_id")
+  userId      String   @map("user_id")
+  action      String                        // READ/CREATE/UPDATE/DELETE/EXPORT/AUTH
+  resource    String                        // estimates/orders/direct_deliveries/pdf
+  resourceId  String?  @map("resource_id")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  resultCode  Int      @default(200) @map("result_code")
+  detail      Json?
+  occurredAt  DateTime @default(now()) @map("occurred_at")
+
+  @@index([customerId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
+}
