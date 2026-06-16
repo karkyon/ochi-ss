@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.1.11", "localhost", "192.168.1.11:3050", "localhost:3050"],
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["192.168.1.11:3050", "localhost:3050"],
+    },
+  },
   async headers() {
     return [
       {
@@ -11,24 +17,10 @@ const nextConfig: NextConfig = {
           { key: "X-XSS-Protection",           value: "1; mode=block" },
           { key: "Referrer-Policy",            value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy",         value: "camera=(), microphone=(), geolocation=()" },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self'",
-              "connect-src 'self'",
-              "frame-ancestors 'none'",
-            ].join("; "),
-          },
         ],
       },
     ]
   },
-
-  /* config options here */
 };
 
 export default nextConfig;
