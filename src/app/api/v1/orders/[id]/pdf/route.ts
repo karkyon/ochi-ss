@@ -14,18 +14,20 @@ export async function GET(
   const { id } = await params
   const order = await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
     return (tx as any).order.findFirst({
-    where: { id, customerId: ctx.customerId },
-    include: {
-      estimateHeader: {
-        include: {
-          details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } }
-        }
-      }
-    },
-  })
-  if (!order) return new NextResponse("Not Found", { status: 404 })
+      where: { id, customerId: ctx.customerId },
+      include: {
+        estimateHeader: {
+          include: {
+            details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } },
+          },
+        },
+      },
+    })
+  }) as any
 
+  if (!order) return new NextResponse("Not Found", { status: 404 })
   audit({ customerId: ctx.customerId, userId: ctx.userId, action: "EXPORT", resource: "pdf", resourceId: id, req })
+
   const estimate = order.estimateHeader as any
   const details  = estimate?.details ?? []
   const orderDate = order.orderDate
@@ -33,7 +35,6 @@ export async function GET(
     : "—"
   const totalAmount = details.reduce((s: number, d: any) => s + Number(d.totalPrice ?? 0), 0)
 
-  // 公差フォーマット
   const fmtK = (upper: any, lower: any) => {
     if (upper == null && lower == null) return "—"
     const u = upper != null ? `+${Number(upper)}` : ""
@@ -172,20 +173,6 @@ export async function GET(
   </div>
 </body>
 </html>`
-
-    // PDF発行ログ記録（監査証跡）
-  try {
-    await prisma.securityLog.create({
-      data: {
-        eventType: "PDF_ISSUE",
-        message:   `注文書PDF発行 orderId=${id}`,
-        logLevel:  "INFO",
-        username:  (session.user as any).userId ?? "",
-      },
-    })
-  } catch (logErr) {
-    console.warn("[orders/pdf] SecurityLog 記録失敗:", logErr)
-  }
 
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
