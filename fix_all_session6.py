@@ -1,4 +1,92 @@
-"use client"
+#!/usr/bin/env python3
+"""
+fix_all_session6.py
+配置: ~/projects/ochi-ss/fix_all_session6.py
+実行: cd ~/projects/ochi-ss && python3 fix_all_session6.py
+"""
+import os, json, subprocess, sys
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
+def write(path, content):
+    full = os.path.join(ROOT, path)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"  OK: {path}")
+
+def remove(path):
+    full = os.path.join(ROOT, path)
+    if os.path.exists(full):
+        os.remove(full)
+        print(f"  DEL: {path}")
+
+def run(cmd):
+    r = subprocess.run(cmd, shell=True, cwd=ROOT, capture_output=True, text=True)
+    return r.returncode, r.stdout, r.stderr
+
+PRE_CHECK = r"""import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { prisma } from "@/lib/prisma"
+import bcrypt from "bcryptjs"
+
+const schema = z.object({
+  companyCode: z.string().regex(/^\d{5}$/, "企業コードは5桁"),
+  userId:      z.string().min(1).max(50),
+  password:    z.string().min(1).max(50),
+})
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const parsed = schema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, code: -99, msg: parsed.error.issues.map((i) => i.message).join(", ") },
+        { status: 400 }
+      )
+    }
+    const { companyCode, userId, password } = parsed.data
+
+    const customer = await prisma.customer.findFirst({
+      where: { customerCode: { startsWith: companyCode }, isDeleted: false },
+      select: { id: true, loginEnabled: true },
+    })
+    if (!customer)
+      return NextResponse.json({ ok: false, code: -4, msg: "企業コードが正しくありません" })
+    if (!customer.loginEnabled)
+      return NextResponse.json({ ok: false, code: -3, msg: "この企業のログインは現在無効です。管理者にお問い合わせください" })
+
+    const user = await prisma.user.findFirst({
+      where: { customerId: customer.id, username: userId, isDeleted: false },
+      select: { id: true, passwordHash: true, userStatus: true, accountLocked: true, lockedUntil: true },
+    })
+    if (!user)
+      return NextResponse.json({ ok: false, code: -1, msg: "ユーザーIDまたはパスワードが正しくありません" })
+
+    if (user.accountLocked && user.lockedUntil && new Date() > new Date(user.lockedUntil)) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { accountLocked: false, loginFailCount: 0, lockedUntil: null },
+      })
+      user.accountLocked = false
+    }
+    if (user.accountLocked || user.userStatus !== 1)
+      return NextResponse.json({ ok: false, code: -2, msg: "アカウントがロックされています。30分後に再度お試しください" })
+
+    const valid = await bcrypt.compare(password, user.passwordHash)
+    if (!valid)
+      return NextResponse.json({ ok: false, code: -1, msg: "ユーザーIDまたはパスワードが正しくありません" })
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error("[pre-check] エラー:", err)
+    return NextResponse.json({ ok: false, code: -99, msg: "サーバーエラーが発生しました" }, { status: 500 })
+  }
+}
+"""
+
+LOGIN_CLIENT = r""""use client"
 import { useState, useRef, FormEvent, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -152,3 +240,42 @@ export default function LoginClient() {
     </div>
   )
 }
+"""
+
+def main():
+    print("=== fix_all_session6.py ===")
+
+    write("src/app/api/v1/auth/pre-check/route.ts", PRE_CHECK)
+    write("src/app/(auth)/login/LoginClient.tsx",    LOGIN_CLIENT)
+
+    pkg_path = os.path.join(ROOT, "package.json")
+    with open(pkg_path) as f: pkg = json.load(f)
+    dev = pkg["scripts"].get("dev", "")
+    if "-H 0.0.0.0" not in dev:
+        pkg["scripts"]["dev"] = dev + " -H 0.0.0.0"
+        with open(pkg_path, "w") as f:
+            json.dump(pkg, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        print(f"  OK: package.json dev={pkg['scripts']['dev']}")
+
+    remove("0001-fix-Toast-NextAuth-v5-beta-2.patch")
+
+    run("git add -A")
+    code, out, err = run('git commit -m "fix: ログイン失敗Toast確定版(pre-check API) + dev -H 0.0.0.0"')
+    print(f"  commit: {(out+err).strip()[:100]}")
+
+    code2, out2, err2 = run("git push origin main")
+    if code2 == 0:
+        print("  PUSH OK")
+    else:
+        print(f"  push結果: {(out2+err2).strip()[:200]}")
+
+    self_path = os.path.abspath(__file__)
+    if os.path.exists(self_path):
+        os.remove(self_path)
+
+    print("\n完了!")
+    print("実行: sudo systemctl restart ochi-web.service")
+
+if __name__ == "__main__":
+    main()
