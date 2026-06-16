@@ -1,0 +1,19 @@
+[Unit]
+Description=Ochi-ss Next.js (port 3050)
+After=network-online.target ochi-infra.service
+Requires=ochi-infra.service
+
+[Service]
+Type=simple
+User=karkyon
+WorkingDirectory=/home/karkyon/projects/ochi-ss
+EnvironmentFile=/home/karkyon/projects/ochi-ss/.env
+ExecStart=/usr/bin/npm run dev
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ochi-web
+
+[Install]
+WantedBy=multi-user.target
