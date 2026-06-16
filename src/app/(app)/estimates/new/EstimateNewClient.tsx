@@ -1,5 +1,16 @@
 // src/app/(app)/estimates/new/EstimateNewClient.tsx
 "use client"
+
+// HTTP環境（non-SecureContext）でも動くUUID生成
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function") {
+    return (crypto as any).randomUUID()
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 
@@ -38,7 +49,7 @@ interface Props {
 // ─── ヘルパー ──────────────────────────────────────────────────
 function newForm(): DetailForm {
   return {
-    clientDetailId: crypto.randomUUID(),
+    clientDetailId: generateUUID(),
     materialCode: "", kakouShiyouCode: 0,
     kakouShijiCodeT: "W", kakouShijiCodeA: "W", kakouShijiCodeB: "W",
     shiagari: "",

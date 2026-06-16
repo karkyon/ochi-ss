@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import Link from "next/link"
-import OchiHeader from "@/components/ui/OchiHeader"
 import DraftRestoreBanner from "@/components/ui/DraftRestoreBanner"
 import DashboardNotificationsClient from "./DashboardNotificationsClient"
 
@@ -60,10 +59,7 @@ export default async function DashboardPage() {
   } catch { /* サイレント */ }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
-      <OchiHeader userName={userName} companyName={companyName} />
-
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "16px" }}>
+    <div style={{ maxWidth: "960px", margin: "0 auto", padding: "16px" }}>
 
         {/* ユーザー情報 */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px" }}>
@@ -120,7 +116,6 @@ export default async function DashboardPage() {
 
         {/* お知らせ */}
         <DashboardNotificationsClient notifications={notifications} unreadCount={unreadCount} />
-      </div>
     </div>
   )
 }
