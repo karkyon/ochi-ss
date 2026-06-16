@@ -1,7 +1,5 @@
 // src/app/api/v1/estimates/[id]/draft/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
 import { getTenantCtx } from "@/lib/tenant-guard"
 import { withTenant } from "@/lib/with-tenant"
 import { audit } from "@/lib/audit-log"
@@ -41,31 +39,29 @@ export async function PATCH(
     }
   }
 
-  const hp = body.headerPartial ?? {}
+  const hp = (body.headerPartial ?? {}) as Record<string, any>
   const now = new Date()
   const draftExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
   await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
-    await (tx as any).estimateHeader.update({
-      where: { id },
-      data: {
-        draftSavedAt: now, draftExpiresAt,
-        ...(hp.inputDate && { inputDate: new Date(hp.inputDate as string) }),
-        ...(hp.estimateDate && { estimateDate: new Date(hp.estimateDate as string) }),
-        ...(hp.destinationCode !== undefined && { destinationCode: hp.destinationCode as string|null }),
-        ...(hp.destinationName !== undefined && { destinationName: hp.destinationName as string|null }),
-        ...(hp.destinationDept !== undefined && { destinationDept: hp.destinationDept as string|null }),
-        ...(hp.destinationPerson !== undefined && { destinationPerson: hp.destinationPerson as string|null }),
-        ...(hp.destinationZip !== undefined && { destinationZip: hp.destinationZip as string|null }),
-        ...(hp.destinationAddress !== undefined && { destinationAddress: hp.destinationAddress as string|null }),
-        ...(hp.destinationTel !== undefined && { destinationTel: hp.destinationTel as string|null }),
-        ...(hp.destinationFax !== undefined && { destinationFax: hp.destinationFax as string|null }),
-        ...(hp.customerOrderNo !== undefined && { customerOrderNo: hp.customerOrderNo as string|null }),
-        ...(hp.endUserNo !== undefined && { endUserNo: hp.endUserNo as string|null }),
-        ...(hp.contact !== undefined && { remarks: hp.contact as string|null }),
-        ...(hp.requestNouki !== undefined && { requestNouki: hp.requestNouki as string|null }),
-      },
-    })
+    const updateData: Record<string, any> = { draftSavedAt: now, draftExpiresAt }
+    if (hp.inputDate)           updateData.inputDate           = new Date(hp.inputDate)
+    if (hp.estimateDate)        updateData.estimateDate        = new Date(hp.estimateDate)
+    if ("destinationCode"   in hp) updateData.destinationCode   = hp.destinationCode ?? null
+    if ("destinationName"   in hp) updateData.destinationName   = hp.destinationName ?? null
+    if ("destinationDept"   in hp) updateData.destinationDept   = hp.destinationDept ?? null
+    if ("destinationPerson" in hp) updateData.destinationPerson = hp.destinationPerson ?? null
+    if ("destinationZip"    in hp) updateData.destinationZip    = hp.destinationZip ?? null
+    if ("destinationAddress"in hp) updateData.destinationAddress= hp.destinationAddress ?? null
+    if ("destinationTel"    in hp) updateData.destinationTel    = hp.destinationTel ?? null
+    if ("destinationFax"    in hp) updateData.destinationFax    = hp.destinationFax ?? null
+    if ("customerOrderNo"   in hp) updateData.customerOrderNo   = hp.customerOrderNo ?? null
+    if ("endUserNo"         in hp) updateData.endUserNo         = hp.endUserNo ?? null
+    if ("contact"           in hp) updateData.remarks           = hp.contact ?? null
+    if ("requestNouki"      in hp) updateData.requestNouki      = hp.requestNouki ?? null
+
+    await (tx as any).estimateHeader.update({ where: { id }, data: updateData })
+
     if (body.details && body.details.length > 0) {
       await (tx as any).estimateDetail.deleteMany({ where: { estimateHeaderId: id } })
       await (tx as any).estimateDetail.createMany({

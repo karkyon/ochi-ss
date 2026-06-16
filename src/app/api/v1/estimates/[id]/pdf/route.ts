@@ -1,6 +1,5 @@
 // GET /api/v1/estimates/[id]/pdf — 見積書HTML出力
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getTenantCtx } from "@/lib/tenant-guard"
 import { withTenant } from "@/lib/with-tenant"
 import { audit } from "@/lib/audit-log"
@@ -202,19 +201,6 @@ export async function GET(
 </body>
 </html>`
 
-  // PDF発行ログ記録（監査証跡）
-  try {
-    await prisma.securityLog.create({
-      data: {
-        eventType: "PDF_ISSUE",
-        message:   `見積書PDF発行 estimateId=${id} estimateNo=${estimate.estimateNo ?? "未採番"}`,
-        logLevel:  "INFO",
-        username:  (session.user as any).userId ?? "",
-      },
-    })
-  } catch (logErr) {
-    console.warn("[estimates/pdf] SecurityLog 記録失敗:", logErr)
-  }
 
   return new NextResponse(html, {
     headers: {
