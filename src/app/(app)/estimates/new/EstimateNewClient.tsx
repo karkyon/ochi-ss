@@ -12,32 +12,40 @@ function generateUUID(): string {
   })
 }
 
-// ─── WO加工仕様マップ（添付SSデータより実装） ────────────────
-// 仕上り名 → 加工指示(T/A/B) のデフォルト対応
-// 加工指示コード文字列: "W"=平研削, "G"=研削, "〜"=なし(ランダム面), "RG"=両面研削, "SG"=ショット
-// 添付SS: 加工仕様コード2=6F(W/W/W), 7=6F2G(W/W/W), 8=6F2G(W/W/W)等
+// ─── WO加工仕様マップ（添付SSのWO加工仕様テーブル実データ準拠） ──
+// 加工指示コード: 1=RG, 2=W, 4=〜(なし/ランダム面), 5=SG
+// ※ 6F2G等は複数の加工指示パターンが存在するため「デフォルト」のみ定義
+//   実際の加工指示は仕上り選択後にユーザーが加工仕様欄で確認・変更する
 const SHIAGARI_CUT_MAP: Record<string, { t: string; a: string; b: string }> = {
-  "6F":    { t: "W",  a: "W",  b: "W"  },  // 6面フライス: 全面W
-  "6F2G":  { t: "W",  a: "W",  b: "W"  },  // 6面フライス+2面研削: W/W/W
-  "4F2G":  { t: "W",  a: "W",  b: "W"  },
-  "2F2G":  { t: "W",  a: "W",  b: "W"  },
-  "6F2SG": { t: "W",  a: "W",  b: "W"  },
-  "4F2SG": { t: "W",  a: "W",  b: "W"  },
-  "4F":    { t: "W",  a: "〜", b: "〜" },  // 4面フライス: T面のみW
-  "2F":    { t: "W",  a: "〜", b: "W"  },  // 2面フライス
-  "黒皮":  { t: "〜", a: "〜", b: "〜" },  // 未加工
+  // コード2: T=W, A=W, B=W
+  "6F":    { t: "W",  a: "W",  b: "W"  },
+  // コード7: T=RG, A=W, B=W（最も一般的な6F2Gパターン）
+  "6F2G":  { t: "RG", a: "W",  b: "W"  },
+  // コード5: T=RG, A=〜, B=W
+  "4F2G":  { t: "RG", a: "〜", b: "W"  },
+  // コード4: T=RG, A=〜, B=〜
+  "2F2G":  { t: "RG", a: "〜", b: "〜" },
+  // コード17: T=SG, A=W, B=W
+  "6F2SG": { t: "SG", a: "W",  b: "W"  },
+  // コード10: T=W, A=〜, B=W
+  "4F":    { t: "W",  a: "〜", b: "W"  },
+  // コード11: T=W, A=〜, B=〜
+  "2F":    { t: "W",  a: "〜", b: "〜" },
+  // コード16: T=〜, A=〜, B=〜
+  "黒皮":  { t: "〜", a: "〜", b: "〜" },
 }
 
-// 仕上り名から加工指示を解決（完全一致 → 部分一致 → デフォルトW/W/W）
+// 仕上り名から加工指示を解決（完全一致 → 前方部分一致 → デフォルト6F=W/W/W）
 function resolveCutCodes(specName: string): { t: string; a: string; b: string } {
   if (SHIAGARI_CUT_MAP[specName]) return SHIAGARI_CUT_MAP[specName]
-  for (const [key, val] of Object.entries(SHIAGARI_CUT_MAP)) {
-    if (specName.startsWith(key)) return val
+  // "6F2G(特殊)" 等の前方一致
+  for (const key of Object.keys(SHIAGARI_CUT_MAP)) {
+    if (specName.startsWith(key)) return SHIAGARI_CUT_MAP[key]
   }
   return { t: "W", a: "W", b: "W" }
 }
 
-// 加工指示が全面確定（〜なし）かどうか
+// 加工指示が全面確定（〜なし）かどうか → ENTERで寸法Tへスキップ判定
 function allCutsDefined(cuts: { t: string; a: string; b: string }): boolean {
   return cuts.t !== "〜" && cuts.a !== "〜" && cuts.b !== "〜"
 }
