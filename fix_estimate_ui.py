@@ -1,4 +1,22 @@
-// src/app/(app)/estimates/new/EstimateNewClient.tsx
+import subprocess, os, sys
+
+ROOT = os.path.expanduser("~/projects/ochi-ss")
+os.chdir(ROOT)
+
+def run(cmd, check=True):
+    r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        print(f"ERROR:\n{r.stdout}\n{r.stderr}")
+        sys.exit(1)
+    return r.stdout.strip()
+
+print("=== fix_estimate_ui.py ===")
+print("[1] git pull...")
+print(" ", run("git pull").split("\n")[0])
+
+TARGET = f"{ROOT}/src/app/(app)/estimates/new/EstimateNewClient.tsx"
+
+NEW_CLIENT = r'''// src/app/(app)/estimates/new/EstimateNewClient.tsx
 "use client"
 
 // HTTP環境（non-SecureContext）でも動くUUID生成
@@ -921,3 +939,34 @@ export default function EstimateNewClient({ materials, processingSpecs, userInfo
     </div>
   )
 }
+'''
+
+print("[2] ファイル書き込み...")
+with open(TARGET, "w", encoding="utf-8") as f:
+    f.write(NEW_CLIENT)
+print(f"  OK: {TARGET}")
+
+# tsc check
+print("[3] tsc チェック...")
+r = subprocess.run("npx tsc --noEmit 2>&1", shell=True, capture_output=True, text=True, cwd=ROOT)
+lines = [l for l in (r.stdout + r.stderr).splitlines()
+         if "error TS" in l and "node_modules" not in l and ".next" not in l and "Downloads" not in l]
+if lines:
+    print("  tscエラー:")
+    for l in lines:
+        print("   ", l)
+    sys.exit(1)
+print("  ✅ 実コードエラー0件")
+
+# git commit & push
+print("[4] git commit & push...")
+run("git add -A")
+r = subprocess.run(
+    'git commit -m "feat: 見積入力UI改善 — 列順入替/公差高さ修正/ENTERフォーカス/材料・仕上りサジェスト/標準公差面取り連動"',
+    shell=True, capture_output=True, text=True, cwd=ROOT)
+print(" ", r.stdout.strip().split("\n")[0])
+run("git push")
+print("  PUSH OK")
+
+print()
+print("✅ 完了! sudo systemctl restart ochi-web.service を実行してください")
