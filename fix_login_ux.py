@@ -1,4 +1,22 @@
-"use client"
+import subprocess, os, sys, base64, datetime
+
+ROOT = os.path.expanduser("~/projects/ochi-ss")
+os.chdir(ROOT)
+
+def run(cmd, check=True):
+    r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        print(f"ERROR: {cmd}\n{r.stdout}\n{r.stderr}")
+        sys.exit(1)
+    return r.stdout.strip()
+
+print("=== fix_login_ux.py ===")
+print("[1] git pull...")
+out = run("git pull")
+print(" ", out.split("\n")[0])
+
+# LoginClient.tsx 完全書き直し
+LOGIN_CLIENT = r'''"use client"
 import { useState, useRef, FormEvent, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -371,3 +389,31 @@ export default function LoginClient() {
     </div>
   )
 }
+'''
+
+TARGET = f"{ROOT}/src/app/(auth)/login/LoginClient.tsx"
+with open(TARGET, "w", encoding="utf-8") as f:
+    f.write(LOGIN_CLIENT)
+print(f"  OK: {TARGET}")
+
+# tsc check
+print("[2] tsc チェック...")
+r = subprocess.run("npx tsc --noEmit 2>&1", shell=True, capture_output=True, text=True, cwd=ROOT)
+lines = [l for l in (r.stdout + r.stderr).splitlines()
+         if "error TS" in l and "node_modules" not in l and ".next" not in l and "Downloads" not in l]
+if lines:
+    print("  tscエラー:")
+    for l in lines:
+        print("   ", l)
+    sys.exit(1)
+print("  ✅ 実コードエラー0件")
+
+# git commit & push
+print("[3] git commit & push...")
+run("git add -A")
+r = subprocess.run('git commit -m "fix: ログインエラーUI改善 — エラー種別ごとに明確なメッセージ表示"',
+                   shell=True, capture_output=True, text=True, cwd=ROOT)
+print(" ", r.stdout.strip().split("\n")[0])
+run("git push")
+print("  PUSH OK")
+print("✅ 完了!")
