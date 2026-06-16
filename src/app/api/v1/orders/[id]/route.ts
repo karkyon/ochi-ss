@@ -1,19 +1,21 @@
 // GET /api/v1/orders/[id] — 注文詳細取得
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getTenantCtx } from "@/lib/tenant-guard"
+import { withTenant } from "@/lib/with-tenant"
+import { audit } from "@/lib/audit-log"
 
 interface Props { params: Promise<{ id: string }> }
 
 export async function GET(req: NextRequest, { params }: Props) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { ctx, error } = await getTenantCtx()
+  if (error) return error
 
   const { id } = await params
   console.log("[GET /api/v1/orders/[id]]", id)
 
-  const order = await (prisma as any).order.findFirst({
-    where: { id, customerId: session.user.customerId!, isDeleted: false },
+  const order = await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
+    return (tx as any).order.findFirst({
+    where: { id, customerId: ctx.customerId, isDeleted: false },
     include: {
       estimateHeader: {
         include: {
@@ -22,10 +24,11 @@ export async function GET(req: NextRequest, { params }: Props) {
       },
       statusHistories:     { orderBy: { occurredAt: "asc" } },
       specChangeHistories: { orderBy: { occurredAt: "asc" } },
-    },
-  })
+    })
+  }) as any
 
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  audit({ customerId: ctx.customerId, userId: ctx.userId, action: "READ", resource: "orders", resourceId: id, req })
 
   const est = order.estimateHeader
 

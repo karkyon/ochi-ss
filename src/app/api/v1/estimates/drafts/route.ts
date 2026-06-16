@@ -10,18 +10,19 @@
 //  - 最大5件（降順）
 
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getTenantCtx } from "@/lib/tenant-guard"
+import { withTenant } from "@/lib/with-tenant"
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { ctx, error } = await getTenantCtx()
+  if (error) return error
 
   const now = new Date()
 
-  const drafts = await prisma.estimateHeader.findMany({
+  const drafts = await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
+    return (tx as any).estimateHeader.findMany({
     where: {
-      customerId:    session.user.customerId!,
+      customerId:    ctx.customerId,
       estimateStatus: "draft",
       // isDraftOnly=true に限定せず、draft ステータスのもの全件を対象にする
       // （自動保存 draft + 通常保存途中の両方をカバー）
@@ -45,7 +46,8 @@ export async function GET() {
         select: { id: true },
       },
     },
-  })
+    })
+  }) as any
 
   return NextResponse.json({
     drafts: drafts.map((d) => ({

@@ -1,18 +1,20 @@
 // GET /api/v1/orders/[id]/pdf — 注文書HTML出力
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getTenantCtx } from "@/lib/tenant-guard"
+import { withTenant } from "@/lib/with-tenant"
+import { audit } from "@/lib/audit-log"
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new NextResponse("Unauthorized", { status: 401 })
+  const { ctx, error } = await getTenantCtx()
+  if (error) return new NextResponse("Unauthorized", { status: 401 })
 
   const { id } = await params
-  const order = await prisma.order.findFirst({
-    where: { id, customerId: session.user.customerId! },
+  const order = await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
+    return (tx as any).order.findFirst({
+    where: { id, customerId: ctx.customerId },
     include: {
       estimateHeader: {
         include: {
@@ -23,6 +25,7 @@ export async function GET(
   })
   if (!order) return new NextResponse("Not Found", { status: 404 })
 
+  audit({ customerId: ctx.customerId, userId: ctx.userId, action: "EXPORT", resource: "pdf", resourceId: id, req })
   const estimate = order.estimateHeader as any
   const details  = estimate?.details ?? []
   const orderDate = order.orderDate

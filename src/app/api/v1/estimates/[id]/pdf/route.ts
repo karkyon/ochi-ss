@@ -1,27 +1,31 @@
 // GET /api/v1/estimates/[id]/pdf — 見積書HTML出力
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getTenantCtx } from "@/lib/tenant-guard"
+import { withTenant } from "@/lib/with-tenant"
+import { audit } from "@/lib/audit-log"
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new NextResponse("Unauthorized", { status: 401 })
-
+  const { ctx, error } = await getTenantCtx()
+  if (error) return new NextResponse("Unauthorized", { status: 401 })
   const { id } = await params
-  const estimate = await prisma.estimateHeader.findFirst({
-    where: { id, customerId: session.user.customerId!, isDeleted: false },
+  const estimate = await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
+    return (tx as any).estimateHeader.findFirst({
+    where: { id, customerId: ctx.customerId, isDeleted: false },
     include: {
       details: {
         where: { isDeleted: false },
         orderBy: { rowNo: "asc" },
       },
     },
-  })
+    })
+  }) as any
   if (!estimate) return new NextResponse("Not Found", { status: 404 })
 
+  audit({ customerId: ctx.customerId, userId: ctx.userId, action: "EXPORT", resource: "pdf", resourceId: id, req })
   const issueDate = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
   const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     .toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })

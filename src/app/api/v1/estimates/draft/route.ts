@@ -6,13 +6,14 @@
 // レスポンス 201: { estimateId, draftSavedAt, draftExpiresAt }
 
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { getTenantCtx } from "@/lib/tenant-guard"
+import { withTenant } from "@/lib/with-tenant"
+import { audit } from "@/lib/audit-log"
 import { Prisma } from "@prisma/client"
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { ctx, error } = await getTenantCtx()
+  if (error) return error
 
   let body: {
     headerPartial?: Record<string, unknown>
@@ -33,7 +34,8 @@ export async function POST(req: NextRequest) {
   const draftDeviceInfo = ua.length > 200 ? ua.slice(0, 200) : ua
 
   try {
-    const header = await prisma.estimateHeader.create({
+    const header = await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
+    return (tx as any).estimateHeader.create({
       data: {
         estimateNo:      null,
         estimateStatus:  "draft",
@@ -41,11 +43,11 @@ export async function POST(req: NextRequest) {
         draftExpiresAt,
         draftSavedAt:    now,
         draftDeviceInfo,
-        customerId:      session.user.customerId!,
-        customerCode:    session.user.companyCode ?? "",
-        customerName:    session.user.customerName ?? "",   // ← 必須フィールド
-        createdBy:       session.user.userId ?? "",
-        chargeName:      (hp.chargeName as string) ?? session.user.chargeName ?? null,
+        customerId:      ctx.customerId,
+        customerCode:    ctx.companyCode ?? "",
+        customerName:    "",   // ← 必須フィールド
+        createdBy:       ctx.userId ?? "",
+        chargeName:      (hp.chargeName as string) ?? ctx.userName ?? null,
         inputDate:       hp.inputDate ? new Date(hp.inputDate as string) : now,
         estimateDate:    hp.estimateDate ? new Date(hp.estimateDate as string) : now,
         requestNouki:    (hp.requestNouki as string) ?? null,
