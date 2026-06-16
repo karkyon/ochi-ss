@@ -582,8 +582,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   const formatted = normalizeZip(e.target.value)
                   if (formatted) { setDistZip(formatted); console.log("[郵便番号] onBlur整形:", formatted) }
                 }}
+                onFocus={e => { e.target.style.background = "#ffffcc"; e.target.style.borderColor = "#f59e0b" }}
                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleZip().then(() => focusById("f-distAddr")) } }}
-                placeholder="xxx-xxxx" {...FH} />
+                placeholder="xxx-xxxx" />
               <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "0 4px", height: "24px" }}
                 onClick={() => handleZip().then(() => focusById("f-distAddr"))}>検索</button>
             </div>
