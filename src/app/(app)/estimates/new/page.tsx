@@ -74,7 +74,7 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
   return (
     <EstimateNewClient
       materials={materials.map(m => ({ materialCode: m.materialCode, materialName: m.materialName ?? "" }))}
-      processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? "" }))}
+      processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? "", kakouShijiT: (s as any).kakouShijiT ?? "W", kakouShijiA: (s as any).kakouShijiA ?? "W", kakouShijiB: (s as any).kakouShijiB ?? "W" }))}
       cuttingMethods={[]}
       userInfo={{ customerId, customerCode, userName, companyName }}
       copySource={copySourceData}

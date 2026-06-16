@@ -290,6 +290,9 @@ model ProcessingSpec {
   id                 String   @id @default(uuid())
   processingSpecCode Int      @unique @map("processing_spec_code")
   processingSpecName String   @map("processing_spec_name")
+  kakouShijiT        String   @default("W") @map("kakou_shiji_t") // 厚み面デフォルト加工指示
+  kakouShijiA        String   @default("W") @map("kakou_shiji_a") // 巾面デフォルト加工指示
+  kakouShijiB        String   @default("W") @map("kakou_shiji_b") // 長さ面デフォルト加工指示
   syncedAt           DateTime @default(now()) @map("synced_at")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")

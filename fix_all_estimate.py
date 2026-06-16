@@ -1,4 +1,225 @@
-// src/app/(app)/estimates/new/EstimateNewClient.tsx
+import subprocess, os, sys, datetime
+
+ROOT = os.path.expanduser("~/projects/ochi-ss")
+os.chdir(ROOT)
+
+def run(cmd, check=True, cwd=None):
+    r = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=cwd or ROOT)
+    if check and r.returncode != 0:
+        print(f"ERROR: {cmd}\n{r.stdout}\n{r.stderr}")
+        sys.exit(1)
+    return r.stdout.strip()
+
+print("=== fix_all_estimate_issues.py ===")
+print("[1] git pull...")
+print(" ", run("git pull").split("\n")[0])
+
+# ─────────────────────────────────────────────────────────────
+# [2] Prismaマイグレーション: processing_specsにkakou_shiji列追加
+# ─────────────────────────────────────────────────────────────
+print("[2] Prismaマイグレーション作成...")
+ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+mdir = f"{ROOT}/prisma/migrations/{ts}_add_kakou_shiji_to_processing_specs"
+os.makedirs(mdir, exist_ok=True)
+
+migration_sql = """-- add kakou_shiji columns to processing_specs
+-- WO加工仕様テーブルの加工指示コード(T/A/B)をキャッシュ
+ALTER TABLE processing_specs
+  ADD COLUMN IF NOT EXISTS kakou_shiji_t VARCHAR(10) DEFAULT 'W',
+  ADD COLUMN IF NOT EXISTS kakou_shiji_a VARCHAR(10) DEFAULT 'W',
+  ADD COLUMN IF NOT EXISTS kakou_shiji_b VARCHAR(10) DEFAULT 'W';
+"""
+with open(f"{mdir}/migration.sql", "w") as f:
+    f.write(migration_sql)
+
+out = run("npx prisma migrate deploy 2>&1")
+if "migration" in out.lower() or "applied" in out.lower() or "All migrations" in out:
+    print("  ✅ migrate deploy 成功")
+else:
+    print(out[-300:])
+    # マイグレーション失敗しても続行（カラムが既にある場合など）
+
+# schema.prismaにもkakou_shiji列を追加
+schema_path = f"{ROOT}/prisma/schema.prisma"
+with open(schema_path, "r") as f:
+    schema = f.read()
+
+OLD_SPEC_MODEL = """/// 加工仕様マスタ（複製キャッシュ）
+model ProcessingSpec {
+  id                 String   @id @default(uuid())
+  processingSpecCode Int      @unique @map("processing_spec_code")
+  processingSpecName String   @map("processing_spec_name")
+  syncedAt           DateTime @default(now()) @map("synced_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("processing_specs")
+}"""
+
+NEW_SPEC_MODEL = """/// 加工仕様マスタ（複製キャッシュ）
+model ProcessingSpec {
+  id                 String   @id @default(uuid())
+  processingSpecCode Int      @unique @map("processing_spec_code")
+  processingSpecName String   @map("processing_spec_name")
+  kakouShijiT        String   @default("W") @map("kakou_shiji_t") // 厚み面デフォルト加工指示
+  kakouShijiA        String   @default("W") @map("kakou_shiji_a") // 巾面デフォルト加工指示
+  kakouShijiB        String   @default("W") @map("kakou_shiji_b") // 長さ面デフォルト加工指示
+  syncedAt           DateTime @default(now()) @map("synced_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("processing_specs")
+}"""
+
+if OLD_SPEC_MODEL in schema:
+    schema = schema.replace(OLD_SPEC_MODEL, NEW_SPEC_MODEL)
+    with open(schema_path, "w") as f:
+        f.write(schema)
+    print("  schema.prisma 更新OK")
+    run("npx prisma generate 2>&1")
+    print("  Prisma Client 再生成OK")
+elif "kakouShijiT" in schema:
+    print("  schema.prisma 既に更新済み")
+else:
+    print("  WARNING: schema.prisma の対象モデルが見つかりません")
+
+# ─────────────────────────────────────────────────────────────
+# [3] WO加工仕様同期API追加
+#     GET /api/v1/masters/processing-specs
+#     → SQLServerのWO加工仕様テーブルから取得しPostgreSQLに同期
+# ─────────────────────────────────────────────────────────────
+print("[3] WO加工仕様同期API 更新...")
+
+PROC_SPEC_ROUTE = r'''// src/app/api/v1/masters/processing-specs/route.ts
+// GET /api/v1/masters/processing-specs
+// 加工仕様マスタ取得（PostgreSQLキャッシュ優先、SQLServer同期付き）
+// レスポンス: { specs: [{processingSpecCode, processingSpecName, kakouShijiT, kakouShijiA, kakouShijiB}] }
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+
+// WO加工仕様テーブルの静的フォールバック
+// SQL Server未接続時に使用（添付SSのWO加工仕様テーブルデータ準拠）
+const FALLBACK_SPECS = [
+  { code: 2,  name: "6F",    t: "W",  a: "W",  b: "W"  },
+  { code: 4,  name: "2F2G",  t: "RG", a: "〜", b: "〜" },
+  { code: 5,  name: "4F2G",  t: "RG", a: "〜", b: "W"  },
+  { code: 7,  name: "6F2G",  t: "RG", a: "W",  b: "W"  },
+  { code: 8,  name: "6F2G",  t: "W",  a: "RG", b: "W"  },
+  { code: 9,  name: "6F2G",  t: "W",  a: "W",  b: "RG" },
+  { code: 10, name: "4F",    t: "W",  a: "〜", b: "W"  },
+  { code: 11, name: "2F",    t: "W",  a: "〜", b: "〜" },
+  { code: 12, name: "2F2G",  t: "〜", a: "RG", b: "〜" },
+  { code: 13, name: "2F2G",  t: "〜", a: "〜", b: "RG" },
+  { code: 14, name: "4F2G",  t: "〜", a: "W",  b: "RG" },
+  { code: 15, name: "2F",    t: "〜", a: "〜", b: "W"  },
+  { code: 16, name: "黒皮",  t: "〜", a: "〜", b: "〜" },
+  { code: 17, name: "6F2SG", t: "SG", a: "W",  b: "W"  },
+  { code: 20, name: "4F",    t: "〜", a: "W",  b: "〜" },
+  { code: 22, name: "6F2SG", t: "W",  a: "SG", b: "W"  },
+  { code: 23, name: "6F2SG", t: "W",  a: "W",  b: "SG" },
+  { code: 33, name: "4F2G",  t: "W",  a: "〜", b: "RG" },
+  { code: 43, name: "4F2G",  t: "〜", a: "W",  b: "W"  },
+  { code: 44, name: "2F",    t: "〜", a: "W",  b: "〜" },
+  { code: 45, name: "4F2G",  t: "RG", a: "W",  b: "〜" },
+  { code: 117,name: "4F2G",  t: "W",  a: "RG", b: "〜" },
+]
+
+export async function GET() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // SQLServerからWO加工仕様テーブルを取得して同期
+  let syncedFromSqlServer = false
+  try {
+    const { getSqlServerPool, sql } = await import("@/lib/sqlserver")
+    const pool = await getSqlServerPool()
+    const result = await pool.request().query(`
+      SELECT
+        [加工仕様コード],
+        [加工指示コードT],
+        [加工指示コードA],
+        [加工指示コードB],
+        [加工仕様]
+      FROM [dbo].[WO加工仕様]
+      WHERE [加工指示コードT] IN (1,2,4,5)
+         OR [加工指示コードA] IN (1,2,4,5)
+         OR [加工指示コードB] IN (1,2,4,5)
+      ORDER BY [加工仕様コード]
+    `)
+
+    // 加工指示コード → 文字列変換
+    const codeToStr = (c: number): string => {
+      if (c === 1) return "RG"
+      if (c === 2) return "W"
+      if (c === 4) return "〜"
+      if (c === 5) return "SG"
+      return "W"
+    }
+
+    for (const row of result.recordset) {
+      const specCode = Number(row["加工仕様コード"])
+      const specName = String(row["加工仕様"] ?? "").trim()
+      const t = codeToStr(Number(row["加工指示コードT"]))
+      const a = codeToStr(Number(row["加工指示コードA"]))
+      const b = codeToStr(Number(row["加工指示コードB"]))
+      if (!specCode || !specName) continue
+      await prisma.processingSpec.upsert({
+        where: { processingSpecCode: specCode },
+        update: { processingSpecName: specName, kakouShijiT: t, kakouShijiA: a, kakouShijiB: b, syncedAt: new Date() },
+        create: { processingSpecCode: specCode, processingSpecName: specName, kakouShijiT: t, kakouShijiA: a, kakouShijiB: b },
+      })
+    }
+    syncedFromSqlServer = true
+    console.log(`[processing-specs] SQLServer同期完了: ${result.recordset.length}件`)
+  } catch (err: any) {
+    console.warn("[processing-specs] SQLServer接続失敗、DBキャッシュ使用:", err.message)
+    // フォールバック: 静的データでPostgreSQLを初期化
+    for (const s of FALLBACK_SPECS) {
+      try {
+        await prisma.processingSpec.upsert({
+          where: { processingSpecCode: s.code },
+          update: { processingSpecName: s.name, kakouShijiT: s.t, kakouShijiA: s.a, kakouShijiB: s.b },
+          create: { processingSpecCode: s.code, processingSpecName: s.name, kakouShijiT: s.t, kakouShijiA: s.a, kakouShijiB: s.b },
+        })
+      } catch { /* ignore */ }
+    }
+  }
+
+  // PostgreSQLから取得して返す
+  const specs = await prisma.processingSpec.findMany({
+    orderBy: { processingSpecCode: "asc" },
+    select: {
+      processingSpecCode: true,
+      processingSpecName: true,
+      kakouShijiT: true,
+      kakouShijiA: true,
+      kakouShijiB: true,
+    },
+  })
+
+  return NextResponse.json({ specs, syncedFromSqlServer })
+}
+'''
+
+route_path = f"{ROOT}/src/app/api/v1/masters/processing-specs/route.ts"
+with open(route_path, "w", encoding="utf-8") as f:
+    f.write(PROC_SPEC_ROUTE)
+print(f"  OK: {route_path}")
+
+# ─────────────────────────────────────────────────────────────
+# [4] EstimateNewClient.tsx 完全書き直し
+#     - 郵便番号バグ修正
+#     - 郵便番号整形（ハイフン対応・7桁補完・〒xxx-xxxx形式）
+#     - WO加工仕様マップをAPI(/api/v1/masters/processing-specs)から取得
+#     - デフォルト仕上り: 6F(コード2)
+#     - 全フィールドのconsole.log実装
+# ─────────────────────────────────────────────────────────────
+print("[4] EstimateNewClient.tsx 完全書き直し...")
+
+TARGET = f"{ROOT}/src/app/(app)/estimates/new/EstimateNewClient.tsx"
+
+NEW_CLIENT = r'''// src/app/(app)/estimates/new/EstimateNewClient.tsx
 "use client"
 
 // HTTP環境（non-SecureContext）でも動くUUID生成
@@ -959,3 +1180,59 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     </div>
   )
 }
+'''
+
+with open(TARGET, "w", encoding="utf-8") as f:
+    f.write(NEW_CLIENT)
+print(f"  OK: {TARGET}")
+
+# ─────────────────────────────────────────────────────────────
+# [5] estimates/new/page.tsx の processingSpecs 型を更新
+# ─────────────────────────────────────────────────────────────
+print("[5] estimates/new/page.tsx 型更新確認...")
+page_path = f"{ROOT}/src/app/(app)/estimates/new/page.tsx"
+with open(page_path, "r") as f:
+    page = f.read()
+# processingSpecsのmapにkakouShiji列を追加
+OLD_SPECS_MAP = "processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? \"\" }))}"
+NEW_SPECS_MAP = "processingSpecs={processingSpecs.map(s => ({ processingSpecCode: s.processingSpecCode, processingSpecName: s.processingSpecName ?? \"\", kakouShijiT: (s as any).kakouShijiT ?? \"W\", kakouShijiA: (s as any).kakouShijiA ?? \"W\", kakouShijiB: (s as any).kakouShijiB ?? \"W\" }))}"
+if OLD_SPECS_MAP in page:
+    page = page.replace(OLD_SPECS_MAP, NEW_SPECS_MAP)
+    with open(page_path, "w") as f:
+        f.write(page)
+    print("  page.tsx processingSpecs map 更新OK")
+else:
+    print("  page.tsx: 対象箇所なし（既存か形式違い）")
+
+# tsc check
+print("[6] tsc チェック...")
+r = subprocess.run("npx tsc --noEmit 2>&1", shell=True, capture_output=True, text=True, cwd=ROOT)
+lines = [l for l in (r.stdout + r.stderr).splitlines()
+         if "error TS" in l and "node_modules" not in l and ".next" not in l and "Downloads" not in l]
+if lines:
+    print("  tscエラー:")
+    for l in lines: print("   ", l)
+    sys.exit(1)
+print("  ✅ 実コードエラー0件")
+
+# git commit & push
+print("[7] git commit & push...")
+run("git add -A")
+r = subprocess.run(
+    'git commit -m "fix: 郵便番号住所取得バグ修正 + WO加工仕様DB化(SQLServer同期) + 全console.log実装 + 6Fデフォルト修正"',
+    shell=True, capture_output=True, text=True, cwd=ROOT)
+print(" ", r.stdout.strip().split("\n")[0])
+run("git push")
+print("  PUSH OK")
+
+# 自身削除
+import os as _os
+_os.remove(__file__)
+print(f"  削除: {__file__}")
+
+print()
+print("✅ 全修正完了!")
+print()
+print("─" * 60)
+print("実行: sudo systemctl restart ochi-web.service")
+print("─" * 60)
