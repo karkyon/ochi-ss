@@ -161,10 +161,10 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   // 表示はこの文字列バッファで保持し、blur時にのみ form へ数値反映する。
   type TolKey = "toleranceTUp" | "toleranceTDown" | "toleranceAUp" | "toleranceADown" | "toleranceBUp" | "toleranceBDown" | "mentori4" | "mentori8"
   const [tolInputs, setTolInputs] = useState<Record<TolKey, string>>({
-    toleranceTUp: "0", toleranceTDown: "0",
-    toleranceAUp: "0", toleranceADown: "0",
-    toleranceBUp: "0", toleranceBDown: "0",
-    mentori4: "0", mentori8: "0",
+    toleranceTUp: "0.00", toleranceTDown: "0.00",
+    toleranceAUp: "0.00", toleranceADown: "0.00",
+    toleranceBUp: "0.00", toleranceBDown: "0.00",
+    mentori4: "0.0", mentori8: "0.0",
   })
   // form側の数値が外部要因（標準公差/標準面取/新規/クリア/コピー読込）で
   // 変化した場合に、表示文字列バッファを追従させる
@@ -185,7 +185,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       for (const [key, numVal] of pairs) {
         const currentParsed = parseFloat(prev[key])
         if (Number.isNaN(currentParsed) || currentParsed !== numVal) {
-          next[key] = String(numVal)
+          const digits = key.startsWith("mentori") ? 1 : 2
+          next[key] = numVal.toFixed(digits)
           changed = true
         }
       }
@@ -209,11 +210,15 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       setForm(f => ({ ...f, [key]: parsed }))
     }
   }, [])
-  // blur時: 文字列バッファを正規化（空や不正値は"0"に戻す）
+  // blur時: 文字列バッファを正規化。
+  // 公差(toleranceXxx)は小数第2位固定、面取り(mentoriXxx)は小数第1位固定で
+  // 表示する（"1.0"が"1"に省略される、"0.10"が"0.1"に省略される、等を防止）。
   const makeTolBlur = useCallback((key: TolKey) => () => {
     setTolInputs(prev => {
       const parsed = parseFloat(prev[key])
-      const normalized = Number.isNaN(parsed) ? "0" : String(parsed)
+      if (Number.isNaN(parsed)) return { ...prev, [key]: key.startsWith("mentori") ? "0.0" : "0.00" }
+      const digits = key.startsWith("mentori") ? 1 : 2
+      const normalized = parsed.toFixed(digits)
       return { ...prev, [key]: normalized }
     })
   }, [])
@@ -407,12 +412,20 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       console.log("[handleCalculate] レスポンスBody:", JSON.stringify(data, null, 2))
       console.log("====================================================")
       if (!res.ok) throw new Error(data.error ?? "計算APIエラー " + res.status)
+      // route.ts の実レスポンス構造: { unitPrice, sumPrice, shortestDelivery, deliveryDeadline }
+      // 旧コードは存在しないフィールド(totalPrice/deliveryDate/fastDeliveryDate等)を
+      // 参照していたため、送料込みプレート金額・最短納期が常に未設定だった。
+      if (!data.shortestDelivery) {
+        console.warn("[handleCalculate] shortestDelivery が空文字。SP側で当該組合せの納期が算出されなかった可能性があります。")
+      }
       setForm(f => ({
         ...f,
-        unitPrice: data.unitPrice, totalPrice: data.totalPrice,
-        deliveryDate: data.deliveryDate, deliveryDeadline: data.deliveryDeadline,
-        fastDeliveryDate: data.fastDeliveryDate ?? data.deliveryDate,
-        fastDeliveryDeadline: data.fastDeliveryDeadline ?? data.deliveryDeadline,
+        unitPrice: data.unitPrice,
+        totalPrice: data.sumPrice,
+        deliveryDate: data.shortestDelivery || undefined,
+        deliveryDeadline: data.deliveryDeadline,
+        fastDeliveryDate: data.shortestDelivery || undefined,
+        fastDeliveryDeadline: data.deliveryDeadline ?? undefined,
         calculated: true,
       }))
       setTimeout(() => focusById("btn-add"), 50)
@@ -435,6 +448,50 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const matName = materials.find(x => x.materialCode === m)?.materialName ?? ""
     setForm({ ...newForm(), materialCode: m })
     setMatSuggest(matName); setSpecSuggest("")
+    setTimeout(() => focusById("f-mat-suggest"), 50)
+  }
+  // ── 明細行 編集 ──
+  // 過去実装(リデザイン前)で存在していたが全画面リデザイン時に欠落していた機能。
+  // 対象行の内容をフォームへ復元し、一覧からは一旦削除する
+  // （再計算→「明細に追加」で一覧に戻す流れ）。
+  const handleEditDetail = (id: string) => {
+    const target = details.find(d => d.clientDetailId === id)
+    if (!target) return
+    console.log("[handleEditDetail] 編集対象:", JSON.stringify(target, null, 2))
+    setForm({ ...target, calculated: false })
+    setTolInputs({
+      toleranceTUp: target.toleranceTUp.toFixed(2), toleranceTDown: target.toleranceTDown.toFixed(2),
+      toleranceAUp: target.toleranceAUp.toFixed(2), toleranceADown: target.toleranceADown.toFixed(2),
+      toleranceBUp: target.toleranceBUp.toFixed(2), toleranceBDown: target.toleranceBDown.toFixed(2),
+      mentori4: target.mentori4.toFixed(1), mentori8: target.mentori8.toFixed(1),
+    })
+    const matName = materials.find(m => m.materialCode === target.materialCode)?.materialName ?? target.materialCode
+    setMatSuggest(matName)
+    setSpecSuggest(target.shiagari)
+    setDetails(p => p.filter(d => d.clientDetailId !== id))
+    setSelectedIds(p => { const n = new Set(p); n.delete(id); return n })
+    window.scrollTo({ top: 0, behavior: "smooth" })
+    setTimeout(() => focusById("f-mat-suggest"), 50)
+  }
+  // ── 明細行 複写 ──
+  // 一覧の行はそのまま残し、内容をフォームへコピーする（新規UUIDを振り直す）。
+  // ユーザーは複写内容を必要に応じて変更し、再計算→「明細に追加」で
+  // 別行として一覧に追加できる。
+  const handleDuplicateDetail = (id: string) => {
+    const target = details.find(d => d.clientDetailId === id)
+    if (!target) return
+    console.log("[handleDuplicateDetail] 複写対象:", JSON.stringify(target, null, 2))
+    setForm({ ...target, clientDetailId: generateUUID(), calculated: false })
+    setTolInputs({
+      toleranceTUp: target.toleranceTUp.toFixed(2), toleranceTDown: target.toleranceTDown.toFixed(2),
+      toleranceAUp: target.toleranceAUp.toFixed(2), toleranceADown: target.toleranceADown.toFixed(2),
+      toleranceBUp: target.toleranceBUp.toFixed(2), toleranceBDown: target.toleranceBDown.toFixed(2),
+      mentori4: target.mentori4.toFixed(1), mentori8: target.mentori8.toFixed(1),
+    })
+    const matName = materials.find(m => m.materialCode === target.materialCode)?.materialName ?? target.materialCode
+    setMatSuggest(matName)
+    setSpecSuggest(target.shiagari)
+    window.scrollTo({ top: 0, behavior: "smooth" })
     setTimeout(() => focusById("f-mat-suggest"), 50)
   }
   const handleDel = (id: string) => {
@@ -1038,7 +1095,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.unitPrice != null ? "¥" + d.unitPrice.toLocaleString() : "—"}</td>
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.totalPrice != null ? "¥" + d.totalPrice.toLocaleString() : "—"}</td>
                 <td style={{ ...TD, textAlign: "center" }}>
-                  <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleDel(d.clientDetailId)}>削除</button>
+                  <div style={{ display: "flex", gap: "3px", justifyContent: "center" }}>
+                    <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleEditDetail(d.clientDetailId)}>編集</button>
+                    <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleDuplicateDetail(d.clientDetailId)}>複写</button>
+                    <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleDel(d.clientDetailId)}>削除</button>
+                  </div>
                 </td>
               </tr>
             ))}

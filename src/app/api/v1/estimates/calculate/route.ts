@@ -254,14 +254,19 @@ export async function POST(req: NextRequest) {
       TyokusousakiPost: body.tyokusousakiPost ?? "", TyokusousakiCharge: body.tyokusousakiCharge ?? "",
       EditMode: body.editMode,
     }
-    console.log("========== [calculate] SP実行直前: 全送信パラメータ ==========")
-    console.log(JSON.stringify(spParams, null, 2))
-    console.log("================================================================")
-    const result = await request.execute("usp_ASP_EstimateAmountCalculation_get")
+    const SP_NAME = "usp_ASP_EstimateAmountCalculation_get"
+    console.log("========== [calculate] SP実行直前 ==========")
+    console.log("[calculate] 実行ストアドプロシージャ名:", SP_NAME)
+    console.log("[calculate] 全送信パラメータ(85項目):", JSON.stringify(spParams, null, 2))
+    console.log("================================================")
+    const result = await request.execute(SP_NAME)
     // ── SP実行結果(OUTPUT全項目)をログ出力（デバッグ用）──
-    console.log("========== [calculate] SP実行結果: OUTPUT全項目 ==========")
-    console.log(JSON.stringify(result.output, null, 2))
-    console.log("=============================================================")
+    console.log("========== [calculate] SP実行結果 ==========")
+    console.log("[calculate] 実行済みストアドプロシージャ名:", SP_NAME)
+    console.log("[calculate] OUTPUT全項目:", JSON.stringify(result.output, null, 2))
+    console.log("[calculate] recordsets件数:", result.recordsets?.length ?? 0)
+    console.log("[calculate] rowsAffected:", JSON.stringify(result.rowsAffected))
+    console.log("================================================")
 
     const out = result.output
     const unitPrice: number    = Number(out["UnitPrice"]      ?? 0)
