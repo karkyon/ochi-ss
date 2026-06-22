@@ -814,7 +814,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
           </thead>
           <tbody>
             <tr>
-              <td style={{ ...TD, textAlign: "center", color: "#94a3b8", fontSize: "10px" }}>—</td>
+              <td style={{ ...TD, textAlign: "center", color: editingDetailId ? "#92400e" : "#94a3b8", fontSize: "10px", fontWeight: editingDetailId ? 700 : 400, background: editingDetailId ? "#fef3c7" : "transparent" }}>
+                {editingDetailId
+                  ? (() => {
+                      const idx = details.findIndex(d => d.clientDetailId === editingDetailId)
+                      return idx >= 0 ? idx + 1 : "—"
+                    })()
+                  : "—"}
+              </td>
 
               {/* 材料: サジェスト */}
               <td style={TD}>
