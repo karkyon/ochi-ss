@@ -223,6 +223,10 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     })
   }, [])
   const [details, setDetails] = useState<DetailForm[]>([])
+  // 編集中の明細ID。nullなら新規追加モード、値があれば「その行を編集中」で
+  // 「明細に追加」ボタンが「明細を更新」に変わり、更新時は該当行を
+  // 配列内の同じ位置で上書きする（削除して末尾に追加、ではない）。
+  const [editingDetailId, setEditingDetailId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [saving, setSaving]   = useState(false)
   const [saveMsg, setSaveMsg] = useState("")
@@ -440,10 +444,20 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     }
   }
 
+  // 「明細に追加」(新規)と「明細を更新」(編集中)を統合したハンドラ。
+  // editingDetailId が設定されていれば、details配列内の該当行を
+  // 同じ位置でフォーム内容に上書きする（編集前の行順・Noを維持）。
+  // 未設定なら末尾に新規追加する（従来通り）。
   const handleAdd = () => {
     if (!form.calculated) return
-    console.log("[handleAdd] 明細追加:", JSON.stringify(form, null, 2))
-    setDetails(p => [...p, { ...form }])
+    if (editingDetailId) {
+      console.log("[handleAdd] 明細更新 id:", editingDetailId, JSON.stringify(form, null, 2))
+      setDetails(p => p.map(d => d.clientDetailId === editingDetailId ? { ...form, clientDetailId: editingDetailId } : d))
+      setEditingDetailId(null)
+    } else {
+      console.log("[handleAdd] 明細追加:", JSON.stringify(form, null, 2))
+      setDetails(p => [...p, { ...form }])
+    }
     const m = form.materialCode
     const matName = materials.find(x => x.materialCode === m)?.materialName ?? ""
     setForm({ ...newForm(), materialCode: m })
@@ -451,13 +465,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     setTimeout(() => focusById("f-mat-suggest"), 50)
   }
   // ── 明細行 編集 ──
-  // 過去実装(リデザイン前)で存在していたが全画面リデザイン時に欠落していた機能。
-  // 対象行の内容をフォームへ復元し、一覧からは一旦削除する
-  // （再計算→「明細に追加」で一覧に戻す流れ）。
+  // 対象行は一覧にそのまま残し、内容をフォームへ復元するのみ。
+  // editingDetailId をセットすることで「明細に追加」ボタンが
+  // 「明細を更新」に変わり、再計算後の更新時に該当行を同じ位置で
+  // 上書きする（削除して再追加ではない）。
   const handleEditDetail = (id: string) => {
     const target = details.find(d => d.clientDetailId === id)
     if (!target) return
-    console.log("[handleEditDetail] 編集対象:", JSON.stringify(target, null, 2))
+    console.log("[handleEditDetail] 編集対象 id:", id, JSON.stringify(target, null, 2))
     setForm({ ...target, calculated: false })
     setTolInputs({
       toleranceTUp: target.toleranceTUp.toFixed(2), toleranceTDown: target.toleranceTDown.toFixed(2),
@@ -468,8 +483,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const matName = materials.find(m => m.materialCode === target.materialCode)?.materialName ?? target.materialCode
     setMatSuggest(matName)
     setSpecSuggest(target.shiagari)
-    setDetails(p => p.filter(d => d.clientDetailId !== id))
-    setSelectedIds(p => { const n = new Set(p); n.delete(id); return n })
+    setEditingDetailId(id)
     window.scrollTo({ top: 0, behavior: "smooth" })
     setTimeout(() => focusById("f-mat-suggest"), 50)
   }
@@ -481,6 +495,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const target = details.find(d => d.clientDetailId === id)
     if (!target) return
     console.log("[handleDuplicateDetail] 複写対象:", JSON.stringify(target, null, 2))
+    // 複写は常に新規追加扱い（編集モードではない）
+    setEditingDetailId(null)
     setForm({ ...target, clientDetailId: generateUUID(), calculated: false })
     setTolInputs({
       toleranceTUp: target.toleranceTUp.toFixed(2), toleranceTDown: target.toleranceTDown.toFixed(2),
@@ -611,7 +627,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         <div style={{ fontWeight: 700, fontSize: "13px", color: "#1e3a5f" }}>お見積り入力</div>
         <div style={{ display: "flex", gap: "6px" }}>
           <button className="btn-ochi btn-outline" style={{ fontSize: "11px" }}
-            onClick={() => { console.log("[新規] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest("") }}>新規</button>
+            onClick={() => { console.log("[新規] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setEditingDetailId(null) }}>新規</button>
           <button className="btn-ochi btn-primary" style={{ fontSize: "11px" }}
             onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "この見積りを保存"}</button>
           <button className="btn-ochi" style={{ fontSize: "11px", background: "#92400e", color: "#fff" }}
@@ -754,7 +770,13 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       </div>
 
       {/* ─── 見積明細編集 ─── */}
-      <div style={{ fontSize: "11px", fontWeight: 600, background: "#d8e9f5", color: "#1e3a5f", padding: "3px 8px", borderRadius: "4px 4px 0 0", marginTop: "8px" }}>見積明細編集</div>
+      <div style={{ fontSize: "11px", fontWeight: 600, background: editingDetailId ? "#fef3c7" : "#d8e9f5", color: editingDetailId ? "#92400e" : "#1e3a5f", padding: "3px 8px", borderRadius: "4px 4px 0 0", marginTop: "8px" }}>
+        見積明細編集
+        {editingDetailId && (() => {
+          const idx = details.findIndex(d => d.clientDetailId === editingDetailId)
+          return idx >= 0 ? ` — No.${idx + 1} を編集中` : null
+        })()}
+      </div>
       <div style={{ overflowX: "auto", border: "1px solid #e2e8f0" }}>
         <datalist id="dl-materials">
           {materials.map(m => <option key={m.materialCode} value={m.materialName || m.materialCode} />)}
@@ -1026,13 +1048,13 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                     📊 見積計算
                   </button>
                   <button id="btn-add" className="btn-ochi btn-primary"
-                    style={{ fontSize: "11px", minWidth: "90px", background: form.calculated ? "#16a34a" : "#94a3b8", cursor: form.calculated ? "pointer" : "not-allowed" }}
+                    style={{ fontSize: "11px", minWidth: "90px", background: form.calculated ? (editingDetailId ? "#d97706" : "#16a34a") : "#94a3b8", cursor: form.calculated ? "pointer" : "not-allowed" }}
                     onClick={handleAdd} disabled={!form.calculated}
                     onKeyDown={e => { if (e.key === "Enter" && form.calculated) { e.preventDefault(); handleAdd() } }}>
-                    ＋ 明細に追加
+                    {editingDetailId ? "✓ 明細を更新" : "＋ 明細に追加"}
                   </button>
                   <button className="btn-ochi btn-outline" style={{ fontSize: "11px" }}
-                    onClick={() => { console.log("[クリア] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setTimeout(() => focusById("f-mat-suggest"), 50) }}>
+                    onClick={() => { console.log("[クリア] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setEditingDetailId(null); setTimeout(() => focusById("f-mat-suggest"), 50) }}>
                     クリア
                   </button>
                 </div>
