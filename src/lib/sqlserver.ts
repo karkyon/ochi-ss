@@ -16,14 +16,33 @@
 //    プロセスシングルトンで管理
 // ============================================================
 
-import * as mssql from "mssql"
+import * as mssqlModule from "mssql"
+
+// ────────────────────────────────────────────────
+// HMR対策: mssqlモジュール参照のプロセス内固定化
+// Next.js dev環境のHMRでAPI Route群が再バンドルされると、
+// `import * as mssql from "mssql"` が複数チャンクで個別に require され、
+// mssql内部 tedious/request.js の TYPES厳密等価比較(===)が破綻し
+// "parameter.type.validate is not a function" が発生する。
+// global に保持した単一インスタンスを常に再利用することで回避する。
+// ────────────────────────────────────────────────
+declare global {
+  // eslint-disable-next-line no-var
+  var __mssqlModule: typeof mssqlModule | undefined
+}
+
+if (!global.__mssqlModule) {
+  global.__mssqlModule = mssqlModule
+}
+
+const mssql = global.__mssqlModule
 
 export { mssql as sql }
 
 // ────────────────────────────────────────────────
 // 接続文字列パーサー
 // ────────────────────────────────────────────────
-function parseConnectionString(connStr: string): mssql.config {
+function parseConnectionString(connStr: string): mssqlModule.config {
   const params: Record<string, string> = {}
   connStr.split(";").forEach((part) => {
     const idx = part.indexOf("=")
@@ -63,10 +82,10 @@ function parseConnectionString(connStr: string): mssql.config {
 declare global {
   // Next.js の HMR でも再利用できるように global に保持
   // eslint-disable-next-line no-var
-  var __sqlPool: mssql.ConnectionPool | undefined
+  var __sqlPool: mssqlModule.ConnectionPool | undefined
 }
 
-export async function getSqlServerPool(): Promise<mssql.ConnectionPool> {
+export async function getSqlServerPool(): Promise<mssqlModule.ConnectionPool> {
   if (global.__sqlPool && global.__sqlPool.connected) {
     return global.__sqlPool
   }
