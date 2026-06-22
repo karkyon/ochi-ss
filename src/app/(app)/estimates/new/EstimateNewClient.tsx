@@ -384,16 +384,28 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       mentori4: form.mentori4, mentori8: form.mentori8,
       quantity: form.quantity,
     }
-    console.log("[handleCalculate] リクエスト:", JSON.stringify(payload, null, 2))
+    const url = "/api/v1/estimates/calculate"
+    console.log("========== [handleCalculate] REQUEST ==========")
+    console.log("[handleCalculate] URL:", url, "METHOD: POST")
+    console.log("[handleCalculate] payload全内容:", JSON.stringify(payload, null, 2))
+    console.log("==================================================")
     if (!form.materialCode || !form.kakouShiyouCode) { alert("材料と加工仕様を選択してください"); return }
     if (!form.sizeT || !form.sizeB || !form.sizeA) { alert("寸法T・巾・長さを入力してください"); return }
     try {
-      const res = await fetch("/api/v1/estimates/calculate", {
+      const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
-      const data = await res.json()
-      console.log("[handleCalculate] レスポンス:", JSON.stringify(data, null, 2))
+      const resHeaders: Record<string, string> = {}
+      res.headers.forEach((v, k) => { resHeaders[k] = v })
+      let data: any
+      const rawText = await res.text()
+      try { data = JSON.parse(rawText) } catch { data = { rawText } }
+      console.log("========== [handleCalculate] RESPONSE ==========")
+      console.log("[handleCalculate] HTTPステータス:", res.status, res.statusText)
+      console.log("[handleCalculate] レスポンスヘッダー:", JSON.stringify(resHeaders, null, 2))
+      console.log("[handleCalculate] レスポンスBody:", JSON.stringify(data, null, 2))
+      console.log("====================================================")
       if (!res.ok) throw new Error(data.error ?? "計算APIエラー " + res.status)
       setForm(f => ({
         ...f,
@@ -405,7 +417,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       }))
       setTimeout(() => focusById("btn-add"), 50)
     } catch (e: any) {
-      console.error("[handleCalculate] エラー:", e.message)
+      console.error("========== [handleCalculate] エラー全詳細 ==========")
+      console.error("name:", e?.name)
+      console.error("message:", e?.message)
+      console.error("stack:", e?.stack)
+      try { console.error("全プロパティ:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2)) } catch { /* noop */ }
+      console.error("=======================================================")
       alert("見積計算に失敗しました: " + e.message)
     }
   }

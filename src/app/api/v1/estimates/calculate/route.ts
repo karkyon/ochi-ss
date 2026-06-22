@@ -71,6 +71,11 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
+  // ── REQ全内容をサーバーログに出力（デバッグ用）──
+  console.log("========== [calculate] REQUEST受信 ==========")
+  console.log("[calculate] URL:", req.url)
+  console.log("[calculate] body全内容:", JSON.stringify(body, null, 2))
+  console.log("===============================================")
 
   const errors: string[] = []
   if (!body.materialCode)    errors.push("materialCode は必須です")
@@ -202,19 +207,33 @@ export async function POST(req: NextRequest) {
     request.output("Prefectures_OUT",     sql.VarChar(20))
     request.output("Coefficient_OUT",     sql.Decimal(3, 1))
 
-    console.log("[calculate] SP送信パラメータ:", {
-      materialCode: body.materialCode,
-      kakouShiyouCode: body.kakouShiyouCode,
-      kakouT: body.kakouT,
-      kakouShijiCodeT: body.kakouShijiCodeT,
-      kakouA: body.kakouA,
-      kakouShijiCodeA: body.kakouShijiCodeA,
-      kakouB: body.kakouB,
-      kakouShijiCodeB: body.kakouShijiCodeB,
-      sizeT: body.sizeT, sizeA: body.sizeA, sizeB: body.sizeB,
-      quantity: body.quantity,
-    })
+    // ── SPに渡す全パラメータ(85項目)をログ出力（デバッグ用）──
+    const spParams = {
+      SessionID: sessionId, RowID: body.rowId ?? 0, WOEstimateNo: body.estOrderNo ?? "",
+      ZairyouCd: body.materialCode, ZairyouName: body.materialName ?? "",
+      KakouShiyouCd: body.kakouShiyouCode, KakouShiyou: body.kakouShiyou ?? "",
+      Kakou_T: body.kakouShijiCodeT ?? "", Kakou_A: body.kakouShijiCodeA ?? "", Kakou_B: body.kakouShijiCodeB ?? "",
+      KakouShijiCd_T: body.kakouShijiCodeT ?? "", KakouShijiCd_A: body.kakouShijiCodeA ?? "", KakouShijiCd_B: body.kakouShijiCodeB ?? "",
+      Size_T: body.sizeT, Size_A: body.sizeA, Size_B: body.sizeB,
+      Kousa_T_U: body.kousaTUpper ?? 0, Kousa_A_U: body.kousaAUpper ?? 0, Kousa_B_U: body.kousaBUpper ?? 0,
+      Kousa_T_L: body.kousaTLower ?? 0, Kousa_A_L: body.kousaALower ?? 0, Kousa_B_L: body.kousaBLower ?? 0,
+      MentoriShiji: body.mentoriShiji ?? "", Mentori_4: body.mentori4 ?? 0, Mentori_8: body.mentori8 ?? 0,
+      Suryou: body.quantity, RequestPrice: 0, RequestNouki: body.requestNouki ?? "",
+      CustomerNo: body.customerNo ?? "", EndUserNo: body.endUserNo ?? "", Refer: "",
+      TokuisakiCd: tokuisakiCd, EndUserCd: body.endUserCd ?? "",
+      TyokusousakiCd: body.tyokusousakiCd ?? "", TyokusousakiName: body.tyokusousakiName ?? "",
+      TyokusousakiZipCd: body.tyokusousakiYubin ?? "", TyokusousakiAddr: body.tyokusousakiAddress ?? "",
+      TyokusousakiPost: body.tyokusousakiPost ?? "", TyokusousakiCharge: body.tyokusousakiCharge ?? "",
+      EditMode: body.editMode,
+    }
+    console.log("========== [calculate] SP実行直前: 全送信パラメータ ==========")
+    console.log(JSON.stringify(spParams, null, 2))
+    console.log("================================================================")
     const result = await request.execute("usp_ASP_EstimateAmountCalculation_get")
+    // ── SP実行結果(OUTPUT全項目)をログ出力（デバッグ用）──
+    console.log("========== [calculate] SP実行結果: OUTPUT全項目 ==========")
+    console.log(JSON.stringify(result.output, null, 2))
+    console.log("=============================================================")
 
     const out = result.output
     const unitPrice: number    = Number(out["UnitPrice"]      ?? 0)
@@ -264,29 +283,54 @@ export async function POST(req: NextRequest) {
     }
     // mssql RequestError は message が空文字になることがあり、
     // 実際の詳細は originalError や number/state/class/procName/lineNumber に
-    // 入っているケースがあるため、判明する情報を全てサーバーログに出力する。
-    console.error("[calculate] SP 実行エラー:", {
-      name: err?.name,
-      message: err?.message,
-      code: err?.code,
-      number: err?.number,
-      state: err?.state,
-      class: err?.class,
-      serverName: err?.serverName,
-      procName: err?.procName,
-      lineNumber: err?.lineNumber,
-      originalErrorMessage: err?.originalError?.message,
-      originalErrorInfo: err?.originalError?.info,
-      stack: err?.stack,
-    })
+    // 入っているケースがある。さらに err が通常のEnumerable propertyを
+    // 持たない/circular構造を含む場合もあるため、
+    // Object.getOwnPropertyNames で全プロパティを安全にダンプする。
+    const dumpError = (e: any): Record<string, unknown> => {
+      if (e === null || e === undefined) return { value: String(e) }
+      if (typeof e !== "object") return { value: String(e), type: typeof e }
+      const out: Record<string, unknown> = {}
+      const seen = new WeakSet<object>()
+      const safe = (v: unknown, depth: number): unknown => {
+        if (v === null || v === undefined) return v
+        if (typeof v !== "object") return v
+        if (depth > 3) return "[depth limit]"
+        if (seen.has(v as object)) return "[circular]"
+        seen.add(v as object)
+        if (v instanceof Error) {
+          const inner: Record<string, unknown> = {}
+          for (const k of Object.getOwnPropertyNames(v)) {
+            inner[k] = safe((v as any)[k], depth + 1)
+          }
+          return inner
+        }
+        if (Array.isArray(v)) return v.map(item => safe(item, depth + 1))
+        const objOut: Record<string, unknown> = {}
+        for (const k of Object.getOwnPropertyNames(v)) {
+          try { objOut[k] = safe((v as any)[k], depth + 1) } catch { objOut[k] = "[unreadable]" }
+        }
+        return objOut
+      }
+      for (const k of Object.getOwnPropertyNames(e)) {
+        try { out[k] = safe(e[k], 0) } catch { out[k] = "[unreadable]" }
+      }
+      return out
+    }
+    const errorDump = dumpError(err)
+    console.error("========== [calculate] SP 実行エラー: 全詳細ダンプ ==========")
+    console.error("err instanceof Error:", err instanceof Error)
+    console.error("typeof err:", typeof err)
+    console.error(JSON.stringify(errorDump, null, 2))
+    console.error("================================================================")
+
     const detailMessage =
       err?.message ||
       err?.originalError?.message ||
       err?.originalError?.info?.message ||
       (err?.number ? `SQLエラー番号: ${err.number}` : "") ||
-      "不明なエラー（サーバーログを確認してください）"
+      `不明なエラー。詳細: ${JSON.stringify(errorDump).slice(0, 500)}`
     return NextResponse.json(
-      { error: "計算処理中にエラーが発生しました", detail: detailMessage },
+      { error: "計算処理中にエラーが発生しました", detail: detailMessage, debugDump: errorDump },
       { status: 500 }
     )
   }
