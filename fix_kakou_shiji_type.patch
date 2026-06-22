@@ -1,0 +1,25 @@
+diff --git a/src/app/api/v1/estimates/calculate/route.ts b/src/app/api/v1/estimates/calculate/route.ts
+index c5b0f3e..ea6d4ff 100644
+--- a/src/app/api/v1/estimates/calculate/route.ts
++++ b/src/app/api/v1/estimates/calculate/route.ts
+@@ -105,12 +105,14 @@ export async function POST(req: NextRequest) {
+     request.input("ZairyouName",         sql.VarChar(20),      body.materialName ?? "")
+     request.input("KakouShiyouCd",       sql.SmallInt,         body.kakouShiyouCode)
+     request.input("KakouShiyou",         sql.VarChar(10),      body.kakouShiyou ?? "")
+-    request.input("Kakou_T",             sql.TinyInt,          body.kakouShijiCodeT ? Number(body.kakouShijiCodeT) : null)
+-    request.input("Kakou_A",             sql.TinyInt,          body.kakouShijiCodeA ? Number(body.kakouShijiCodeA) : null)
+-    request.input("Kakou_B",             sql.TinyInt,          body.kakouShijiCodeB ? Number(body.kakouShijiCodeB) : null)
+-    request.input("KakouShijiCd_T",      sql.TinyInt,          body.kakouShijiCodeT ? Number(body.kakouShijiCodeT) : null)
+-    request.input("KakouShijiCd_A",      sql.TinyInt,          body.kakouShijiCodeA ? Number(body.kakouShijiCodeA) : null)
+-    request.input("KakouShijiCd_B",      sql.TinyInt,          body.kakouShijiCodeB ? Number(body.kakouShijiCodeB) : null)
++    // SP定義: VARCHAR(10)。フロントは "W"/"RG"/"SG"/"〜" 等の文字列コードを保持しており、
++    // 数値変換(Number())は不要かつ不正（"W"→NaN化しSP側で計算不能となるバグの原因だった）。
++    request.input("Kakou_T",             sql.VarChar(10),     body.kakouShijiCodeT ?? "")
++    request.input("Kakou_A",             sql.VarChar(10),     body.kakouShijiCodeA ?? "")
++    request.input("Kakou_B",             sql.VarChar(10),     body.kakouShijiCodeB ?? "")
++    request.input("KakouShijiCd_T",      sql.VarChar(10),     body.kakouShijiCodeT ?? "")
++    request.input("KakouShijiCd_A",      sql.VarChar(10),     body.kakouShijiCodeA ?? "")
++    request.input("KakouShijiCd_B",      sql.VarChar(10),     body.kakouShijiCodeB ?? "")
+     // SP定義: DECIMAL(8,3)
+     request.input("Size_T",              sql.Decimal(8, 3),    body.sizeT)
+     request.input("Size_A",              sql.Decimal(8, 3),    body.sizeA)
