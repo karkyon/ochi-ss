@@ -59,6 +59,25 @@ interface CalculateRequest {
   tyokusousakiCharge?: string
 }
 
+// ── 加工指示コード 文字列→整数 逆引き ──
+// src/app/api/v1/masters/processing-specs/route.ts の codeToStr() と対になる変換。
+// SQL Server「WO加工仕様」テーブルの加工指示コードT/A/B(int)を、表示用に
+// codeToStr()で "RG"/"W"/"〜"/"SG" に変換した結果がフロントに渡っているため、
+// SP実行前にその逆変換で整数に戻す必要がある。
+// 確定根拠: SP実行時の実エラー
+//   "Conversion failed when converting the varchar value 'W' to data type int."
+//   (procName: usp_ASP_EstimateAmountCalculation_get, lineNumber: 533)
+// により、@Kakou_T/A/B, @KakouShijiCd_T/A/B は INT 系であることが判明した。
+function strToKakouCode(s: string | undefined | null): number | null {
+  switch (s) {
+    case "RG": return 1
+    case "W":  return 2
+    case "〜": return 4
+    case "SG": return 5
+    default:   return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) {
@@ -110,14 +129,23 @@ export async function POST(req: NextRequest) {
     request.input("ZairyouName",         sql.VarChar(20),      body.materialName ?? "")
     request.input("KakouShiyouCd",       sql.SmallInt,         body.kakouShiyouCode)
     request.input("KakouShiyou",         sql.VarChar(10),      body.kakouShiyou ?? "")
-    // SP定義: VARCHAR(10)。フロントは "W"/"RG"/"SG"/"〜" 等の文字列コードを保持しており、
-    // 数値変換(Number())は不要かつ不正（"W"→NaN化しSP側で計算不能となるバグの原因だった）。
-    request.input("Kakou_T",             sql.VarChar(10),     body.kakouShijiCodeT ?? "")
-    request.input("Kakou_A",             sql.VarChar(10),     body.kakouShijiCodeA ?? "")
-    request.input("Kakou_B",             sql.VarChar(10),     body.kakouShijiCodeB ?? "")
-    request.input("KakouShijiCd_T",      sql.VarChar(10),     body.kakouShijiCodeT ?? "")
-    request.input("KakouShijiCd_A",      sql.VarChar(10),     body.kakouShijiCodeA ?? "")
-    request.input("KakouShijiCd_B",      sql.VarChar(10),     body.kakouShijiCodeB ?? "")
+    // SP実エラーで確定: @Kakou_T/A/B, @KakouShijiCd_T/A/B は INT 系。
+    // フロントは "W"/"RG"/"SG"/"〜" の表示用文字列を保持しているため、
+    // strToKakouCode() で元の整数コード(1/2/4/5)に逆変換してから渡す。
+    const kakouTCode = strToKakouCode(body.kakouShijiCodeT)
+    const kakouACode = strToKakouCode(body.kakouShijiCodeA)
+    const kakouBCode = strToKakouCode(body.kakouShijiCodeB)
+    console.log("[calculate] 加工指示コード逆変換:", {
+      T: { from: body.kakouShijiCodeT, to: kakouTCode },
+      A: { from: body.kakouShijiCodeA, to: kakouACode },
+      B: { from: body.kakouShijiCodeB, to: kakouBCode },
+    })
+    request.input("Kakou_T",             sql.Int,             kakouTCode)
+    request.input("Kakou_A",             sql.Int,             kakouACode)
+    request.input("Kakou_B",             sql.Int,             kakouBCode)
+    request.input("KakouShijiCd_T",      sql.Int,             kakouTCode)
+    request.input("KakouShijiCd_A",      sql.Int,             kakouACode)
+    request.input("KakouShijiCd_B",      sql.Int,             kakouBCode)
     // SP定義: DECIMAL(8,3)
     request.input("Size_T",              sql.Decimal(8, 3),    body.sizeT)
     request.input("Size_A",              sql.Decimal(8, 3),    body.sizeA)
@@ -212,8 +240,8 @@ export async function POST(req: NextRequest) {
       SessionID: sessionId, RowID: body.rowId ?? 0, WOEstimateNo: body.estOrderNo ?? "",
       ZairyouCd: body.materialCode, ZairyouName: body.materialName ?? "",
       KakouShiyouCd: body.kakouShiyouCode, KakouShiyou: body.kakouShiyou ?? "",
-      Kakou_T: body.kakouShijiCodeT ?? "", Kakou_A: body.kakouShijiCodeA ?? "", Kakou_B: body.kakouShijiCodeB ?? "",
-      KakouShijiCd_T: body.kakouShijiCodeT ?? "", KakouShijiCd_A: body.kakouShijiCodeA ?? "", KakouShijiCd_B: body.kakouShijiCodeB ?? "",
+      Kakou_T: kakouTCode, Kakou_A: kakouACode, Kakou_B: kakouBCode,
+      KakouShijiCd_T: kakouTCode, KakouShijiCd_A: kakouACode, KakouShijiCd_B: kakouBCode,
       Size_T: body.sizeT, Size_A: body.sizeA, Size_B: body.sizeB,
       Kousa_T_U: body.kousaTUpper ?? 0, Kousa_A_U: body.kousaAUpper ?? 0, Kousa_B_U: body.kousaBUpper ?? 0,
       Kousa_T_L: body.kousaTLower ?? 0, Kousa_A_L: body.kousaALower ?? 0, Kousa_B_L: body.kousaBLower ?? 0,
