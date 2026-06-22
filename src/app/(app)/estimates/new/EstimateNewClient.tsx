@@ -154,6 +154,69 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
 
   // 明細状態
   const [form, setForm]       = useState<DetailForm>(newForm())
+
+  // ── 公差・面取り 表示用文字列バッファ ──
+  // number state(form.toleranceXxx等)を直接inputのvalueにバインドすると
+  // 0が空欄表示になったり、"0.1"等の入力中に先頭の0が消える不具合が出るため、
+  // 表示はこの文字列バッファで保持し、blur時にのみ form へ数値反映する。
+  type TolKey = "toleranceTUp" | "toleranceTDown" | "toleranceAUp" | "toleranceADown" | "toleranceBUp" | "toleranceBDown" | "mentori4" | "mentori8"
+  const [tolInputs, setTolInputs] = useState<Record<TolKey, string>>({
+    toleranceTUp: "0", toleranceTDown: "0",
+    toleranceAUp: "0", toleranceADown: "0",
+    toleranceBUp: "0", toleranceBDown: "0",
+    mentori4: "0", mentori8: "0",
+  })
+  // form側の数値が外部要因（標準公差/標準面取/新規/クリア/コピー読込）で
+  // 変化した場合に、表示文字列バッファを追従させる
+  useEffect(() => {
+    // 文字列バッファの「数値としての値」がform側と既に一致していれば、
+    // 入力中の表示文字列（"0.10"等の末尾0や途中入力）を保持するため上書きしない。
+    // 標準公差/標準面取/新規/クリア/コピー読込のように値そのものが変わった
+    // ときだけ文字列バッファを同期する。
+    setTolInputs(prev => {
+      const next = { ...prev }
+      const pairs: Array<[TolKey, number]> = [
+        ["toleranceTUp", form.toleranceTUp], ["toleranceTDown", form.toleranceTDown],
+        ["toleranceAUp", form.toleranceAUp], ["toleranceADown", form.toleranceADown],
+        ["toleranceBUp", form.toleranceBUp], ["toleranceBDown", form.toleranceBDown],
+        ["mentori4", form.mentori4], ["mentori8", form.mentori8],
+      ]
+      let changed = false
+      for (const [key, numVal] of pairs) {
+        const currentParsed = parseFloat(prev[key])
+        if (Number.isNaN(currentParsed) || currentParsed !== numVal) {
+          next[key] = String(numVal)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [form.toleranceTUp, form.toleranceTDown, form.toleranceAUp, form.toleranceADown, form.toleranceBUp, form.toleranceBDown, form.mentori4, form.mentori8])
+
+  // 公差・面取り共通の入力ハンドラ生成
+  // 入力中は文字列バッファのみ更新（自由に "0.1" "0.01" 等を打てる）。
+  // 数値として確定できる場合は form 側にも即時反映（計算時に正しい値を使うため）。
+  const makeTolHandler = useCallback((key: TolKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value
+    setTolInputs(prev => ({ ...prev, [key]: raw }))
+    // "-" や "0." のような未確定の途中入力はform更新をスキップ（NaN化を防ぐ）
+    if (raw === "" || raw === "-" || raw === "." || raw === "-.") {
+      setForm(f => ({ ...f, [key]: 0 }))
+      return
+    }
+    const parsed = parseFloat(raw)
+    if (!Number.isNaN(parsed)) {
+      setForm(f => ({ ...f, [key]: parsed }))
+    }
+  }, [])
+  // blur時: 文字列バッファを正規化（空や不正値は"0"に戻す）
+  const makeTolBlur = useCallback((key: TolKey) => () => {
+    setTolInputs(prev => {
+      const parsed = parseFloat(prev[key])
+      const normalized = Number.isNaN(parsed) ? "0" : String(parsed)
+      return { ...prev, [key]: normalized }
+    })
+  }, [])
   const [details, setDetails] = useState<DetailForm[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [saving, setSaving]   = useState(false)
@@ -755,38 +818,44 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               {/* 公差: 上下2段 */}
               <td style={{ ...TD, padding: "1px 2px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <input id="f-tolTUp" style={TOL_INP} type="number" step="0.001"
-                    value={form.toleranceTUp || ""}
-                    onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[公差T上]→",v); setForm(f=>({...f,toleranceTUp:v})) }}
-                    onKeyDown={onEnter("f-tolTDn")} {...FH} />
-                  <input id="f-tolTDn" style={TOL_INP} type="number" step="0.001"
-                    value={form.toleranceTDown || ""}
-                    onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[公差T下]→",v); setForm(f=>({...f,toleranceTDown:v})) }}
-                    onKeyDown={onEnter("f-tolAUp")} {...FH} />
+                  <input id="f-tolTUp" style={TOL_INP} type="text" inputMode="decimal"
+                    value={tolInputs.toleranceTUp}
+                    onChange={e => { console.log("[公差T上]→", e.target.value); makeTolHandler("toleranceTUp")(e) }}
+                    onBlur={e => { FH.onBlur(e); makeTolBlur("toleranceTUp")() }}
+                    onKeyDown={onEnter("f-tolTDn")} onFocus={FH.onFocus} />
+                  <input id="f-tolTDn" style={TOL_INP} type="text" inputMode="decimal"
+                    value={tolInputs.toleranceTDown}
+                    onChange={e => { console.log("[公差T下]→", e.target.value); makeTolHandler("toleranceTDown")(e) }}
+                    onBlur={e => { FH.onBlur(e); makeTolBlur("toleranceTDown")() }}
+                    onKeyDown={onEnter("f-tolAUp")} onFocus={FH.onFocus} />
                 </div>
               </td>
               <td style={{ ...TD, padding: "1px 2px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <input id="f-tolAUp" style={TOL_INP} type="number" step="0.001"
-                    value={form.toleranceAUp || ""}
-                    onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[公差A上]→",v); setForm(f=>({...f,toleranceAUp:v})) }}
-                    onKeyDown={onEnter("f-tolADn")} {...FH} />
-                  <input id="f-tolADn" style={TOL_INP} type="number" step="0.001"
-                    value={form.toleranceADown || ""}
-                    onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[公差A下]→",v); setForm(f=>({...f,toleranceADown:v})) }}
-                    onKeyDown={onEnter("f-tolBUp")} {...FH} />
+                  <input id="f-tolAUp" style={TOL_INP} type="text" inputMode="decimal"
+                    value={tolInputs.toleranceAUp}
+                    onChange={e => { console.log("[公差A上]→", e.target.value); makeTolHandler("toleranceAUp")(e) }}
+                    onBlur={e => { FH.onBlur(e); makeTolBlur("toleranceAUp")() }}
+                    onKeyDown={onEnter("f-tolADn")} onFocus={FH.onFocus} />
+                  <input id="f-tolADn" style={TOL_INP} type="text" inputMode="decimal"
+                    value={tolInputs.toleranceADown}
+                    onChange={e => { console.log("[公差A下]→", e.target.value); makeTolHandler("toleranceADown")(e) }}
+                    onBlur={e => { FH.onBlur(e); makeTolBlur("toleranceADown")() }}
+                    onKeyDown={onEnter("f-tolBUp")} onFocus={FH.onFocus} />
                 </div>
               </td>
               <td style={{ ...TD, padding: "1px 2px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <input id="f-tolBUp" style={TOL_INP} type="number" step="0.001"
-                    value={form.toleranceBUp || ""}
-                    onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[公差B上]→",v); setForm(f=>({...f,toleranceBUp:v})) }}
-                    onKeyDown={onEnter("f-tolBDn")} {...FH} />
-                  <input id="f-tolBDn" style={TOL_INP} type="number" step="0.001"
-                    value={form.toleranceBDown || ""}
-                    onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[公差B下]→",v); setForm(f=>({...f,toleranceBDown:v})) }}
-                    onKeyDown={onEnter("btn-std-chamfer")} {...FH} />
+                  <input id="f-tolBUp" style={TOL_INP} type="text" inputMode="decimal"
+                    value={tolInputs.toleranceBUp}
+                    onChange={e => { console.log("[公差B上]→", e.target.value); makeTolHandler("toleranceBUp")(e) }}
+                    onBlur={e => { FH.onBlur(e); makeTolBlur("toleranceBUp")() }}
+                    onKeyDown={onEnter("f-tolBDn")} onFocus={FH.onFocus} />
+                  <input id="f-tolBDn" style={TOL_INP} type="text" inputMode="decimal"
+                    value={tolInputs.toleranceBDown}
+                    onChange={e => { console.log("[公差B下]→", e.target.value); makeTolHandler("toleranceBDown")(e) }}
+                    onBlur={e => { FH.onBlur(e); makeTolBlur("toleranceBDown")() }}
+                    onKeyDown={onEnter("btn-std-chamfer")} onFocus={FH.onFocus} />
                 </div>
               </td>
 
@@ -805,16 +874,18 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleStdChamfer() } }}>標準</button>
               </td>
               <td style={TD}>
-                <input id="f-mentori4" style={{ ...INP, textAlign: "right" }} type="number" step="0.1"
-                  value={form.mentori4 || ""}
-                  onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[4C]→",v); setForm(f=>({...f,mentori4:v})) }}
-                  onKeyDown={onEnter("f-mentori8")} {...FH} />
+                <input id="f-mentori4" style={{ ...INP, textAlign: "right" }} type="text" inputMode="decimal"
+                  value={tolInputs.mentori4}
+                  onChange={e => { console.log("[4C]→", e.target.value); makeTolHandler("mentori4")(e) }}
+                  onBlur={e => { FH.onBlur(e); makeTolBlur("mentori4")() }}
+                  onKeyDown={onEnter("f-mentori8")} onFocus={FH.onFocus} />
               </td>
               <td style={TD}>
-                <input id="f-mentori8" style={{ ...INP, textAlign: "right" }} type="number" step="0.1"
-                  value={form.mentori8 || ""}
-                  onChange={e => { const v=parseFloat(e.target.value)||0; console.log("[8C]→",v); setForm(f=>({...f,mentori8:v})) }}
-                  onKeyDown={onEnter("f-qty")} {...FH} />
+                <input id="f-mentori8" style={{ ...INP, textAlign: "right" }} type="text" inputMode="decimal"
+                  value={tolInputs.mentori8}
+                  onChange={e => { console.log("[8C]→", e.target.value); makeTolHandler("mentori8")(e) }}
+                  onBlur={e => { FH.onBlur(e); makeTolBlur("mentori8")() }}
+                  onKeyDown={onEnter("f-qty")} onFocus={FH.onFocus} />
               </td>
               <td style={TD}>
                 <input id="f-qty" style={{ ...INP, textAlign: "right" }} type="number" min="1"

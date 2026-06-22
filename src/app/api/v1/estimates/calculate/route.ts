@@ -262,9 +262,31 @@ export async function POST(req: NextRequest) {
         { status: 504 }
       )
     }
-    console.error("[calculate] SP 実行エラー:", err)
+    // mssql RequestError は message が空文字になることがあり、
+    // 実際の詳細は originalError や number/state/class/procName/lineNumber に
+    // 入っているケースがあるため、判明する情報を全てサーバーログに出力する。
+    console.error("[calculate] SP 実行エラー:", {
+      name: err?.name,
+      message: err?.message,
+      code: err?.code,
+      number: err?.number,
+      state: err?.state,
+      class: err?.class,
+      serverName: err?.serverName,
+      procName: err?.procName,
+      lineNumber: err?.lineNumber,
+      originalErrorMessage: err?.originalError?.message,
+      originalErrorInfo: err?.originalError?.info,
+      stack: err?.stack,
+    })
+    const detailMessage =
+      err?.message ||
+      err?.originalError?.message ||
+      err?.originalError?.info?.message ||
+      (err?.number ? `SQLエラー番号: ${err.number}` : "") ||
+      "不明なエラー（サーバーログを確認してください）"
     return NextResponse.json(
-      { error: "計算処理中にエラーが発生しました", detail: err.message },
+      { error: "計算処理中にエラーが発生しました", detail: detailMessage },
       { status: 500 }
     )
   }
