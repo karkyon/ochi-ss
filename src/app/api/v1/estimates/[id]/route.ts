@@ -67,7 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           remarks: body.remarks ?? null, estimateStatus: "saved", editMode: "edit", updatedAt: new Date(),
         },
       })
-      await (tx as any).estimateDetail.updateMany({ where: { estimateHeaderId: id, isDeleted: false }, data: { isDeleted: true, updatedAt: new Date() } })
+      await (tx as any).estimateDetail.deleteMany({ where: { estimateHeaderId: id } })
       await (tx as any).estimateDetail.createMany({
         data: body.details.map((d: any, idx: number) => ({
           estimateHeaderId: id, rowNo: idx + 1,
