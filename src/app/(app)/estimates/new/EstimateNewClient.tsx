@@ -561,7 +561,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       destinationAddress: isHikitori ? "" : distAddr,
       destinationTel:     isHikitori ? "" : distTel,
       destinationFax:     isHikitori ? "" : distFax,
-      details: details.map((d, i) => ({ ...d, rowNo: i + 1 })),
+      details: details.map((d, i) => ({ ...d, rowNo: i + 1, mentoriShiji: String(d.mentoriShiji) })),
     }
     console.log("[handleSave] リクエスト:", JSON.stringify(payload, null, 2))
     setSaving(true); setSaveMsg("保存中...")
