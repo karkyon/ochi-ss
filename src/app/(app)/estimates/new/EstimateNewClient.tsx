@@ -292,7 +292,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     if (copySource.estimateNo)        setEstimateNo(copySource.estimateNo)
     if (copySource.customerOrderNo)   setCustOrderNo(copySource.customerOrderNo)
     if (copySource.endUserNo)         setEndUserNo(copySource.endUserNo)
-    if (copySource.destinationCode)   setDistCode(copySource.destinationCode)
+    if (copySource.destinationCode) {
+      setDistCode(copySource.destinationCode)
+      setDistId("__existing__")
+      setDistOriginal({ name: copySource.destinationName ?? "", dept: copySource.destinationDept ?? "", person: copySource.destinationPerson ?? "", zip: copySource.destinationZip ?? "", addr: copySource.destinationAddress ?? "", tel: copySource.destinationTel ?? "", fax: copySource.destinationFax ?? "" })
+    } else if (copySource.destinationName) {
+      setDistId("__existing__")
+      setDistOriginal({ name: copySource.destinationName ?? "", dept: copySource.destinationDept ?? "", person: copySource.destinationPerson ?? "", zip: copySource.destinationZip ?? "", addr: copySource.destinationAddress ?? "", tel: copySource.destinationTel ?? "", fax: copySource.destinationFax ?? "" })
+    }
     if (copySource.destinationName)   setDistName(copySource.destinationName)
     if (copySource.destinationDept)   setDistDept(copySource.destinationDept)
     if (copySource.destinationPerson) setDistPerson(copySource.destinationPerson)
@@ -624,7 +631,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       destinationAddress: isHikitori ? "" : distAddr,
       destinationTel:     isHikitori ? "" : distTel,
       destinationFax:     isHikitori ? "" : distFax,
-      details: details.map((d, i) => ({ ...d, rowNo: i + 1, mentoriShiji: String(d.mentoriShiji) })),
+      details: details.map((d, i) => ({ ...d, rowNo: i + 1,
+        mentoriShiji: String(d.mentoriShiji),
+        kakouShiyou: d.shiagari,
+        kakouT: d.kakouShijiCodeT, kakouA: d.kakouShijiCodeA, kakouB: d.kakouShijiCodeB,
+      })),
     }
     console.log("[handleSave] リクエスト:", JSON.stringify(payload, null, 2))
     setSaving(true); setSaveMsg("保存中...")
@@ -737,12 +748,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     if (!distId) {
       // コードなし・直接入力 → 新規登録確認
       const ok = window.confirm(
-        `入力された送り先情報をマスタに登録しますか？
-
-` +
-        `出荷先名: ${distName}
-住所: ${distAddr}
-TEL: ${distTel}`
+        `【送り先マスタ登録】\n入力された送り先情報をマスタに登録しますか？\n\n出荷先名: ${distName}\n住所: ${distAddr}\nTEL: ${distTel}\n\n「はい」で登録、「いいえ」でスキップ`
       )
       if (!ok) return true  // キャンセル → 登録しないが保存は続行
       try {
@@ -773,7 +779,7 @@ TEL: ${distTel}`
         alert("送り先マスタ登録中にエラーが発生しました: " + e.message)
         return false
       }
-    } else if (distOriginal) {
+    } else if (distOriginal && distId && distId !== "__existing__") {
       const changed =
         distName    !== distOriginal.name   ||
         distDept    !== distOriginal.dept   ||
@@ -784,12 +790,7 @@ TEL: ${distTel}`
         distFax     !== distOriginal.fax
       if (changed) {
         const ok = window.confirm(
-          `変更された送り先情報でマスタを更新しますか？
-
-` +
-          `出荷先名: ${distName}
-住所: ${distAddr}
-TEL: ${distTel}`
+          `【送り先マスタ更新】\n変更された送り先情報でマスタを更新しますか？\n\n出荷先名: ${distName}\n住所: ${distAddr}\nTEL: ${distTel}\n\n「はい」で更新、「いいえ」でスキップ`
         )
         if (!ok) return true
         try {
