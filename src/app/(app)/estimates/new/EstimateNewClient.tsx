@@ -82,13 +82,22 @@ function newForm(): DetailForm {
 }
 function isExpired(d?: string | null) { return !!d && new Date(d) < new Date() }
 function fmt(iso?: string | null) { return iso ? iso.slice(0, 10) : "" }
+function fmtDt(iso?: string | null) {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (iso.length <= 10) return iso.slice(0, 10)
+  const dateStr = iso.slice(0, 10)
+  const h = String(d.getHours()).padStart(2, "0")
+  const m = String(d.getMinutes()).padStart(2, "0")
+  return `${dateStr} ${h}:${m}`
+}
 function allCutsDefined(t: string, a: string, b: string): boolean {
   return t !== "〜" && a !== "〜" && b !== "〜"
 }
 
 // ─── スタイル定数 ─────────────────────────────────────────────
 const TH: React.CSSProperties = {
-  background: "#1e3a5f", color: "#fff", fontSize: "10px", fontWeight: 600,
+  background: "#1e3a5f", color: "#fff", fontSize: "12px", fontWeight: 600,
   padding: "3px 2px", textAlign: "center", border: "1px solid #334155", whiteSpace: "nowrap",
 }
 const TD: React.CSSProperties = {
@@ -96,18 +105,18 @@ const TD: React.CSSProperties = {
 }
 const INP: React.CSSProperties = {
   width: "100%", border: "1px solid #cbd5e1", borderRadius: "3px",
-  padding: "2px 4px", fontSize: "11px", background: "#fff", boxSizing: "border-box", height: "24px",
+  padding: "2px 4px", fontSize: "13px", background: "#fff", boxSizing: "border-box", height: "28px",
 }
 const SEL: React.CSSProperties = {
   width: "100%", border: "1px solid #cbd5e1", borderRadius: "3px",
-  padding: "1px 2px", fontSize: "11px", background: "#fff", height: "24px",
+  padding: "1px 2px", fontSize: "13px", background: "#fff", height: "28px",
 }
 const LBL: React.CSSProperties = {
-  background: "#e8edf5", fontSize: "10px", fontWeight: 600, color: "#374151",
+  background: "#e8edf5", fontSize: "12px", fontWeight: 600, color: "#374151",
   padding: "3px 6px", border: "1px solid #d1d5db", whiteSpace: "nowrap",
 }
 const TOL_INP: React.CSSProperties = {
-  ...INP, height: "22px", fontSize: "10px", textAlign: "right", padding: "1px 3px",
+  ...INP, height: "26px", fontSize: "12px", textAlign: "right", padding: "1px 3px",
 }
 const FH = {
   onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -621,19 +630,19 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   }
 
   return (
-    <div style={{ fontSize: "11px", padding: "4px 8px", maxWidth: "1280px", margin: "0 auto" }}>
+    <div style={{ fontSize: "13px", padding: "4px 8px", maxWidth: "1280px", margin: "0 auto" }}>
       {/* ─── ヘッダーボタン ─── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-        <div style={{ fontWeight: 700, fontSize: "13px", color: "#1e3a5f" }}>お見積り入力</div>
+        <div style={{ fontWeight: 700, fontSize: "15px", color: "#1e3a5f" }}>お見積り入力</div>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button className="btn-ochi btn-outline" style={{ fontSize: "11px" }}
+          <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}
             onClick={() => { console.log("[新規] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setEditingDetailId(null) }}>新規</button>
-          <button className="btn-ochi btn-primary" style={{ fontSize: "11px" }}
-            onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "この見積りを保存"}</button>
-          <button className="btn-ochi" style={{ fontSize: "11px", background: "#92400e", color: "#fff" }}
-            onClick={handleOrder}>この見積りを注文</button>
+          <button className="btn-ochi btn-navy" style={{ fontSize: "13px" }}
+            onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "💾 この見積りを保存"}</button>
+          <button className="btn-ochi btn-amber" style={{ fontSize: "13px" }}
+            onClick={handleOrder}>📋 この見積りを注文</button>
           <Link href="/dashboard">
-            <button className="btn-ochi btn-outline" style={{ fontSize: "11px" }}>← メインメニュー</button>
+            <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}>← メインメニュー</button>
           </Link>
         </div>
       </div>
@@ -1034,7 +1043,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                   <div>
                     <div style={{ fontSize: "9px", color: "#64748b" }}>納期保証期限</div>
-                    <input style={{ ...INP, width: "130px", background: form.fastDeliveryDeadline ? "#ffffcc" : "#fff" }} value={fmt(form.fastDeliveryDeadline)} readOnly />
+                    <input style={{ ...INP, width: "160px", background: form.fastDeliveryDeadline ? "#ffffcc" : "#fff" }} value={fmtDt(form.fastDeliveryDeadline)} readOnly />
                   </div>
                   <div>
                     <div style={{ fontSize: "9px", color: "#64748b" }}>送料込みプレート単価</div>
@@ -1048,19 +1057,19 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               </td>
               <td colSpan={9} style={{ ...TD, padding: "4px" }}>
                 <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center" }}>
-                  <button id="btn-calc" className="btn-ochi btn-primary"
-                    style={{ fontSize: "11px", minWidth: "90px" }}
+                  <button id="btn-calc" className="btn-ochi btn-blue"
+                    style={{ fontSize: "13px", minWidth: "100px" }}
                     onClick={handleCalculate}
                     onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleCalculate() } }}>
                     📊 見積計算
                   </button>
-                  <button id="btn-add" className="btn-ochi btn-primary"
-                    style={{ fontSize: "11px", minWidth: "90px", background: form.calculated ? (editingDetailId ? "#d97706" : "#16a34a") : "#94a3b8", cursor: form.calculated ? "pointer" : "not-allowed" }}
+                  <button id="btn-add" className="btn-ochi"
+                    style={{ fontSize: "13px", minWidth: "110px", background: form.calculated ? (editingDetailId ? "#d97706" : "#16a34a") : "#94a3b8", color: "#fff", cursor: form.calculated ? "pointer" : "not-allowed", border: "none" }}
                     onClick={handleAdd} disabled={!form.calculated}
                     onKeyDown={e => { if (e.key === "Enter" && form.calculated) { e.preventDefault(); handleAdd() } }}>
                     {editingDetailId ? "✓ 明細を更新" : "＋ 明細に追加"}
                   </button>
-                  <button className="btn-ochi btn-outline" style={{ fontSize: "11px" }}
+                  <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}
                     onClick={() => { console.log("[クリア] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setEditingDetailId(null); setTimeout(() => focusById("f-mat-suggest"), 50) }}>
                     クリア
                   </button>
@@ -1082,7 +1091,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         </span>
       </div>
       <div style={{ overflowX: "auto", border: "1px solid #86efac", borderTop: "none" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
           <thead>
             <tr>
               <th style={{ ...TH, background: "#166534", width: "28px" }}>
@@ -1110,7 +1119,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               <tr key={d.clientDetailId} style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
                 <td style={{ ...TD, textAlign: "center" }}><input type="checkbox" checked={selectedIds.has(d.clientDetailId)} onChange={e => selOne(d.clientDetailId, e.target.checked)} /></td>
                 <td style={{ ...TD, textAlign: "center" }}>{i + 1}</td>
-                <td style={TD}>{d.materialCode}</td>
+                <td style={TD}>{materials.find(m => m.materialCode === d.materialCode)?.materialName ?? d.materialCode}</td>
                 <td style={TD}>{d.shiagari}</td>
                 <td style={{ ...TD, textAlign: "right" }}>{d.sizeT}</td>
                 <td style={{ ...TD, textAlign: "right" }}>{d.sizeA}</td>
@@ -1124,10 +1133,10 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.unitPrice != null ? "¥" + d.unitPrice.toLocaleString() : "—"}</td>
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.totalPrice != null ? "¥" + d.totalPrice.toLocaleString() : "—"}</td>
                 <td style={{ ...TD, textAlign: "center" }}>
-                  <div style={{ display: "flex", gap: "3px", justifyContent: "center" }}>
-                    <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleEditDetail(d.clientDetailId)}>編集</button>
-                    <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleDuplicateDetail(d.clientDetailId)}>複写</button>
-                    <button className="btn-ochi btn-outline" style={{ fontSize: "9px", padding: "1px 5px" }} onClick={() => handleDel(d.clientDetailId)}>削除</button>
+                  <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+                    <button className="btn-ochi btn-blue" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleEditDetail(d.clientDetailId)}>✏️ 編集</button>
+                    <button className="btn-ochi btn-gray" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDuplicateDetail(d.clientDetailId)}>📋 複写</button>
+                    <button className="btn-ochi btn-red" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDel(d.clientDetailId)}>🗑️ 削除</button>
                   </div>
                 </td>
               </tr>
