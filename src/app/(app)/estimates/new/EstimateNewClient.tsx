@@ -502,6 +502,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       console.log("[handleCalculate] HTTPステータス:", res.status, res.statusText)
       console.log("[handleCalculate] レスポンスヘッダー:", JSON.stringify(resHeaders, null, 2))
       console.log("[handleCalculate] レスポンスBody:", JSON.stringify(data, null, 2))
+      if (data.ssmsExecSql) {
+        console.log("\n========== [SSMS貼り付け用EXEC文] ここからコピー ==========")
+        console.log(data.ssmsExecSql)
+        console.log("========== [SSMS貼り付け用EXEC文] ここまでコピー ==========")
+      }
       console.log("====================================================")
       if (!res.ok) throw new Error(data.error ?? "計算APIエラー " + res.status)
       // route.ts の実レスポンス構造: { unitPrice, sumPrice, shortestDelivery, deliveryDeadline }
