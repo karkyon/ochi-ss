@@ -284,6 +284,69 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     console.log("[EstimateNewClient] 初期フォーム値:", JSON.stringify(newForm()))
   }, [])
 
+  // ── copySource（編集呼び出し）があればヘッダー・明細を復元 ──
+  useEffect(() => {
+    if (!copySource) return
+    console.log("[EstimateNewClient] copySource復元開始:", JSON.stringify(copySource))
+    if (copySource.estimateId)        setDraftId(copySource.estimateId)
+    if (copySource.estimateNo)        setEstimateNo(copySource.estimateNo)
+    if (copySource.customerOrderNo)   setCustOrderNo(copySource.customerOrderNo)
+    if (copySource.endUserNo)         setEndUserNo(copySource.endUserNo)
+    if (copySource.destinationCode)   setDistCode(copySource.destinationCode)
+    if (copySource.destinationName)   setDistName(copySource.destinationName)
+    if (copySource.destinationDept)   setDistDept(copySource.destinationDept)
+    if (copySource.destinationPerson) setDistPerson(copySource.destinationPerson)
+    if (copySource.destinationZip)    setDistZip(copySource.destinationZip)
+    if (copySource.destinationAddress) setDistAddr(copySource.destinationAddress)
+    if (copySource.destinationTel)    setDistTel(copySource.destinationTel)
+    if (copySource.destinationFax)    setDistFax(copySource.destinationFax)
+    if (copySource.contact)           setContact(copySource.contact)
+    if (copySource.shippingMethod) {
+      const sm = copySource.shippingMethod === "1" ? "発送"
+               : copySource.shippingMethod === "2" ? "直送"
+               : copySource.shippingMethod === "3" ? "引取り"
+               : "発送"
+      setShippingMethod(sm)
+    }
+    if (copySource.details?.length > 0) {
+      const restored = copySource.details.map((d: any) => ({
+        clientDetailId:   d.clientDetailId || generateUUID(),
+        materialCode:     d.materialCode     ?? "",
+        kakouShiyouCode:  d.kakouShiyouCode  ?? 0,
+        kakouShijiCodeT:  d.kakouT           ?? "W",
+        kakouShijiCodeA:  d.kakouA           ?? "W",
+        kakouShijiCodeB:  d.kakouB           ?? "W",
+        shiagari:         d.shiagari         ?? "",
+        sizeT:  Number(d.sizeT  ?? 0),
+        sizeB:  Number(d.sizeB  ?? 0),
+        sizeA:  Number(d.sizeA  ?? 0),
+        toleranceTUp:   Number(d.toleranceTUp   ?? 0),
+        toleranceTDown: Number(d.toleranceTDown ?? 0),
+        toleranceBUp:   Number(d.toleranceBUp   ?? 0),
+        toleranceBDown: Number(d.toleranceBDown ?? 0),
+        toleranceAUp:   Number(d.toleranceAUp   ?? 0),
+        toleranceADown: Number(d.toleranceADown ?? 0),
+        mentoriShiji:   Number(d.mentoriShiji   ?? 9),
+        mentori4:  Number(d.mentori4  ?? 0),
+        mentori8:  Number(d.mentori8  ?? 0),
+        quantity:  Number(d.quantity  ?? 1),
+        customerDetailOrderNo:    d.customerDetailOrderNo    ?? "",
+        destinationDetailOrderNo: d.destinationDetailOrderNo ?? "",
+        remarks:   d.remarks   ?? "",
+        unitPrice:  Number(d.unitPrice  ?? 0),
+        totalPrice: Number(d.totalPrice ?? 0),
+        deliveryDate:     d.deliveryDate     ?? undefined,
+        deliveryDeadline: d.deliveryDeadline ?? null,
+        fastDeliveryDate:     d.deliveryDate     ?? undefined,
+        fastDeliveryDeadline: d.deliveryDeadline ?? undefined,
+        calculated: true,
+      }))
+      setDetails(restored)
+      console.log("[EstimateNewClient] copySource明細復元:", restored.length, "件")
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copySource])
+
   const filteredSpecs: ProcSpec[] = form.materialCode && matProcMap[form.materialCode]
     ? procSpecs.filter(s => matProcMap[form.materialCode].includes(s.processingSpecCode))
     : procSpecs
