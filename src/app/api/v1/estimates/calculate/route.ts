@@ -255,9 +255,77 @@ export async function POST(req: NextRequest) {
       EditMode: body.editMode,
     }
     const SP_NAME = "usp_ASP_EstimateAmountCalculation_get"
+    // ── SSMS貼り付け用EXEC文を生成してログ出力 ──
+    const nullOrStr = (v: any) => v === null || v === undefined ? "NULL" : `'${String(v).replace(/'/g, "''")}'`
+    const nullOrNum = (v: any) => v === null || v === undefined ? "NULL" : String(v)
+    const execSql = `USE [ochidb_dev]
+GO
+
+DECLARE @RC int
+DECLARE @SessionID varchar(30)        = ${nullOrStr(spParams.SessionID)}
+DECLARE @RowID int                    = ${nullOrNum(spParams.RowID)}
+DECLARE @WOEstimateNo varchar(20)     = ${nullOrStr(spParams.WOEstimateNo)}
+DECLARE @ZairyouCd varchar(4)         = ${nullOrStr(spParams.ZairyouCd)}
+DECLARE @ZairyouName varchar(20)      = ${nullOrStr(spParams.ZairyouName)}
+DECLARE @KakouShiyouCd smallint       = ${nullOrNum(spParams.KakouShiyouCd)}
+DECLARE @KakouShiyou varchar(10)      = ${nullOrStr(spParams.KakouShiyou)}
+DECLARE @Kakou_T varchar(10)          = ${nullOrNum(spParams.Kakou_T)}
+DECLARE @Kakou_A varchar(10)          = ${nullOrNum(spParams.Kakou_A)}
+DECLARE @Kakou_B varchar(10)          = ${nullOrNum(spParams.Kakou_B)}
+DECLARE @KakouShijiCd_T varchar(10)   = ${nullOrNum(spParams.KakouShijiCd_T)}
+DECLARE @KakouShijiCd_A varchar(10)   = ${nullOrNum(spParams.KakouShijiCd_A)}
+DECLARE @KakouShijiCd_B varchar(10)   = ${nullOrNum(spParams.KakouShijiCd_B)}
+DECLARE @Size_T decimal(8,3)          = ${nullOrNum(spParams.Size_T)}
+DECLARE @Size_A decimal(8,3)          = ${nullOrNum(spParams.Size_A)}
+DECLARE @Size_B decimal(8,3)          = ${nullOrNum(spParams.Size_B)}
+DECLARE @Kousa_T_U decimal(8,3)       = ${nullOrNum(spParams.Kousa_T_U)}
+DECLARE @Kousa_A_U decimal(8,3)       = ${nullOrNum(spParams.Kousa_A_U)}
+DECLARE @Kousa_B_U decimal(8,3)       = ${nullOrNum(spParams.Kousa_B_U)}
+DECLARE @Kousa_T_L decimal(8,3)       = ${nullOrNum(spParams.Kousa_T_L)}
+DECLARE @Kousa_A_L decimal(8,3)       = ${nullOrNum(spParams.Kousa_A_L)}
+DECLARE @Kousa_B_L decimal(8,3)       = ${nullOrNum(spParams.Kousa_B_L)}
+DECLARE @MentoriShiji varchar(10)     = ${nullOrStr(spParams.MentoriShiji)}
+DECLARE @Mentori_4 decimal(8,3)       = ${nullOrNum(spParams.Mentori_4)}
+DECLARE @Mentori_8 decimal(8,3)       = ${nullOrNum(spParams.Mentori_8)}
+DECLARE @Suryou int                   = ${nullOrNum(spParams.Suryou)}
+DECLARE @RequestPrice money           = ${nullOrNum(spParams.RequestPrice)}
+DECLARE @RequestNouki varchar(10)     = ${nullOrStr(spParams.RequestNouki)}
+DECLARE @CustomerNo varchar(100)      = ${nullOrStr(spParams.CustomerNo)}
+DECLARE @EndUserNo varchar(100)       = ${nullOrStr(spParams.EndUserNo)}
+DECLARE @Refer varchar(255)           = ${nullOrStr(spParams.Refer)}
+DECLARE @TokuisakiCd varchar(6)       = ${nullOrStr(spParams.TokuisakiCd)}
+DECLARE @EndUserCd varchar(6)         = ${nullOrStr(spParams.EndUserCd)}
+DECLARE @TyokusousakiCd varchar(6)    = ${nullOrStr(spParams.TyokusousakiCd)}
+DECLARE @TyokusousakiName varchar(80) = ${nullOrStr(spParams.TyokusousakiName)}
+DECLARE @TyokusousakiZipCd varchar(10)= ${nullOrStr(spParams.TyokusousakiZipCd)}
+DECLARE @TyokusousakiAddr varchar(255)= ${nullOrStr(spParams.TyokusousakiAddr)}
+DECLARE @TyokusousakiPost varchar(50) = ${nullOrStr(spParams.TyokusousakiPost)}
+DECLARE @TyokusousakiCharge varchar(20)=${nullOrStr(spParams.TyokusousakiCharge)}
+DECLARE @EditMode varchar(10)         = ${nullOrStr(spParams.EditMode)}
+DECLARE @ShortestNouki varchar(10)
+DECLARE @UnitPrice money
+DECLARE @SumPrice money
+DECLARE @DeliveryDeadline datetime2(7)
+
+EXECUTE @RC = [dbo].[usp_ASP_EstimateAmountCalculation_get]
+   @SessionID ,@RowID ,@WOEstimateNo ,@ZairyouCd ,@ZairyouName
+  ,@KakouShiyouCd ,@KakouShiyou ,@Kakou_T ,@Kakou_A ,@Kakou_B
+  ,@KakouShijiCd_T ,@KakouShijiCd_A ,@KakouShijiCd_B
+  ,@Size_T ,@Size_A ,@Size_B
+  ,@Kousa_T_U ,@Kousa_A_U ,@Kousa_B_U ,@Kousa_T_L ,@Kousa_A_L ,@Kousa_B_L
+  ,@MentoriShiji ,@Mentori_4 ,@Mentori_8 ,@Suryou ,@RequestPrice ,@RequestNouki
+  ,@CustomerNo ,@EndUserNo ,@Refer ,@TokuisakiCd ,@EndUserCd
+  ,@TyokusousakiCd ,@TyokusousakiName ,@TyokusousakiZipCd ,@TyokusousakiAddr
+  ,@TyokusousakiPost ,@TyokusousakiCharge ,@EditMode
+  ,@ShortestNouki OUTPUT ,@UnitPrice OUTPUT ,@SumPrice OUTPUT ,@DeliveryDeadline OUTPUT
+
+SELECT @ShortestNouki AS ShortestNouki, @UnitPrice AS UnitPrice, @SumPrice AS SumPrice, @DeliveryDeadline AS DeliveryDeadline
+GO`
     console.log("========== [calculate] SP実行直前 ==========")
     console.log("[calculate] 実行ストアドプロシージャ名:", SP_NAME)
     console.log("[calculate] 全送信パラメータ(85項目):", JSON.stringify(spParams, null, 2))
+    console.log("\n========== [calculate] SSMS貼り付け用EXEC文 ==========")
+    console.log(execSql)
     console.log("================================================")
     const result = await request.execute(SP_NAME)
     // ── SP実行結果(OUTPUT全項目)をログ出力（デバッグ用）──
@@ -292,7 +360,7 @@ export async function POST(req: NextRequest) {
       sumPrice,
       shortestDelivery: shortestNouki,
       deliveryDeadline: deliveryDeadline
-        ? (deliveryDeadline as Date).toISOString().slice(0, 10)
+        ? (deliveryDeadline as Date).toISOString()
         : null,
       intermediate: {
         materialSizeT:       Number(out["ZairyouSizeT_OUT"]      ?? 0),
