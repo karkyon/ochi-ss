@@ -24,9 +24,27 @@ export async function POST(req: NextRequest) {
   if (error) return error
 
   const body = await req.json()
+
+  // deliveryCode 自動採番: 数字3桁連番（001, 002, ...）
+  let deliveryCode = (body.deliveryCode ?? "").trim()
+  if (!deliveryCode) {
+    const rows = await withTenant(ctx.customerId, ctx.isSuperAdmin, (tx) =>
+      (tx as any).directDelivery.findMany({
+        where: { customerId: ctx.customerId, isDeleted: false },
+        select: { deliveryCode: true },
+      })
+    ) as any[]
+    let max = 0
+    for (const r of rows) {
+      const n = parseInt(r.deliveryCode, 10)
+      if (!isNaN(n) && n > max) max = n
+    }
+    deliveryCode = String(max + 1).padStart(3, "0")
+  }
+
   const created = await withTenant(ctx.customerId, ctx.isSuperAdmin, (tx) =>
     (tx as any).directDelivery.create({
-      data: { ...body, customerId: ctx.customerId, customerCode: ctx.companyCode, isDeleted: false },
+      data: { ...body, deliveryCode, customerId: ctx.customerId, customerCode: ctx.companyCode, isDeleted: false },
     })
   )
   audit({ customerId: ctx.customerId, userId: ctx.userId, action: "CREATE", resource: "direct_deliveries", resourceId: created.id, req })

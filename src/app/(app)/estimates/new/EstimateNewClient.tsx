@@ -629,16 +629,22 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     console.log("[handleSave] リクエスト:", JSON.stringify(payload, null, 2))
     setSaving(true); setSaveMsg("保存中...")
     try {
-      const res = await fetch("/api/v1/estimates", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const isEdit = !!draftId
+      const fetchUrl = isEdit ? `/api/v1/estimates/${draftId}` : "/api/v1/estimates"
+      const fetchMethod = isEdit ? "PUT" : "POST"
+      console.log(`[handleSave] ${isEdit ? "編集更新(PUT)" : "新規保存(POST)"} url:`, fetchUrl)
+      const res = await fetch(fetchUrl, {
+        method: fetchMethod, headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
       console.log("[handleSave] レスポンス:", JSON.stringify(data, null, 2))
       if (!res.ok) throw new Error(data.error ?? "保存失敗")
-      setDraftId(data.estimateId ?? data.id)
-      setEstimateNo(data.estimateNo ?? "")
-      setSaveMsg("✅ 保存完了！見積番号: " + (data.estimateNo ?? ""))
+      const savedId = data.estimateId ?? data.id
+      const savedNo = data.estimateNo ?? estimateNo
+      if (savedId) setDraftId(savedId)
+      setEstimateNo(savedNo)
+      setSaveMsg("✅ 保存完了！見積番号: " + savedNo)
     } catch (e: any) {
       console.error("[handleSave] エラー:", e.message)
       setSaveMsg("❌ 保存失敗: " + e.message)
