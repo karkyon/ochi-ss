@@ -140,7 +140,7 @@ function onEnter(nextId: string) {
 }
 
 // ─── メインコンポーネント ────────────────────────────────────
-export default function EstimateNewClient({ materials, processingSpecs: initSpecs, userInfo, copySource }: Props) {
+export default function EstimateNewClient({ materials, processingSpecs: initSpecs, userInfo, copySource, isCopy }: Props) {
   const today = new Date().toISOString().slice(0, 10)
 
   // ヘッダー状態
