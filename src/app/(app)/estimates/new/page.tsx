@@ -62,9 +62,17 @@ export default async function EstimateNewPage({ searchParams }: { searchParams: 
             customerDetailOrderNo:    (d as any).customerDetailOrderNo    ?? "",
             destinationDetailOrderNo: (d as any).destinationDetailOrderNo ?? "",
             remarks: (d as any).remarks ?? "",
+            unitPrice:  Number(d.unitPrice  ?? 0),
+            totalPrice: Number(d.totalPrice ?? 0),
+            deliveryDate: d.shortestDelivery ?? undefined,
+            fastDeliveryDate: d.shortestDelivery ?? undefined,
+            // deliveryDeadlineは日時フルで渡す（fmtDtで表示するため）
             deliveryDeadline: d.deliveryDeadline
-              ? d.deliveryDeadline.toISOString().slice(0, 10)
+              ? d.deliveryDeadline.toISOString()
               : null,
+            fastDeliveryDeadline: d.deliveryDeadline
+              ? d.deliveryDeadline.toISOString()
+              : undefined,
           })),
         }
       }
