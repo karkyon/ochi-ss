@@ -103,6 +103,8 @@ function detailPattern(d: { unitPrice?: number; totalPrice?: number; fastDeliver
   if (!hasPrice) return 1
   const hasDelivery = !!d.fastDeliveryDate && d.fastDeliveryDate !== ""
   if (!hasDelivery) return 2
+  // 納期保証期限切れは注文不可（パターン2扱い）
+  if (d.deliveryDeadline && new Date(d.deliveryDeadline) < new Date()) return 2
   return 3
 }
 
