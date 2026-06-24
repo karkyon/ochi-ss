@@ -55,6 +55,11 @@ interface DetailForm {
   deliveryDate?: string; deliveryDeadline?: string | null
   fastDeliveryDate?: string; fastDeliveryDeadline?: string
   calculated?: boolean
+  // 注文済み情報
+  isOrdered?: boolean        // 注文済みフラグ
+  orderedOrderNo?: string    // 注文番号
+  // 履歴
+  historyLog?: Array<{ at: string; action: string; detail: string }>
 }
 
 interface Props {
@@ -91,6 +96,16 @@ function fmtDt(iso?: string | null) {
   const m = String(d.getMinutes()).padStart(2, "0")
   return `${dateStr} ${h}:${m}`
 }
+// ── 明細パターン判定 ──────────────────────────────────────────
+// 1: 金額算出不可 / 2: 金額OK・納期未算出 / 3: 金額・納期両方OK
+function detailPattern(d: { unitPrice?: number; totalPrice?: number; fastDeliveryDate?: string; deliveryDeadline?: string | null }): 1 | 2 | 3 {
+  const hasPrice = (d.unitPrice ?? 0) > 0
+  if (!hasPrice) return 1
+  const hasDelivery = !!d.fastDeliveryDate && d.fastDeliveryDate !== ""
+  if (!hasDelivery) return 2
+  return 3
+}
+
 function allCutsDefined(t: string, a: string, b: string): boolean {
   return t !== "〜" && a !== "〜" && b !== "〜"
 }
@@ -245,6 +260,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   const [saving, setSaving]   = useState(false)
   const [saveMsg, setSaveMsg] = useState("")
   const [draftId, setDraftId] = useState<string | null>(null)
+  const [historyModal, setHistoryModal] = useState<{ id: string; log: Array<{ at: string; action: string; detail: string }> } | null>(null)
 
   // マスタ（DBから取得したProcSpecにT/A/B列含む）
   const [procSpecs, setProcSpecs] = useState<ProcSpec[]>(initSpecs)
@@ -545,11 +561,13 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     if (!form.calculated) return
     if (editingDetailId) {
       console.log("[handleAdd] 明細更新 id:", editingDetailId, JSON.stringify(form, null, 2))
-      setDetails(p => p.map(d => d.clientDetailId === editingDetailId ? { ...form, clientDetailId: editingDetailId } : d))
+      const editLog = { at: new Date().toISOString(), action: "編集", detail: `材料:${form.materialCode} T:${form.sizeT} A:${form.sizeA} B:${form.sizeB} 数量:${form.quantity}` }
+      setDetails(p => p.map(d => d.clientDetailId === editingDetailId ? { ...form, clientDetailId: editingDetailId, historyLog: [...(d.historyLog ?? []), editLog] } : d))
       setEditingDetailId(null)
     } else {
       console.log("[handleAdd] 明細追加:", JSON.stringify(form, null, 2))
-      setDetails(p => [...p, { ...form }])
+      const addLog = { at: new Date().toISOString(), action: "新規追加", detail: `材料:${form.materialCode} T:${form.sizeT} A:${form.sizeA} B:${form.sizeB} 数量:${form.quantity}` }
+      setDetails(p => [...p, { ...form, historyLog: [addLog] }])
     }
     const m = form.materialCode
     const matName = materials.find(x => x.materialCode === m)?.materialName ?? ""
@@ -676,6 +694,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const sel = details.filter(d => selectedIds.has(d.clientDetailId))
     console.log("[handleOrder] 選択明細:", sel.length, "件")
     if (sel.length === 0) { alert("注文する明細を選択してください"); return }
+    // パターン3のみ注文可能チェック
+    const nonOrderable = sel.filter(d => detailPattern(d) !== 3)
+    if (nonOrderable.length > 0) { alert("注文できない明細が含まれています。\n金額・納期が両方算出された明細のみ注文できます。"); return }
     await handleSave()
     if (draftId) window.location.href = "/orders/confirm?estimateId=" + draftId
   }
@@ -1383,8 +1404,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
           <thead>
             <tr>
-              <th style={{ ...TH, background: "#166534", width: "28px" }}>
-                <input type="checkbox" onChange={e => selAll(e.target.checked)} checked={details.length > 0 && selectedIds.size === details.length} />
+              <th style={{ ...TH, background: "#166534", width: "60px" }}>
+                <input type="checkbox"
+                  onChange={e => selAll(e.target.checked)}
+                  checked={details.filter(d => detailPattern(d) === 3 && !d.isOrdered).length > 0 && details.filter(d => detailPattern(d) === 3 && !d.isOrdered).every(d => selectedIds.has(d.clientDetailId))}
+                  title="注文可能な明細をすべて選択" />
               </th>
               <th style={{ ...TH, background: "#166534", width: "28px" }}>No</th>
               <th style={{ ...TH, background: "#166534" }}>材料</th>
@@ -1405,8 +1429,22 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
             {details.length === 0 ? (
               <tr><td colSpan={14} style={{ ...TD, textAlign: "center", padding: "12px", color: "#94a3b8" }}>明細がありません。上のフォームで入力後「明細に追加」してください。</td></tr>
             ) : details.map((d, i) => (
-              <tr key={d.clientDetailId} style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
-                <td style={{ ...TD, textAlign: "center" }}><input type="checkbox" checked={selectedIds.has(d.clientDetailId)} onChange={e => selOne(d.clientDetailId, e.target.checked)} /></td>
+              <tr key={d.clientDetailId} style={{ background: d.isOrdered ? "#fefce8" : i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
+                <td style={{ ...TD, textAlign: "center", width: "60px" }}>
+                  {d.isOrdered ? (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                      <span style={{ background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "9999px", whiteSpace: "nowrap" }}>注文済</span>
+                      {d.orderedOrderNo && <span style={{ fontSize: "9px", color: "#166534", fontWeight: 600 }}>{d.orderedOrderNo}</span>}
+                    </div>
+                  ) : detailPattern(d) === 3 ? (
+                    <input type="checkbox" checked={selectedIds.has(d.clientDetailId)} onChange={e => selOne(d.clientDetailId, e.target.checked)} title="注文可能" />
+                  ) : (
+                    <span title={detailPattern(d) === 1 ? "金額未算出のため注文不可" : "納期未回答のため注文不可"}
+                      style={{ fontSize: "9px", color: "#94a3b8", cursor: "default" }}>
+                      {detailPattern(d) === 1 ? "❶" : "❷"}
+                    </span>
+                  )}
+                </td>
                 <td style={{ ...TD, textAlign: "center" }}>{i + 1}</td>
                 <td style={TD}>{materials.find(m => m.materialCode === d.materialCode)?.materialName ?? d.materialCode}</td>
                 <td style={TD}>{d.shiagari}</td>
@@ -1422,10 +1460,20 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.unitPrice != null ? "¥" + d.unitPrice.toLocaleString() : "—"}</td>
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.totalPrice != null ? "¥" + d.totalPrice.toLocaleString() : "—"}</td>
                 <td style={{ ...TD, textAlign: "center" }}>
-                  <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
-                    <button className="btn-ochi btn-blue" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleEditDetail(d.clientDetailId)}>✏️ 編集</button>
-                    <button className="btn-ochi btn-gray" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDuplicateDetail(d.clientDetailId)}>📋 複写</button>
-                    <button className="btn-ochi btn-red" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDel(d.clientDetailId)}>🗑️ 削除</button>
+                  <div style={{ display: "flex", gap: "4px", justifyContent: "center", flexWrap: "wrap" }}>
+                    {!d.isOrdered && (
+                      <>
+                        <button className="btn-ochi btn-blue" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleEditDetail(d.clientDetailId)}>✏️ 編集</button>
+                        <button className="btn-ochi btn-gray" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDuplicateDetail(d.clientDetailId)}>📋 複写</button>
+                        <button className="btn-ochi btn-red" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDel(d.clientDetailId)}>🗑️ 削除</button>
+                      </>
+                    )}
+                    {d.isOrdered && (
+                      <button className="btn-ochi btn-gray" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }} onClick={() => handleDuplicateDetail(d.clientDetailId)}>📋 複写</button>
+                    )}
+                    <button className="btn-ochi btn-outline" style={{ fontSize: "11px", padding: "2px 8px", height: "26px" }}
+                      onClick={() => setHistoryModal({ id: d.clientDetailId, log: d.historyLog ?? [] })}
+                      title="変更履歴">📋 履歴</button>
                   </div>
                 </td>
               </tr>
@@ -1433,6 +1481,50 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
           </tbody>
         </table>
       </div>
+
+      {/* ─── 変更履歴モーダル ─── */}
+      {historyModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: "8px", boxShadow: "0 8px 32px rgba(0,0,0,0.25)", width: "600px", maxWidth: "95vw", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "#1e3a5f", color: "#fff", padding: "10px 16px", borderRadius: "8px 8px 0 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: 700, fontSize: "14px" }}>📋 明細変更履歴</span>
+              <button onClick={() => setHistoryModal(null)} style={{ background: "none", border: "none", color: "#fff", fontSize: "18px", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ overflowY: "auto", flex: 1, padding: "8px 0" }}>
+              {historyModal.log.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>履歴がありません</div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                  <thead>
+                    <tr>
+                      {["日時", "操作", "内容"].map(h => (
+                        <th key={h} style={{ background: "#1e3a5f", color: "#fff", padding: "6px 10px", textAlign: "left", position: "sticky", top: 0 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...historyModal.log].reverse().map((log, i) => (
+                      <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc" }}>
+                        <td style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#64748b" }}>
+                          {new Date(log.at).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </td>
+                        <td style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
+                          <span style={{ background: log.action === "新規追加" ? "#dcfce7" : log.action === "編集" ? "#dbeafe" : log.action === "注文" ? "#fef9c3" : "#f3f4f6", color: log.action === "新規追加" ? "#166534" : log.action === "編集" ? "#1e40af" : log.action === "注文" ? "#854d0e" : "#374151", fontSize: "11px", fontWeight: 600, padding: "1px 6px", borderRadius: "9999px" }}>{log.action}</span>
+                        </td>
+                        <td style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0", color: "#374151" }}>{log.detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div style={{ padding: "8px 16px", borderTop: "1px solid #e2e8f0", textAlign: "right" }}>
+              <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }} onClick={() => setHistoryModal(null)}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
