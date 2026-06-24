@@ -151,6 +151,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   const [custOrderNo, setCustOrderNo] = useState("")
   const [endUserNo, setEndUserNo]     = useState("")
   const [distCode, setDistCode]       = useState("")
+  const [distId, setDistId]           = useState<string | null>(null)  // マスタから呼び出したレコードID
+  const [distOriginal, setDistOriginal] = useState<Record<string,string> | null>(null) // 呼び出し時スナップショット
+  const [showDistModal, setShowDistModal] = useState(false)  // 出荷先検索モーダル表示フラグ
+  const [distModalKw, setDistModalKw] = useState("")         // モーダル内検索キーワード
+  const [distModalRows, setDistModalRows] = useState<any[]>([]) // モーダル検索結果
   const [distName, setDistName]       = useState("")
   const [distDept, setDistDept]       = useState("")
   const [distPerson, setDistPerson]   = useState("")
@@ -535,16 +540,27 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
 
   // ── 保存 ──
   const handleSave = async () => {
+    // 送り先マスタ登録/更新チェック
+    const distOk = await checkAndSaveDistMaster()
+    if (!distOk) return
+    const isHikitori = shippingMethod === "引取り"
+    // APIはbody直下のフラット構造で inputDate, details 等を参照する
     const payload = {
-      estimateId: draftId,
-      header: {
-        inputDate, estimateDate, shippingMethodId: 1,
-        destinationCode: distCode, destinationName: distName,
-        destinationDept: distDept, destinationPerson: distPerson,
-        destinationZip: distZip, destinationAddress: distAddr,
-        destinationTel: distTel, destinationFax: distFax,
-        contact, customerOrderNo: custOrderNo, endUserNo, remarks: contact,
-      },
+      inputDate,
+      estimateDate,
+      shippingMethodId: shippingMethod === "発送" ? 1 : shippingMethod === "直送" ? 2 : 3,
+      customerOrderNo: custOrderNo,
+      endUserNo,
+      remarks: contact,
+      contact,
+      destinationCode:    isHikitori ? "" : distCode,
+      destinationName:    isHikitori ? "" : distName,
+      destinationDept:    isHikitori ? "" : distDept,
+      destinationPerson:  isHikitori ? "" : distPerson,
+      destinationZip:     isHikitori ? "" : distZip,
+      destinationAddress: isHikitori ? "" : distAddr,
+      destinationTel:     isHikitori ? "" : distTel,
+      destinationFax:     isHikitori ? "" : distFax,
       details: details.map((d, i) => ({ ...d, rowNo: i + 1 })),
     }
     console.log("[handleSave] リクエスト:", JSON.stringify(payload, null, 2))
@@ -575,26 +591,166 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     if (draftId) window.location.href = "/orders/confirm?estimateId=" + draftId
   }
 
-  // ── 直送先検索 ──
+  // ── 直送先：フィールドセット共通ヘルパー ──
+  const applyDelivery = (dd: any) => {
+    setDistId(dd.id ?? null)
+    setDistCode(dd.deliveryCode ?? dd.code ?? "")
+    setDistName(dd.companyName ?? dd.name ?? "")
+    setDistDept(dd.departmentName ?? dd.department ?? "")
+    setDistPerson(dd.contactPerson ?? dd.person ?? "")
+    setDistZip(dd.postalCode ?? dd.zipCode ?? "")
+    setDistAddr([dd.address1, dd.address2, dd.address3].filter(Boolean).join("") || dd.address || "")
+    setDistTel(dd.phoneNumber ?? dd.tel ?? "")
+    setDistFax(dd.faxNumber ?? dd.fax ?? "")
+    // 呼び出し時スナップショット保存（変更検知用）
+    setDistOriginal({
+      name: dd.companyName ?? dd.name ?? "",
+      dept: dd.departmentName ?? dd.department ?? "",
+      person: dd.contactPerson ?? dd.person ?? "",
+      zip: dd.postalCode ?? dd.zipCode ?? "",
+      addr: [dd.address1, dd.address2, dd.address3].filter(Boolean).join("") || dd.address || "",
+      tel: dd.phoneNumber ?? dd.tel ?? "",
+      fax: dd.faxNumber ?? dd.fax ?? "",
+    })
+  }
+
+  // ── 直送先コード照会（コード入力→ENTER / 🔍ボタン） ──
   const handleDistSearch = async () => {
     console.log("[handleDistSearch] distCode:", distCode)
-    if (!distCode) return
+    if (!distCode.trim()) {
+      // コードが空 → モーダルを開く
+      setShowDistModal(true)
+      return
+    }
     try {
-      const url = `/api/v1/masters/direct-delivery/search?code=${distCode}&customerCode=${userInfo.customerCode}`
+      const url = `/api/v1/masters/direct-delivery/search?code=${encodeURIComponent(distCode.trim())}`
       const res = await fetch(url)
       const d = await res.json()
       console.log("[handleDistSearch] レスポンス:", JSON.stringify(d, null, 2))
       if (d.delivery) {
-        const dd = d.delivery
-        setDistName(dd.name ?? dd.companyName ?? "")
-        setDistDept(dd.department ?? dd.departmentName ?? "")
-        setDistPerson(dd.person ?? dd.contactPerson ?? "")
-        setDistZip(dd.zipCode ?? dd.postalCode ?? "")
-        setDistAddr(dd.address ?? dd.address1 ?? "")
-        setDistTel(dd.tel ?? dd.phoneNumber ?? "")
-        setDistFax(dd.fax ?? dd.faxNumber ?? "")
+        applyDelivery(d.delivery)
+        setTimeout(() => focusById("f-contact"), 50)
+      } else {
+        alert(`出荷先コード「${distCode}」はマスタに存在しません。
+出荷先名を直接入力してください。`)
+        setDistId(null)
+        setDistOriginal(null)
+        setTimeout(() => focusById("f-distName"), 50)
       }
     } catch(e: any) { console.error("[handleDistSearch] エラー:", e.message) }
+  }
+
+  // ── モーダル内キーワード検索 ──
+  const handleDistModalSearch = async (kw: string) => {
+    try {
+      const url = `/api/v1/masters/direct-delivery/search?keyword=${encodeURIComponent(kw)}`
+      const res = await fetch(url)
+      const d = await res.json()
+      setDistModalRows(d.deliveries ?? [])
+    } catch(e: any) { console.error("[handleDistModalSearch] エラー:", e.message) }
+  }
+
+  // ── モーダルで行選択 ──
+  const handleDistModalSelect = (row: any) => {
+    applyDelivery(row)
+    setShowDistModal(false)
+    setDistModalKw("")
+    setDistModalRows([])
+    setTimeout(() => focusById("f-contact"), 50)
+  }
+
+  // ── 送り先マスタ登録/更新チェック（保存・注文前に呼ぶ） ──
+  const checkAndSaveDistMaster = async (): Promise<boolean> => {
+    if (shippingMethod === "引取り") return true  // 引取りは送り先マスタ処理スキップ
+    const hasDistInfo = distName.trim() !== ""
+    if (!hasDistInfo) return true  // 送り先情報なし → スキップ
+
+    if (!distId) {
+      // コードなし・直接入力 → 新規登録確認
+      const ok = window.confirm(
+        `入力された送り先情報をマスタに登録しますか？
+
+` +
+        `出荷先名: ${distName}
+住所: ${distAddr}
+TEL: ${distTel}`
+      )
+      if (!ok) return true  // キャンセル → 登録しないが保存は続行
+      try {
+        const body = {
+          deliveryCode: distCode.trim() || "",
+          companyName: distName,
+          departmentName: distDept || null,
+          contactPerson: distPerson || null,
+          postalCode: distZip || null,
+          address1: distAddr || null,
+          phoneNumber: distTel || null,
+          faxNumber: distFax || null,
+        }
+        const res = await fetch("/api/v1/masters/direct-delivery", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          alert("送り先マスタ登録に失敗しました: " + (data.error ?? "不明なエラー"))
+          return false
+        }
+        setDistId(data.id)
+        if (data.deliveryCode) setDistCode(data.deliveryCode)
+        setDistOriginal({ name: distName, dept: distDept, person: distPerson, zip: distZip, addr: distAddr, tel: distTel, fax: distFax })
+        console.log("[checkAndSaveDistMaster] 新規登録完了:", data.id)
+      } catch(e: any) {
+        alert("送り先マスタ登録中にエラーが発生しました: " + e.message)
+        return false
+      }
+    } else if (distOriginal) {
+      const changed =
+        distName    !== distOriginal.name   ||
+        distDept    !== distOriginal.dept   ||
+        distPerson  !== distOriginal.person ||
+        distZip     !== distOriginal.zip    ||
+        distAddr    !== distOriginal.addr   ||
+        distTel     !== distOriginal.tel    ||
+        distFax     !== distOriginal.fax
+      if (changed) {
+        const ok = window.confirm(
+          `変更された送り先情報でマスタを更新しますか？
+
+` +
+          `出荷先名: ${distName}
+住所: ${distAddr}
+TEL: ${distTel}`
+        )
+        if (!ok) return true
+        try {
+          const body = {
+            companyName: distName,
+            departmentName: distDept || null,
+            contactPerson: distPerson || null,
+            postalCode: distZip || null,
+            address1: distAddr || null,
+            phoneNumber: distTel || null,
+            faxNumber: distFax || null,
+          }
+          const res = await fetch(`/api/v1/masters/direct-delivery/${distId}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+          const data = await res.json()
+          if (!res.ok) {
+            alert("送り先マスタ更新に失敗しました: " + (data.error ?? "不明なエラー"))
+            return false
+          }
+          setDistOriginal({ name: distName, dept: distDept, person: distPerson, zip: distZip, addr: distAddr, tel: distTel, fax: distFax })
+          console.log("[checkAndSaveDistMaster] 更新完了:", distId)
+        } catch(e: any) {
+          alert("送り先マスタ更新中にエラーが発生しました: " + e.message)
+          return false
+        }
+      }
+    }
+    return true
   }
 
   // ── 郵便番号検索（バグ修正：address1+address2+address3を連結） ──
@@ -690,23 +846,24 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         <select id="f-shippingMethod" style={{ ...SEL, width: "100px" }} value={shippingMethod}
           onChange={e => { console.log("[発送方法] →", e.target.value); setShippingMethod(e.target.value) }}
           onKeyDown={onEnter("f-distCode")} {...FH}>
-          <option value="発送">発送</option><option value="直送">直送</option><option value="持参">持参</option>
+          <option value="発送">発送</option><option value="直送">直送</option><option value="引取り">引取り</option>
         </select>
         <span style={{ fontSize: "10px", color: "#94a3b8" }}>リストよりお選びください</span>
       </div>
 
       {/* ─── 送り先情報 ─── */}
-      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderTop: "none", borderRadius: "0 0 4px 4px", padding: "6px 10px" }}>
-        <div style={{ fontSize: "11px", fontWeight: 700, color: "#1e3a5f", marginBottom: "5px" }}>送り先情報</div>
+      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderTop: "none", borderRadius: "0 0 4px 4px", padding: "6px 10px", opacity: shippingMethod === "引取り" ? 0.45 : 1, pointerEvents: shippingMethod === "引取り" ? "none" : undefined }}>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: "#1e3a5f", marginBottom: "5px" }}>送り先情報{shippingMethod === "引取り" && <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 400, marginLeft: "8px" }}>（引取りのため入力不可）</span>}</div>
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr 1fr", gap: "4px 8px", alignItems: "end", marginBottom: "4px" }}>
           <div>
             <div style={{ fontSize: "10px", fontWeight: 600, marginBottom: "2px" }}>出荷先</div>
             <div style={{ display: "flex", gap: "3px" }}>
               <input id="f-distCode" style={{ ...INP, width: "70px" }} value={distCode}
-                onChange={e => { console.log("[出荷先コード] →", e.target.value); setDistCode(e.target.value) }}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleDistSearch().then(() => focusById("f-distName")) } }} {...FH} />
+                onChange={e => { console.log("[出荷先コード] →", e.target.value); setDistCode(e.target.value); setDistId(null); setDistOriginal(null) }}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleDistSearch() } }} {...FH} />
               <button className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "1px 6px", height: "24px" }}
-                onClick={() => handleDistSearch().then(() => focusById("f-distName"))}>🔍</button>
+                title="出荷先を検索"
+                onClick={() => { setShowDistModal(true); setDistModalKw(""); setTimeout(() => handleDistModalSearch(""), 0) }}>🔍</button>
             </div>
           </div>
           <div>
@@ -770,13 +927,66 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               onKeyDown={onEnter("f-contact")} {...FH} />
           </div>
         </div>
-        <div>
+        <div style={{ pointerEvents: "auto", opacity: 1 }}>
           <div style={{ fontSize: "10px", fontWeight: 600, marginBottom: "2px" }}>通信欄</div>
-          <input id="f-contact" style={INP} value={contact}
+          <input id="f-contact" style={{ ...INP, pointerEvents: "auto", opacity: 1 }} value={contact}
             onChange={e => { console.log("[通信欄] →", e.target.value); setContact(e.target.value) }}
             onKeyDown={onEnter("f-mat-suggest")} {...FH} />
         </div>
       </div>
+
+      {/* ─── 出荷先検索モーダル ─── */}
+      {showDistModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: "8px", boxShadow: "0 8px 32px rgba(0,0,0,0.25)", width: "640px", maxWidth: "95vw", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "#1e3a5f", color: "#fff", padding: "10px 16px", borderRadius: "8px 8px 0 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: 700, fontSize: "14px" }}>🔍 出荷先検索</span>
+              <button onClick={() => { setShowDistModal(false); setDistModalKw(""); setDistModalRows([]) }}
+                style={{ background: "none", border: "none", color: "#fff", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", gap: "8px" }}>
+              <input autoFocus style={{ ...INP, flex: 1 }} placeholder="コード・社名・部署・担当者で検索"
+                value={distModalKw} onChange={e => setDistModalKw(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleDistModalSearch(distModalKw) } }} {...FH} />
+              <button className="btn-ochi btn-blue" style={{ fontSize: "13px" }} onClick={() => handleDistModalSearch(distModalKw)}>検索</button>
+            </div>
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {distModalRows.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+                  {distModalKw ? "該当する出荷先が見つかりません" : "キーワードを入力して検索してください"}
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                  <thead><tr>
+                    {["コード","出荷先名","部署","担当者","郵便番号","住所"].map(h => (
+                      <th key={h} style={{ background: "#1e3a5f", color: "#fff", padding: "6px 8px", textAlign: "left", whiteSpace: "nowrap", position: "sticky", top: 0 }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {distModalRows.map((row, i) => (
+                      <tr key={row.id} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc", cursor: "pointer" }}
+                        onClick={() => handleDistModalSelect(row)}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#dbeafe")}
+                        onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#f8fafc")}>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{row.deliveryCode}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #e2e8f0" }}>{row.companyName}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #e2e8f0" }}>{row.departmentName ?? ""}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #e2e8f0" }}>{row.contactPerson ?? ""}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{row.postalCode ?? ""}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #e2e8f0" }}>{[row.address1, row.address2, row.address3].filter(Boolean).join("")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div style={{ padding: "8px 16px", borderTop: "1px solid #e2e8f0", textAlign: "right" }}>
+              <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}
+                onClick={() => { setShowDistModal(false); setDistModalKw(""); setDistModalRows([]) }}>キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── 見積明細編集 ─── */}
       <div style={{ fontSize: "11px", fontWeight: 600, background: editingDetailId ? "#fef3c7" : "#d8e9f5", color: editingDetailId ? "#92400e" : "#1e3a5f", padding: "3px 8px", borderRadius: "4px 4px 0 0", marginTop: "8px" }}>
