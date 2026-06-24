@@ -288,8 +288,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   useEffect(() => {
     if (!copySource) return
     console.log("[EstimateNewClient] copySource復元開始:", JSON.stringify(copySource))
-    if (copySource.estimateId)        setDraftId(copySource.estimateId)
-    if (copySource.estimateNo)        setEstimateNo(copySource.estimateNo)
+    // コピーモード(isCopy=true)の場合はdraftIdをセットしない（新規POSTで別伝票を作成）
+    // 編集モード(isCopy=false)のみdraftIdをセットしてPUT更新にする
+    if (!isCopy) {
+      if (copySource.estimateId) setDraftId(copySource.estimateId)
+      if (copySource.estimateNo) setEstimateNo(copySource.estimateNo)
+    }
     if (copySource.customerOrderNo)   setCustOrderNo(copySource.customerOrderNo)
     if (copySource.endUserNo)         setEndUserNo(copySource.endUserNo)
     if (copySource.destinationCode) {

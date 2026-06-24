@@ -67,8 +67,8 @@ export default function DirectDeliveryClient({ deliveries: initial, customerCode
   const handleDelete = useCallback(async (d: DD) => {
     if (!confirm(`「${d.companyName}」を削除しますか？`)) return
     const res = await fetch(`/api/v1/masters/direct-delivery/${d.id}`, { method: "DELETE" })
-    if (res.ok) router.refresh()
-    else alert("削除失敗")
+    if (res.ok) { setList(p => p.filter(x => x.id !== d.id)); router.refresh() }
+    else { const err = await res.json().catch(() => ({})); alert("削除失敗: " + (err.error ?? res.status)) }
   }, [router])
 
   const handlePostalSearch = useCallback(async () => {
