@@ -121,12 +121,14 @@ const TD: React.CSSProperties = {
   border: "1px solid #e2e8f0", padding: "2px 3px", verticalAlign: "middle",
 }
 const INP: React.CSSProperties = {
-  width: "100%", border: "1px solid #cbd5e1", borderRadius: "3px",
-  padding: "2px 4px", fontSize: "13px", background: "#fff", boxSizing: "border-box", height: "28px",
+  width: "100%", border: "1.5px solid #94a3b8", borderRadius: "4px",
+  padding: "2px 4px", fontSize: "13px", background: "#ffffff", boxSizing: "border-box", height: "28px",
+  boxShadow: "inset 0 1px 2px rgba(15,23,42,0.06)",
 }
 const SEL: React.CSSProperties = {
-  width: "100%", border: "1px solid #cbd5e1", borderRadius: "3px",
-  padding: "1px 2px", fontSize: "13px", background: "#fff", height: "28px",
+  width: "100%", border: "1.5px solid #94a3b8", borderRadius: "4px",
+  padding: "1px 2px", fontSize: "13px", background: "#ffffff", height: "28px",
+  boxShadow: "inset 0 1px 2px rgba(15,23,42,0.06)",
 }
 const LBL: React.CSSProperties = {
   background: "#e8edf5", fontSize: "12px", fontWeight: 600, color: "#374151",
@@ -1376,22 +1378,25 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
             {/* 計算結果・ボタン */}
             <tr>
               <td colSpan={2} style={{ ...TD, padding: "4px" }}>
-                <div style={{ fontSize: "9px", color: "#64748b" }}>最短納期</div>
-                <input style={{ ...INP, background: "#f8fafc", color: "#64748b", fontSize: "10px" }} value={fmt(form.fastDeliveryDate)} readOnly />
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#334155" }}>最短納期</div>
+                <input style={{ ...INP, background: "#eff6ff", border: "1.5px solid #93c5fd", color: "#1d4ed8", fontSize: "15px", fontWeight: 700 }} value={fmt(form.fastDeliveryDate)} readOnly />
               </td>
               <td colSpan={6} style={{ ...TD, padding: "4px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                   <div>
-                    <div style={{ fontSize: "9px", color: "#64748b" }}>納期保証期限</div>
-                    <input style={{ ...INP, width: "160px", background: form.fastDeliveryDeadline ? "#ffffcc" : "#fff" }} value={fmtDt(form.fastDeliveryDeadline)} readOnly />
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#334155" }}>納期保証期限</div>
+                    <input style={{ ...INP, width: "160px", fontSize: "14px", fontWeight: 700,
+                      background: form.fastDeliveryDeadline ? "#fef9c3" : "#fff",
+                      border: form.fastDeliveryDeadline ? "1.5px solid #f59e0b" : "1.5px solid #94a3b8",
+                      color: form.fastDeliveryDeadline ? "#92400e" : "#0f172a" }} value={fmtDt(form.fastDeliveryDeadline)} readOnly />
                   </div>
                   <div>
-                    <div style={{ fontSize: "9px", color: "#64748b" }}>送料込みプレート単価</div>
-                    <input style={{ ...INP, width: "95px", textAlign: "right", background: "#f8fafc", fontFamily: "monospace" }} value={form.unitPrice != null ? "¥" + form.unitPrice.toLocaleString() : ""} readOnly />
+                    <div style={{ fontSize: "10px", fontWeight: 600, color: "#334155" }}>送料込みプレート単価</div>
+                    <input style={{ ...INP, width: "95px", textAlign: "right", background: "#f8fafc", border: "1.5px solid #cbd5e1", color: "#0f172a", fontFamily: "monospace" }} value={form.unitPrice != null ? "¥" + form.unitPrice.toLocaleString() : ""} readOnly />
                   </div>
                   <div>
-                    <div style={{ fontSize: "9px", color: "#64748b" }}>送料込みプレート金額</div>
-                    <input style={{ ...INP, width: "95px", textAlign: "right", background: "#f8fafc", fontFamily: "monospace" }} value={form.totalPrice != null ? "¥" + form.totalPrice.toLocaleString() : ""} readOnly />
+                    <div style={{ fontSize: "10px", fontWeight: 600, color: "#334155" }}>送料込みプレート金額</div>
+                    <input style={{ ...INP, width: "95px", textAlign: "right", background: "#f8fafc", border: "1.5px solid #cbd5e1", color: "#0f172a", fontFamily: "monospace" }} value={form.totalPrice != null ? "¥" + form.totalPrice.toLocaleString() : ""} readOnly />
                   </div>
                 </div>
               </td>
