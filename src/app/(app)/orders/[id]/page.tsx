@@ -33,8 +33,11 @@ export default async function OrderDetailPage({ params }: Props) {
           details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } },
         },
       },
-      statusHistories:     { orderBy: { occurredAt: "asc" } },
-      specChangeHistories: { orderBy: { occurredAt: "asc" } },
+      statusHistories: { orderBy: { occurredAt: "asc" } },
+      // ★2026/07/13 修正: Prismaスキーマ上の実際のリレーション名は specChanges
+      // (specChangeHistories という名前のフィールドは存在せず
+      //  PrismaClientValidationErrorの原因になっていた)
+      specChanges:     { orderBy: { occurredAt: "asc" } },
     },
   })
 
@@ -180,7 +183,7 @@ export default async function OrderDetailPage({ params }: Props) {
       )}
 
       {/* 仕様変更履歴 */}
-      {order.specChangeHistories?.length > 0 && (
+      {order.specChanges?.length > 0 && (
         <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 mb-4">
           <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-4">⚠️ 仕様変更履歴</p>
           <div className="overflow-x-auto">
@@ -193,7 +196,7 @@ export default async function OrderDetailPage({ params }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {order.specChangeHistories.map((h: any) => (
+                {order.specChanges.map((h: any) => (
                   <tr key={h.id} className="hover:bg-amber-50/50">
                     <td className="px-3 py-2 text-center">{h.rowNo}</td>
                     <td className="px-3 py-2 font-mono">{h.fieldName}</td>

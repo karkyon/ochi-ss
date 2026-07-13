@@ -14,7 +14,8 @@ export async function GET(req: NextRequest, { params }: Props) {
       include: {
         estimateHeader: { include: { details: { where: { isDeleted: false }, orderBy: { rowNo: "asc" } } } },
         statusHistories: { orderBy: { occurredAt: "asc" } },
-        specChangeHistories: { orderBy: { occurredAt: "asc" } },
+        // ★2026/07/13 修正: Prismaスキーマ上の実際のリレーション名は specChanges
+        specChanges: { orderBy: { occurredAt: "asc" } },
       },
     })
   }) as any
@@ -47,7 +48,9 @@ export async function GET(req: NextRequest, { params }: Props) {
       changedBy: h.changedBy, changeReason: h.changeReason ?? null,
       trackingNo: h.trackingNo ?? null, occurredAt: new Date(h.occurredAt).toISOString(),
     })),
-    specChangeHistories: (order.specChangeHistories ?? []).map((h: any) => ({
+    // レスポンスのJSONキー名"specChangeHistories"はAPI互換性のため維持し、
+    // 読み出し元(order.specChanges)のみPrismaの実際のリレーション名に合わせて修正。
+    specChangeHistories: (order.specChanges ?? []).map((h: any) => ({
       id: h.id, rowNo: h.rowNo, fieldName: h.fieldName,
       oldValue: h.oldValue ?? null, newValue: h.newValue,
       changeReason: h.changeReason ?? null, changedBy: h.changedBy,
