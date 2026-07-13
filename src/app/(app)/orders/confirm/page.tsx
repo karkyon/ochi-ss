@@ -14,6 +14,8 @@ export default function OrderConfirmPage() {
   const [ordering, setOrdering]       = useState(false)
   const [error, setError]             = useState("")
   const [expiredRows, setExpiredRows] = useState<number[]>([])   // 期限切れ行番号
+  // 材料コード→材料名 解決用マップ（明細のmaterialNameがnullでも確実に名称表示するため）
+  const [materials, setMaterials] = useState<Record<string, string>>({})
 
   // 見積データ取得 + 納期有効期限チェック
   useEffect(() => {
@@ -26,6 +28,17 @@ export default function OrderConfirmPage() {
         if (!res.ok) { setError("見積データ取得失敗"); setLoading(false); return }
         const d = await res.json()
         setEstimate(d)
+
+        // 材料マスタ取得（明細のmaterialNameがnullの場合でも材料名を表示するため）
+        try {
+          const mres = await fetch("/api/v1/masters/materials")
+          if (mres.ok) {
+            const mlist = await mres.json()
+            const map: Record<string, string> = {}
+            for (const m of mlist) map[m.materialCode] = m.materialName
+            setMaterials(map)
+          }
+        } catch { /* 材料名解決は補助情報のためサイレントに継続 */ }
 
         // 納期有効期限チェック
         const now = new Date()
@@ -133,34 +146,49 @@ export default function OrderConfirmPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead>
                   <tr>
-                    {["No","材料","寸法T×A×B","数量","単価","合計","最短納期","納期有効期限"].map(h => (
-                      <th key={h} className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 whitespace-nowrap">{h}</th>
+                    {["No","材料","加工仕様","寸法T×A×B(mm)","公差(T/A/B)","面取り(4C/8C)","数量","単価","合計","最短納期","納期有効期限"].map(h => (
+                      <th key={h} className="px-3 py-2 text-center text-[11px] font-semibold text-white whitespace-nowrap border border-[#14293f]" style={{ background: "#1e3a5f" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {(estimate.details ?? []).map((d: any) => {
+                <tbody className="divide-y divide-gray-200">
+                  {(estimate.details ?? []).map((d: any, idx: number) => {
                     const expired = expiredRows.includes(d.rowNo)
                     const deadline = d.deliveryDeadline ? new Date(d.deliveryDeadline) : null
+                    const matName = materials[d.materialCode] || d.materialName || d.materialCode
+                    const fmtK = (u: any, l: any) => (u == null && l == null) ? "—" : `+${u ?? 0}/-${Math.abs(l ?? 0)}`
                     return (
-                      <tr key={d.rowNo} className={expired ? "bg-amber-50" : "hover:bg-gray-50"}>
-                        <td className="px-3 py-2 text-center font-medium">
+                      <tr key={d.rowNo} className={expired ? "bg-amber-50" : idx % 2 === 1 ? "bg-slate-50" : "bg-white"}>
+                        <td className="px-3 py-2 text-center font-medium border-r border-gray-200">
                           {d.rowNo}
                           {expired && <span className="ml-1 text-amber-600">⚠</span>}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap">{d.materialName || d.materialCode}</td>
-                        <td className="px-3 py-2 whitespace-nowrap font-mono">
+                        <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200 font-semibold text-gray-800">{matName}</td>
+                        <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200">
+                          <div className="font-medium text-gray-800">{d.kakouShiyou || "—"}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">T:{d.kakouT || "-"} A:{d.kakouA || "-"} B:{d.kakouB || "-"}</div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap font-mono text-center border-r border-gray-200">
                           {Number(d.sizeT)}×{Number(d.sizeA)}×{Number(d.sizeB)}
                         </td>
-                        <td className="px-3 py-2 text-right">{d.quantity}</td>
-                        <td className="px-3 py-2 text-right">¥{Number(d.unitPrice ?? 0).toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-medium">¥{Number(d.totalPrice ?? 0).toLocaleString()}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">{d.shortestDelivery || "—"}</td>
-                        <td className={`px-3 py-2 whitespace-nowrap ${expired ? "text-amber-700 font-semibold" : "text-gray-500"}`}>
-                          {deadline ? deadline.toLocaleDateString("ja-JP") : "—"}
-                          {expired && " (期限切れ)"}
+                        <td className="px-3 py-2 whitespace-nowrap text-[10px] font-mono text-gray-600 border-r border-gray-200">
+                          <div>T {fmtK(d.kousaTUpper, d.kousaTLower)}</div>
+                          <div>A {fmtK(d.kousaAUpper, d.kousaALower)}</div>
+                          <div>B {fmtK(d.kousaBUpper, d.kousaBLower)}</div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-[10px] text-gray-600 text-center border-r border-gray-200">
+                          {d.mentori4 != null ? `4C:${Number(d.mentori4)}` : "4C:—"}<br />
+                          {d.mentori8 != null ? `8C:${Number(d.mentori8)}` : "8C:—"}
+                        </td>
+                        <td className="px-3 py-2 text-right border-r border-gray-200">{d.quantity}</td>
+                        <td className="px-3 py-2 text-right border-r border-gray-200">¥{Number(d.unitPrice ?? 0).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-semibold border-r border-gray-200">¥{Number(d.totalPrice ?? 0).toLocaleString()}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-center border-r border-gray-200">{d.shortestDelivery || "—"}</td>
+                        <td className={`px-3 py-2 whitespace-nowrap text-center ${expired ? "text-red-600 font-bold" : "text-gray-600"}`}>
+                          {deadline ? deadline.toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          {expired && <div className="text-[10px]">⚠ 期限切れ</div>}
                         </td>
                       </tr>
                     )
