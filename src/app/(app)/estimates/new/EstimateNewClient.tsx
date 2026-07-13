@@ -1417,7 +1417,21 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
             <tr>
               <td colSpan={2} style={{ ...TD, padding: "4px" }}>
                 <div style={{ fontSize: "11px", fontWeight: 700, color: "#334155" }}>最短納期</div>
-                <input style={{ ...INP, background: "#eff6ff", border: "1.5px solid #93c5fd", color: "#1d4ed8", fontSize: "15px", fontWeight: 700 }} value={fmt(form.fastDeliveryDate)} readOnly />
+                <input style={{ ...INP,
+                  background: form.fastDeliveryDate ? "#eff6ff" : "#fffbeb",
+                  border: form.fastDeliveryDate ? "1.5px solid #93c5fd" : "1.5px solid #f59e0b",
+                  color: form.fastDeliveryDate ? "#1d4ed8" : "#b45309",
+                  fontSize: form.fastDeliveryDate ? "15px" : "12px", fontWeight: 700 }}
+                  value={form.fastDeliveryDate ? fmt(form.fastDeliveryDate) : (form.calculated ? "納期回答待ち" : "")} readOnly />
+                {/* ★2026/07/13 追加: 見積金額・納期のいずれかが未回答（算出不可）の場合、
+                    ブランク表示のまま放置せず、営業担当が確認・回答する旨を明示する。
+                    shortestDelivery が空文字で返るのは production SP側が当該組合せの
+                    納期パターンを見つけられなかった場合であり、フロント側の不具合ではない。 */}
+                {form.calculated && (!form.fastDeliveryDate || !form.unitPrice) && (
+                  <div style={{ fontSize: "9px", color: "#b45309", marginTop: "3px", lineHeight: 1.35, maxWidth: "230px" }}>
+                    ※見積金額・納期が未回答の場合、営業担当が内容を確認のうえ改めてご回答いたします。
+                  </div>
+                )}
               </td>
               <td colSpan={6} style={{ ...TD, padding: "4px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
@@ -1536,8 +1550,10 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <td style={{ ...TD, textAlign: "right" }}>{d.sizeB}</td>
                 <td style={{ ...TD, textAlign: "center" }}>{d.mentori4 ? `4C:${d.mentori4}` : ""}{d.mentori8 ? ` 8C:${d.mentori8}` : ""}</td>
                 <td style={{ ...TD, textAlign: "right" }}>{d.quantity}</td>
-                <td style={{ ...TD, textAlign: "center", color: isExpired(d.deliveryDeadline) ? "#ef4444" : "#374151" }}>
-                  {fmt(d.fastDeliveryDate)}{isExpired(d.deliveryDeadline) && <span style={{ color: "#ef4444", fontSize: "9px" }}> ⚠期限切</span>}
+                <td style={{ ...TD, textAlign: "center", color: !d.fastDeliveryDate ? "#b45309" : isExpired(d.deliveryDeadline) ? "#ef4444" : "#374151" }}>
+                  {d.fastDeliveryDate
+                    ? <>{fmt(d.fastDeliveryDate)}{isExpired(d.deliveryDeadline) && <span style={{ color: "#ef4444", fontSize: "9px" }}> ⚠期限切</span>}</>
+                    : <span style={{ fontWeight: 700, fontSize: "10px" }}>納期回答待ち</span>}
                 </td>
                 <td style={{ ...TD, textAlign: "center" }}>
                   {d.deliveryDeadline ? (

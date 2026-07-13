@@ -1161,8 +1161,8 @@ export default function EstimateEditClient({ estimateId, estimateData, materials
                   <td className="px-3 py-2 text-right font-medium text-blue-700">
                     {d.totalPrice != null ? `¥${d.totalPrice.toLocaleString()}` : "—"}
                   </td>
-                  <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap">
-                    {d.shortestDelivery || "—"}
+                  <td className={`px-3 py-2 text-center whitespace-nowrap ${d.shortestDelivery ? "text-gray-600" : "text-amber-700 font-semibold"}`}>
+                    {d.shortestDelivery || "納期回答待ち"}
                   </td>
                   <td className="px-3 py-2 text-center">
                     <button
