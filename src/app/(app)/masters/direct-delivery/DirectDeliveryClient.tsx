@@ -195,15 +195,18 @@ export default function DirectDeliveryClient({ deliveries: initial, customerCode
               <F label="部署名" k="departmentName" />
               <F label="担当者名" k="contactPerson" />
               {/* 郵便番号（住所検索ボタン付き） */}
+              {/* ★2026/07/13 修正: 郵便番号入力欄が flex-1 で幅を取りすぎ、
+                  「住所検索」ボタンが隣のTEL欄に重なって見える不具合を修正。
+                  郵便番号欄を固定幅(w-28)にし、ボタンは shrink-0 で確保する。 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <input type="text" value={form.postalCode} onChange={e => setForm(p => ({ ...p, postalCode: e.target.value }))}
                     placeholder="0000000" maxLength={8}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    className="w-28 shrink-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   <button type="button" onClick={handlePostalSearch} disabled={postalSearching}
-                    className="px-3 py-2 text-xs font-medium rounded-lg bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap">
-                    {postalSearching ? "検索中..." : "住所検索"}
+                    className="shrink-0 px-3 py-2 text-xs font-medium rounded-lg bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap">
+                    {postalSearching ? "検索中..." : "📍 住所検索"}
                   </button>
                 </div>
                 {postalError && <p className="mt-1 text-xs text-red-500">{postalError}</p>}

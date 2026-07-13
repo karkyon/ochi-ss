@@ -1423,15 +1423,6 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   color: form.fastDeliveryDate ? "#1d4ed8" : "#b45309",
                   fontSize: form.fastDeliveryDate ? "15px" : "12px", fontWeight: 700 }}
                   value={form.fastDeliveryDate ? fmt(form.fastDeliveryDate) : (form.calculated ? "納期回答待ち" : "")} readOnly />
-                {/* ★2026/07/13 追加: 見積金額・納期のいずれかが未回答（算出不可）の場合、
-                    ブランク表示のまま放置せず、営業担当が確認・回答する旨を明示する。
-                    shortestDelivery が空文字で返るのは production SP側が当該組合せの
-                    納期パターンを見つけられなかった場合であり、フロント側の不具合ではない。 */}
-                {form.calculated && (!form.fastDeliveryDate || !form.unitPrice) && (
-                  <div style={{ fontSize: "9px", color: "#b45309", marginTop: "3px", lineHeight: 1.35, maxWidth: "230px" }}>
-                    ※見積金額・納期が未回答の場合、営業担当が内容を確認のうえ改めてご回答いたします。
-                  </div>
-                )}
               </td>
               <td colSpan={6} style={{ ...TD, padding: "4px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
@@ -1480,6 +1471,18 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 )}
               </td>
             </tr>
+            {/* ★2026/07/13 修正: 営業確認メッセージは狭い列に収めず、
+                計算結果行の下にフル幅の行として大きいフォントサイズ・
+                折り返しなしで表示する（視認性向上）。 */}
+            {form.calculated && (!form.fastDeliveryDate || !form.unitPrice) && (
+              <tr>
+                <td colSpan={17} style={{ ...TD, padding: "6px 10px", background: "#fffbeb", borderTop: "2px solid #f59e0b" }}>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#92400e", whiteSpace: "nowrap" }}>
+                    ※見積金額・納期が未回答の場合、営業担当が内容を確認のうえ改めてご回答いたします。
+                  </div>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
