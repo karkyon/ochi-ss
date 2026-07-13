@@ -72,6 +72,11 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
       unitPrice:  Number(d.unitPrice  ?? 0),
       totalPrice: Number(d.totalPrice ?? 0),
       deliveryDate:     d.shortestDelivery ?? undefined,
+      // ★2026/07/13 追加修正: EstimateNewClient.tsx の登録済み明細一覧「納期」列は
+      // deliveryDate ではなく fastDeliveryDate を参照している
+      // ({fmt(d.fastDeliveryDate)})。この行が無いと納期保証期限は表示されるのに
+      // 肝心の最短納期だけ常に空欄になる。/estimates/new/page.tsx と同じ形式に統一。
+      fastDeliveryDate: d.shortestDelivery ?? undefined,
       // ★2026/07/13 修正: .slice(0, 10)で日付のみに切り詰めると時刻(17:30等)が
       // 失われ、EstimateNewClient側のisExpired()判定で「すでに期限切れ」と
       // 誤判定される致命的バグがあった。/estimates/new/page.tsx と同様に
