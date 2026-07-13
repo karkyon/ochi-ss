@@ -254,6 +254,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     })
   }, [])
   const [details, setDetails] = useState<DetailForm[]>([])
+  // 見積計算の二重送信防止フラグ（連打・Enter二重発火によるSQL Server側
+  // _TMP_WO基準納期設定 の同時実行競合(PK違反)を防止するため追加）
+  const [calcLoading, setCalcLoading] = useState(false)
   // 編集中の明細ID。nullなら新規追加モード、値があれば「その行を編集中」で
   // 「明細に追加」ボタンが「明細を更新」に変わり、更新時は該当行を
   // 配列内の同じ位置で上書きする（削除して末尾に追加、ではない）。
@@ -479,6 +482,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
 
   // ── 計算 ──
   const handleCalculate = async () => {
+    // 二重送信ガード: 計算中の再クリック/Enter二重発火を無視する
+    if (calcLoading) {
+      console.warn("[handleCalculate] 計算処理中のため多重実行をブロックしました")
+      return
+    }
     const spec = procSpecs.find(s => s.processingSpecCode === form.kakouShiyouCode)
     const payload = {
       customerCode: userInfo.customerCode,
@@ -506,6 +514,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     console.log("==================================================")
     if (!form.materialCode || !form.kakouShiyouCode) { alert("材料と加工仕様を選択してください"); return }
     if (!form.sizeT || !form.sizeB || !form.sizeA) { alert("寸法T・巾・長さを入力してください"); return }
+    setCalcLoading(true)
     try {
       const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -552,6 +561,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       try { console.error("全プロパティ:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2)) } catch { /* noop */ }
       console.error("=======================================================")
       alert("見積計算に失敗しました: " + e.message)
+    } finally {
+      setCalcLoading(false)
     }
   }
 
@@ -1370,15 +1381,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               <td colSpan={9} style={{ ...TD, padding: "4px" }}>
                 <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center" }}>
                   <button id="btn-calc" className="btn-ochi btn-blue"
-                    style={{ fontSize: "13px", minWidth: "100px" }}
+                    style={{ fontSize: "13px", minWidth: "100px", opacity: calcLoading ? 0.6 : 1, cursor: calcLoading ? "not-allowed" : "pointer" }}
                     onClick={handleCalculate}
-                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleCalculate() } }}>
-                    📊 見積計算
+                    disabled={calcLoading}>
+                    {calcLoading ? "⏳ 計算中..." : "📊 見積計算"}
                   </button>
                   <button id="btn-add" className="btn-ochi"
                     style={{ fontSize: "13px", minWidth: "110px", background: form.calculated ? (editingDetailId ? "#d97706" : "#16a34a") : "#94a3b8", color: "#fff", cursor: form.calculated ? "pointer" : "not-allowed", border: "none" }}
-                    onClick={handleAdd} disabled={!form.calculated}
-                    onKeyDown={e => { if (e.key === "Enter" && form.calculated) { e.preventDefault(); handleAdd() } }}>
+                    onClick={handleAdd} disabled={!form.calculated}>
                     {editingDetailId ? "✓ 明細を更新" : "＋ 明細に追加"}
                   </button>
                   <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}
