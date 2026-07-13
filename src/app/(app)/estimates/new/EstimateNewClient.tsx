@@ -155,6 +155,12 @@ function onEnter(nextId: string) {
     if (e.key === "Enter") { e.preventDefault(); focusById(nextId) }
   }
 }
+// 材料・仕様サジェストの一致判定用: 大文字小文字・前後空白の差異を無視して比較する。
+// (実運用で "ss400" 等の小文字入力が "SS400" と一致せず、materialCodeが
+//  空のまま計算APIへ送信される不具合の再発防止)
+function normalizeForMatch(s: string | null | undefined): string {
+  return (s ?? "").trim().toLowerCase()
+}
 
 // ─── メインコンポーネント ────────────────────────────────────
 export default function EstimateNewClient({ materials, processingSpecs: initSpecs, userInfo, copySource, isCopy }: Props) {
@@ -257,6 +263,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   // 見積計算の二重送信防止フラグ（連打・Enter二重発火によるSQL Server側
   // _TMP_WO基準納期設定 の同時実行競合(PK違反)を防止するため追加）
   const [calcLoading, setCalcLoading] = useState(false)
+  // 二重送信ガード(ref版): stateの再描画タイミングに依存せず同期的に
+  // 多重実行をブロックするための補助フラグ
+  const calcInFlightRef = useRef(false)
   // 編集中の明細ID。nullなら新規追加モード、値があれば「その行を編集中」で
   // 「明細に追加」ボタンが「明細を更新」に変わり、更新時は該当行を
   // 配列内の同じ位置で上書きする（削除して末尾に追加、ではない）。
@@ -482,9 +491,16 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
 
   // ── 計算 ──
   const handleCalculate = async () => {
-    // 二重送信ガード: 計算中の再クリック/Enter二重発火を無視する
+    // 二重送信ガード(ref版): 再描画を待たず即座に多重実行をブロックする
+    if (calcInFlightRef.current) {
+      console.warn("[handleCalculate] 直前の呼び出しが処理中のため多重実行をブロックしました(ref)")
+      return
+    }
+    calcInFlightRef.current = true
+    // 二重送信ガード(state版): 計算中の再クリック/Enter二重発火を無視する
     if (calcLoading) {
       console.warn("[handleCalculate] 計算処理中のため多重実行をブロックしました")
+      calcInFlightRef.current = false
       return
     }
     const spec = procSpecs.find(s => s.processingSpecCode === form.kakouShiyouCode)
@@ -512,8 +528,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     console.log("[handleCalculate] URL:", url, "METHOD: POST")
     console.log("[handleCalculate] payload全内容:", JSON.stringify(payload, null, 2))
     console.log("==================================================")
-    if (!form.materialCode || !form.kakouShiyouCode) { alert("材料と加工仕様を選択してください"); return }
-    if (!form.sizeT || !form.sizeB || !form.sizeA) { alert("寸法T・巾・長さを入力してください"); return }
+    if (!form.materialCode || !form.kakouShiyouCode) { calcInFlightRef.current = false; alert("材料と加工仕様を選択してください"); return }
+    if (!form.sizeT || !form.sizeB || !form.sizeA) { calcInFlightRef.current = false; alert("寸法T・巾・長さを入力してください"); return }
     setCalcLoading(true)
     try {
       const res = await fetch(url, {
@@ -563,6 +579,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       alert("見積計算に失敗しました: " + e.message)
     } finally {
       setCalcLoading(false)
+      calcInFlightRef.current = false
     }
   }
 
@@ -1161,12 +1178,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   value={matSuggest}
                   onChange={e => {
                     const v = e.target.value; setMatSuggest(v)
-                    const hit = materials.find(m => m.materialName === v || m.materialCode === v)
+                    const hit = materials.find(m => normalizeForMatch(m.materialName) === normalizeForMatch(v) || normalizeForMatch(m.materialCode) === normalizeForMatch(v))
                     if (hit) handleMaterialSelect(hit.materialCode)
                   }}
                   onKeyDown={e => {
                     if (e.key !== "Enter") return; e.preventDefault()
-                    const hit = materials.find(m => m.materialName === matSuggest || m.materialCode === matSuggest)
+                    const hit = materials.find(m => normalizeForMatch(m.materialName) === normalizeForMatch(matSuggest) || normalizeForMatch(m.materialCode) === normalizeForMatch(matSuggest))
                     if (hit) handleMaterialSelect(hit.materialCode)
                     else focusById("f-shiagari")
                   }}
@@ -1179,12 +1196,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   value={specSuggest}
                   onChange={e => {
                     const v = e.target.value; setSpecSuggest(v)
-                    const hit = filteredSpecs.find(s => s.processingSpecName === v)
+                    const hit = filteredSpecs.find(s => normalizeForMatch(s.processingSpecName) === normalizeForMatch(v))
                     if (hit) handleSpecSelect(hit, false)
                   }}
                   onKeyDown={e => {
                     if (e.key !== "Enter") return; e.preventDefault()
-                    const hit = filteredSpecs.find(s => s.processingSpecName === specSuggest)
+                    const hit = filteredSpecs.find(s => normalizeForMatch(s.processingSpecName) === normalizeForMatch(specSuggest))
                     if (hit) {
                       handleSpecSelect(hit, false)
                       const defined = allCutsDefined(hit.kakouShijiT || "W", hit.kakouShijiA || "W", hit.kakouShijiB || "W")
