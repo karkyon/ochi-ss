@@ -959,6 +959,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
             onClick={() => { console.log("[新規] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setEditingDetailId(null) }}>新規</button>
           <button className="btn-ochi btn-navy" style={{ fontSize: "13px" }}
             onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "💾 この見積りを保存"}</button>
+          {draftId && (
+            <a href={`/api/v1/estimates/${draftId}/pdf`} target="_blank" rel="noopener noreferrer"
+              className="btn-ochi btn-outline" style={{ fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+              📄 見積書PDF
+            </a>
+          )}
           <button className="btn-ochi btn-amber" style={{ fontSize: "13px" }}
             onClick={handleOrder}>📋 この見積りを注文</button>
           <Link href="/dashboard">

@@ -136,7 +136,8 @@ export default function EstimatesClient({ defaultValues, estimates, total, page,
                     <Link href={`/estimates/new?copyFrom=${est.id}`} className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "2px 8px" }}>コピー</Link>
                   </td>
                   <td style={{ ...td, textAlign: "center" }}>
-                    <a href={`/estimates/${est.id}/pdf`} target="_blank" className="btn-ochi btn-info" style={{ fontSize: "10px", padding: "2px 8px" }}>見積書</a>
+                    {/* 2026/07/13 修正: /api/v1 プレフィックス漏れで404になっていた */}
+                    <a href={`/api/v1/estimates/${est.id}/pdf`} target="_blank" className="btn-ochi btn-info" style={{ fontSize: "10px", padding: "2px 8px" }}>見積書</a>
                   </td>
                 </tr>
               )

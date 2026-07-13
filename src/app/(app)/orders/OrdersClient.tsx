@@ -96,7 +96,8 @@ export default function OrdersClient({ defaultValues, orders, total, page, total
                     <Link href={`/orders/${o.id}`} className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "2px 8px" }}>詳細</Link>
                   </td>
                   <td style={{ ...td, textAlign: "center" }}>
-                    <a href={`/orders/${o.id}/pdf`} target="_blank" className="btn-ochi btn-info" style={{ fontSize: "10px", padding: "2px 8px" }}>PDF</a>
+                    {/* 2026/07/13 修正: /api/v1 プレフィックス漏れで404になっていた */}
+                    <a href={`/api/v1/orders/${o.id}/pdf`} target="_blank" className="btn-ochi btn-info" style={{ fontSize: "10px", padding: "2px 8px" }}>PDF</a>
                   </td>
                 </tr>
               )
