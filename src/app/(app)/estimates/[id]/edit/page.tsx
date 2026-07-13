@@ -72,8 +72,12 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
       unitPrice:  Number(d.unitPrice  ?? 0),
       totalPrice: Number(d.totalPrice ?? 0),
       deliveryDate:     d.shortestDelivery ?? undefined,
+      // ★2026/07/13 修正: .slice(0, 10)で日付のみに切り詰めると時刻(17:30等)が
+      // 失われ、EstimateNewClient側のisExpired()判定で「すでに期限切れ」と
+      // 誤判定される致命的バグがあった。/estimates/new/page.tsx と同様に
+      // フルISO文字列(時刻付き)のまま渡すよう修正。
       deliveryDeadline: d.deliveryDeadline
-        ? d.deliveryDeadline.toISOString().slice(0, 10)
+        ? d.deliveryDeadline.toISOString()
         : null,
       calculated: true,
     })),
