@@ -716,6 +716,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         mentoriShiji: String(d.mentoriShiji),
         kakouShiyou: d.shiagari,
         kakouT: d.kakouShijiCodeT, kakouA: d.kakouShijiCodeA, kakouB: d.kakouShijiCodeB,
+        // ★2026/07/13 修正: 保存API(POST /api/v1/estimates, PUT /api/v1/estimates/[id])は
+        // 明細受信時に d.shortestDelivery という名前でしか納期を読んでいないが、
+        // クライアント側の型は deliveryDate という名前で保持しているため、
+        // このマッピングが無いと納期が常にnullで保存されていた
+        // (「編集画面で開くと納期保証期限は出るのに納期だけ空欄」の根本原因)。
+        shortestDelivery: d.deliveryDate || d.fastDeliveryDate || undefined,
       })),
     }
     console.log("[handleSave] リクエスト:", JSON.stringify(payload, null, 2))
