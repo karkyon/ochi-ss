@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getTenantCtx } from "@/lib/tenant-guard"
 import { withTenant } from "@/lib/with-tenant"
 import { audit } from "@/lib/audit-log"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(
   req: NextRequest,
@@ -27,6 +28,22 @@ export async function GET(
   if (!estimate) return new NextResponse("Not Found", { status: 404 })
 
   audit({ customerId: ctx.customerId, userId: ctx.userId, action: "EXPORT", resource: "pdf", resourceId: id, req })
+
+  // 自社情報（管理画面 /admin/company で編集可能。未設定時は既定値を使用）
+  const COMPANY_DEFAULTS: Record<string, string> = {
+    company_name: "越智製作所",
+    company_zip: "577-0802",
+    company_address: "大阪府東大阪市小若江3-4-1",
+    company_tel: "072-882-5524",
+    company_fax: "072-882-5527",
+    company_email: "weborder@ochi-ss.co.jp",
+    payment_terms: "月末締め翌月末払い",
+  }
+  const companySettingRows = await prisma.systemSetting.findMany({
+    where: { key: { in: Object.keys(COMPANY_DEFAULTS) } },
+  })
+  const companySettings: Record<string, string> = { ...COMPANY_DEFAULTS }
+  for (const r of companySettingRows) companySettings[r.key] = r.value
 
   const issueDate = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
   const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -266,14 +283,14 @@ export async function GET(
 
     <div class="footer-grid">
       <div class="company-info">
-        <div class="name">越智製作所</div>
-        <div>〒577-0802 大阪府東大阪市小若江3-4-1</div>
-        <div>TEL：072-882-5524　FAX：072-882-5527</div>
-        <div>E-mail：weborder@ochi-ss.co.jp</div>
+        <div class="name">${companySettings.company_name}</div>
+        <div>〒${companySettings.company_zip} ${companySettings.company_address}</div>
+        <div>TEL：${companySettings.company_tel}　FAX：${companySettings.company_fax}</div>
+        <div>E-mail：${companySettings.company_email}</div>
       </div>
       <div class="info-card">
         <h3>お支払条件</h3>
-        <div class="info-row"><span class="value" style="font-weight:500;">月末締め翌月末払い</span></div>
+        <div class="info-row"><span class="value" style="font-weight:500;">${companySettings.payment_terms}</span></div>
         <div style="margin-top:6px; color:#94a3b8; font-size:10px; line-height:1.6;">
           ※ 見積有効期限内にご注文をお願いいたします<br>
           ※ 価格は税抜表示の内訳を上記に明記しております
