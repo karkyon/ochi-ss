@@ -82,14 +82,14 @@ export default function OrderConfirmPage() {
   }, [estimateId, expiredRows, router])
 
   if (loading) return (
-    <div className="max-w-4xl mx-auto px-4 py-16 text-center text-gray-400">読み込み中...</div>
+    <div className="max-w-7xl mx-auto px-4 py-16 text-center text-gray-400">読み込み中...</div>
   )
 
   const totalAmount = estimate?.details?.reduce((s: number, d: any) => s + (Number(d.totalPrice) ?? 0), 0) ?? 0
   const hasExpired  = expiredRows.length > 0
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
           <div className="w-1 h-6 rounded-full bg-[#1a2744]" />
@@ -148,7 +148,7 @@ export default function OrderConfirmPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr>
-                    {["No","材料","加工仕様","寸法T×A×B(mm)","公差(T/A/B)","面取り(4C/8C)","数量","単価","合計","最短納期","納期有効期限"].map(h => (
+                    {["No","材料","加工仕様","寸法T×A×B(mm)","公差(T/A/B)","面取り(4C/8C)","数量","単価","合計","納期（最短納期／有効期限）"].map(h => (
                       <th key={h} className="px-3 py-2 text-center text-[11px] font-semibold text-white whitespace-nowrap border border-[#14293f]" style={{ background: "#1e3a5f" }}>{h}</th>
                     ))}
                   </tr>
@@ -185,10 +185,12 @@ export default function OrderConfirmPage() {
                         <td className="px-3 py-2 text-right border-r border-gray-200">{d.quantity}</td>
                         <td className="px-3 py-2 text-right border-r border-gray-200">¥{Number(d.unitPrice ?? 0).toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-semibold border-r border-gray-200">¥{Number(d.totalPrice ?? 0).toLocaleString()}</td>
-                        <td className="px-3 py-2 whitespace-nowrap text-center border-r border-gray-200">{d.shortestDelivery || "—"}</td>
-                        <td className={`px-3 py-2 whitespace-nowrap text-center ${expired ? "text-red-600 font-bold" : "text-gray-600"}`}>
-                          {deadline ? deadline.toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
-                          {expired && <div className="text-[10px]">⚠ 期限切れ</div>}
+                        <td className={`px-3 py-2 whitespace-nowrap text-center ${expired ? "text-red-600 font-bold" : "text-gray-700"}`}>
+                          <div className="font-semibold">{d.shortestDelivery || "—"}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">
+                            期限: {deadline ? deadline.toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </div>
+                          {expired && <div className="text-[10px] font-bold text-red-600">⚠ 期限切れ</div>}
                         </td>
                       </tr>
                     )
