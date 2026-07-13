@@ -343,9 +343,38 @@ GO`
     const deliveryDeadline     = out["DeliveryDeadline"]
 
     if (unitPrice <= 0) {
-      console.warn("[calculate] SP実行結果が不正(unitPrice<=0):", { unitPrice, shortestNouki })
+      // ★2026/07/13 修正: 「計算結果が不正です」という汎用メッセージだけでは
+      // ユーザーがシステム不具合と誤解するため、SPが返す Exists_OUT / OutOfRange_OUT /
+      // ZairyouSizeT_OUT等から原因を判定し、具体的な理由をエラーメッセージに含める。
+      const existsFlag = out["Exists_OUT"]
+      const outOfRange = out["OutOfRange_OUT"]
+      const zSizeT = out["ZairyouSizeT_OUT"]
+      const zSizeA = out["ZairyouSizeA_OUT"]
+      const zSizeB = out["ZairyouSizeB_OUT"]
+      console.warn("[calculate] SP実行結果が不正(unitPrice<=0):", {
+        unitPrice, shortestNouki, existsFlag, outOfRange, zSizeT, zSizeA, zSizeB,
+      })
+
+      let reason: string
+      let reasonCode: string
+      const sizeLabel = `厚み(T)=${body.sizeT} 幅(A)=${body.sizeA} 長さ(B)=${body.sizeB}`
+      if (outOfRange === true || outOfRange === 1) {
+        reason = `入力された寸法（${sizeLabel}）が、材料コード「${body.materialCode}」の価格設定範囲を超えています。寸法をご確認いただくか、営業担当までお問い合わせください。`
+        reasonCode = "OUT_OF_RANGE"
+      } else if (existsFlag === false || existsFlag === 0) {
+        reason = `材料コード「${body.materialCode}」・寸法（${sizeLabel}）に該当する価格設定が見つかりませんでした。材料または寸法をご確認ください。`
+        reasonCode = "NOT_FOUND"
+      } else {
+        reason = `計算結果の単価が0円になりました。材料コード「${body.materialCode}」・加工仕様・寸法（${sizeLabel}）の組み合わせをご確認ください。`
+        reasonCode = "ZERO_PRICE"
+      }
+
       return NextResponse.json(
-        { error: "計算結果が不正です。材料コード・加工仕様・寸法を確認してください。" },
+        {
+          error: reason,
+          reasonCode,
+          diagnostics: { exists: existsFlag, outOfRange, materialSizeT: zSizeT, materialSizeA: zSizeA, materialSizeB: zSizeB },
+        },
         { status: 422 }
       )
     }

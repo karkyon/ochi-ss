@@ -280,6 +280,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   // 二重送信ガード(ref版): stateの再描画タイミングに依存せず同期的に
   // 多重実行をブロックするための補助フラグ
   const calcInFlightRef = useRef(false)
+  // 見積計算エラーの詳細メッセージ。ブラウザ標準alert()は「システム異常」に
+  // 見えて誤解を招くため、フォーム内にインラインで分かりやすく表示する
+  const [calcError, setCalcError] = useState<string | null>(null)
   // 編集中の明細ID。nullなら新規追加モード、値があれば「その行を編集中」で
   // 「明細に追加」ボタンが「明細を更新」に変わり、更新時は該当行を
   // 配列内の同じ位置で上書きする（削除して末尾に追加、ではない）。
@@ -542,8 +545,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     console.log("[handleCalculate] URL:", url, "METHOD: POST")
     console.log("[handleCalculate] payload全内容:", JSON.stringify(payload, null, 2))
     console.log("==================================================")
-    if (!form.materialCode || !form.kakouShiyouCode) { calcInFlightRef.current = false; alert("材料と加工仕様を選択してください"); return }
-    if (!form.sizeT || !form.sizeB || !form.sizeA) { calcInFlightRef.current = false; alert("寸法T・巾・長さを入力してください"); return }
+    if (!form.materialCode || !form.kakouShiyouCode) { calcInFlightRef.current = false; setCalcError("材料と加工仕様を選択してください"); return }
+    if (!form.sizeT || !form.sizeB || !form.sizeA) { calcInFlightRef.current = false; setCalcError("寸法（厚み・巾・長さ）を入力してください"); return }
+    setCalcError(null)
     setCalcLoading(true)
     try {
       const res = await fetch(url, {
@@ -565,13 +569,19 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         console.log("========== [SSMS貼り付け用EXEC文] ここまでコピー ==========")
       }
       console.log("====================================================")
-      if (!res.ok) throw new Error(data.error ?? "計算APIエラー " + res.status)
+      if (!res.ok) {
+        // 422等はAPI側で原因(材料サイズが範囲外/該当データなし等)を具体的に返す。
+        // ブラウザ標準alertは使わず、フォーム内にそのまま表示する。
+        setCalcError(data.error ?? `計算に失敗しました（HTTP ${res.status}）`)
+        return
+      }
       // route.ts の実レスポンス構造: { unitPrice, sumPrice, shortestDelivery, deliveryDeadline }
       // 旧コードは存在しないフィールド(totalPrice/deliveryDate/fastDeliveryDate等)を
       // 参照していたため、送料込みプレート金額・最短納期が常に未設定だった。
       if (!data.shortestDelivery) {
         console.warn("[handleCalculate] shortestDelivery が空文字。SP側で当該組合せの納期が算出されなかった可能性があります。")
       }
+      setCalcError(null)
       setForm(f => ({
         ...f,
         unitPrice: data.unitPrice,
@@ -590,7 +600,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       console.error("stack:", e?.stack)
       try { console.error("全プロパティ:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2)) } catch { /* noop */ }
       console.error("=======================================================")
-      alert("見積計算に失敗しました: " + e.message)
+      setCalcError("通信エラーが発生しました: " + (e?.message ?? "不明なエラー"))
     } finally {
       setCalcLoading(false)
       calcInFlightRef.current = false
@@ -1430,6 +1440,11 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                     クリア
                   </button>
                 </div>
+                {calcError && (
+                  <div style={{ marginTop: "6px", padding: "8px 10px", background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: "4px", fontSize: "12px", color: "#991b1b", fontWeight: 600, textAlign: "left" }}>
+                    ⚠ {calcError}
+                  </div>
+                )}
                 {!form.calculated && (
                   <div style={{ fontSize: "9px", color: "#f59e0b", textAlign: "right", marginTop: "2px" }}>△ 先に「見積計算」を実行</div>
                 )}
@@ -1495,8 +1510,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <td style={{ ...TD, textAlign: "center" }}>{i + 1}</td>
                 <td style={TD}>{materials.find(m => m.materialCode === d.materialCode)?.materialName ?? d.materialCode}</td>
                 <td style={TD}>
-                  {d.shiagari}
-                  <div style={{ fontSize: "9px", color: "#64748b", marginTop: "1px" }}>
+                  <div style={{ fontWeight: 700 }}>{d.shiagari}</div>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#334155", marginTop: "2px" }}>
                     T:{d.kakouShijiCodeT || "-"} A:{d.kakouShijiCodeA || "-"} B:{d.kakouShijiCodeB || "-"}
                   </div>
                 </td>
