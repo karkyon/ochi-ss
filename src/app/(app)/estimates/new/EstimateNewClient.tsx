@@ -722,6 +722,10 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         // このマッピングが無いと納期が常にnullで保存されていた
         // (「編集画面で開くと納期保証期限は出るのに納期だけ空欄」の根本原因)。
         shortestDelivery: d.deliveryDate || d.fastDeliveryDate || undefined,
+        // ★2026/07/13 追加修正: 同様に materialName も送信されておらず、
+        // 保存API側の materialName: d.materialName ?? null により常にnull保存されていた
+        // (注文確認画面で材料コード"05"等の生値がそのまま表示されていた根本原因の一つ)。
+        materialName: materials.find(m => m.materialCode === d.materialCode)?.materialName ?? undefined,
       })),
     }
     console.log("[handleSave] リクエスト:", JSON.stringify(payload, null, 2))
