@@ -86,6 +86,18 @@ function newForm(): DetailForm {
   }
 }
 function isExpired(d?: string | null) { return !!d && new Date(d) < new Date() }
+// 納期保証期限までの残り時間をラベル化する（UIUX強化: あと何分/何時間/何日かを色分け表示）
+function remainingLabel(deadline?: string | null): { text: string; color: string } {
+  if (!deadline) return { text: "—", color: "#94a3b8" }
+  const diffMs = new Date(deadline).getTime() - Date.now()
+  if (diffMs <= 0) return { text: "期限切れ", color: "#ef4444" }
+  const totalMin = Math.floor(diffMs / 60000)
+  if (totalMin < 60) return { text: `あと${totalMin}分`, color: totalMin <= 15 ? "#ef4444" : "#f59e0b" }
+  const hours = Math.floor(totalMin / 60)
+  if (hours < 24) return { text: `あと${hours}時間${totalMin % 60}分`, color: hours <= 2 ? "#f59e0b" : "#166534" }
+  const days = Math.floor(hours / 24)
+  return { text: `あと${days}日`, color: "#166534" }
+}
 function fmt(iso?: string | null) { return iso ? iso.slice(0, 10) : "" }
 function fmtDt(iso?: string | null) {
   if (!iso) return ""
@@ -1264,7 +1276,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               {/* 標準公差ボタン */}
               <td style={{ ...TD, textAlign: "center", padding: "2px" }}>
                 <button id="btn-std-tol" className="btn-ochi btn-outline"
-                  style={{ fontSize: "9px", padding: "2px 5px", width: "100%", height: "24px" }}
+                  style={{ fontSize: "12px", fontWeight: 700, padding: "3px 5px", width: "100%", height: "28px" }}
                   onClick={handleStdTol}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleStdTol() } }}>標準</button>
               </td>
@@ -1323,7 +1335,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   <option value={9}>---</option>
                 </select>
                 <button id="btn-std-chamfer" className="btn-ochi btn-outline"
-                  style={{ fontSize: "8px", padding: "0 3px", display: "block", width: "100%", height: "20px" }}
+                  style={{ fontSize: "11px", fontWeight: 700, padding: "1px 3px", display: "block", width: "100%", height: "24px" }}
                   onClick={handleStdChamfer}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleStdChamfer() } }}>標準</button>
               </td>
@@ -1453,6 +1465,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               <th style={{ ...TH, background: "#166534" }}>面取り</th>
               <th style={{ ...TH, background: "#166534" }}>数量</th>
               <th style={{ ...TH, background: "#166534" }}>納期</th>
+              <th style={{ ...TH, background: "#166534" }}>納期保証期限</th>
               <th style={{ ...TH, background: "#166534" }}>ご注文番号</th>
               <th style={{ ...TH, background: "#166534" }}>単価</th>
               <th style={{ ...TH, background: "#166534" }}>金額</th>
@@ -1461,7 +1474,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
           </thead>
           <tbody>
             {details.length === 0 ? (
-              <tr><td colSpan={14} style={{ ...TD, textAlign: "center", padding: "12px", color: "#94a3b8" }}>明細がありません。上のフォームで入力後「明細に追加」してください。</td></tr>
+              <tr><td colSpan={15} style={{ ...TD, textAlign: "center", padding: "12px", color: "#94a3b8" }}>明細がありません。上のフォームで入力後「明細に追加」してください。</td></tr>
             ) : details.map((d, i) => (
               <tr key={d.clientDetailId} style={{ background: d.isOrdered ? "#fefce8" : i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
                 <td style={{ ...TD, textAlign: "center", width: "60px" }}>
@@ -1481,7 +1494,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 </td>
                 <td style={{ ...TD, textAlign: "center" }}>{i + 1}</td>
                 <td style={TD}>{materials.find(m => m.materialCode === d.materialCode)?.materialName ?? d.materialCode}</td>
-                <td style={TD}>{d.shiagari}</td>
+                <td style={TD}>
+                  {d.shiagari}
+                  <div style={{ fontSize: "9px", color: "#64748b", marginTop: "1px" }}>
+                    T:{d.kakouShijiCodeT || "-"} A:{d.kakouShijiCodeA || "-"} B:{d.kakouShijiCodeB || "-"}
+                  </div>
+                </td>
                 <td style={{ ...TD, textAlign: "right" }}>{d.sizeT}</td>
                 <td style={{ ...TD, textAlign: "right" }}>{d.sizeA}</td>
                 <td style={{ ...TD, textAlign: "right" }}>{d.sizeB}</td>
@@ -1489,6 +1507,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 <td style={{ ...TD, textAlign: "right" }}>{d.quantity}</td>
                 <td style={{ ...TD, textAlign: "center", color: isExpired(d.deliveryDeadline) ? "#ef4444" : "#374151" }}>
                   {fmt(d.fastDeliveryDate)}{isExpired(d.deliveryDeadline) && <span style={{ color: "#ef4444", fontSize: "9px" }}> ⚠期限切</span>}
+                </td>
+                <td style={{ ...TD, textAlign: "center" }}>
+                  {d.deliveryDeadline ? (
+                    <>
+                      <div style={{ fontSize: "10px", color: isExpired(d.deliveryDeadline) ? "#ef4444" : "#334155", fontWeight: 600 }}>{fmtDt(d.deliveryDeadline)}</div>
+                      <div style={{ fontSize: "9px", fontWeight: 700, color: remainingLabel(d.deliveryDeadline).color }}>{remainingLabel(d.deliveryDeadline).text}</div>
+                    </>
+                  ) : "—"}
                 </td>
                 <td style={TD}>{d.customerDetailOrderNo}</td>
                 <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{d.unitPrice != null ? "¥" + d.unitPrice.toLocaleString() : "—"}</td>
