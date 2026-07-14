@@ -191,6 +191,16 @@ model EstimateDetail {
   totalPrice          Decimal?  @map("total_price") @db.Decimal(14, 2)
   shortestDelivery    String?   @map("shortest_delivery")
   deliveryDeadline    DateTime? @map("delivery_deadline")
+  // ★2026/07/14 追加: 明細単位の個別直送先（未設定時は見積ヘッダーの共通送り先を使用）
+  useIndividualDestination Boolean @default(false) @map("use_individual_destination")
+  destinationCode     String?   @map("indiv_destination_code")
+  destinationName     String?   @map("indiv_destination_name")
+  destinationDept     String?   @map("indiv_destination_dept")
+  destinationPerson   String?   @map("indiv_destination_person")
+  destinationZip      String?   @map("indiv_destination_zip")
+  destinationAddress  String?   @map("indiv_destination_address")
+  destinationTel      String?   @map("indiv_destination_tel")
+  destinationFax      String?   @map("indiv_destination_fax")
   // 計算中間値（デバッグ・監査用）
   materialSizeT       Decimal?  @map("material_size_t") @db.Decimal(7, 3)
   materialSizeA       Decimal?  @map("material_size_a") @db.Decimal(7, 3)
