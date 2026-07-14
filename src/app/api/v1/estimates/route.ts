@@ -83,6 +83,11 @@ interface SaveDetailRequest {
   materialUnitWeight?: number; materialTotalWeight?: number
   productUnitWeight?: number; productTotalWeight?: number
   processingCost6f?: number; processingCostTotal?: number
+  // ★2026/07/14 追加: 明細単位の個別直送先
+  useIndividualDestination?: boolean
+  destinationCode?: string; destinationName?: string; destinationDept?: string
+  destinationPerson?: string; destinationZip?: string; destinationAddress?: string
+  destinationTel?: string; destinationFax?: string
 }
 interface SaveHeaderRequest {
   inputDate: string; customerOrderNo?: string; endUserNo?: string
