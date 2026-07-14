@@ -22,7 +22,7 @@ function normalizeZip(input: string): string {
 // 郵便番号APIに渡す7桁数字
 function zipDigits(zip: string): string { return zip.replace(/\D/g, "").slice(0, 7) }
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, Fragment } from "react"
 import Link from "next/link"
 
 // ─── 型定義 ───────────────────────────────────────────────────
@@ -60,6 +60,17 @@ interface DetailForm {
   orderedOrderNo?: string    // 注文番号
   // 履歴
   historyLog?: Array<{ at: string; action: string; detail: string }>
+  // ★2026/07/14 追加: 明細単位の個別直送先設定
+  // 未設定(false)の場合は見積ヘッダーの共通送り先情報が使われる
+  useIndividualDestination?: boolean
+  destinationCode?: string
+  destinationName?: string
+  destinationDept?: string
+  destinationPerson?: string
+  destinationZip?: string
+  destinationAddress?: string
+  destinationTel?: string
+  destinationFax?: string
 }
 
 interface Props {
@@ -83,6 +94,9 @@ function newForm(): DetailForm {
     quantity: 1,
     customerDetailOrderNo: "", destinationDetailOrderNo: "", remarks: "",
     calculated: false,
+    useIndividualDestination: false,
+    destinationCode: "", destinationName: "", destinationDept: "", destinationPerson: "",
+    destinationZip: "", destinationAddress: "", destinationTel: "", destinationFax: "",
   }
 }
 function isExpired(d?: string | null) { return !!d && new Date(d) < new Date() }
@@ -1413,6 +1427,80 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
               </td>
             </tr>
 
+            {/* ★2026/07/14 追加: 明細単位の直送先個別設定
+                基本は共通の送り先情報（見積ヘッダー）を使うが、この行だけ
+                別の送り先を指定したい場合にボタンで展開できるようにする。
+                内容は共通項目の送り先情報と同じ項目構成。 */}
+            <tr>
+              <td colSpan={17} style={{ ...TD, padding: "4px 6px", background: form.useIndividualDestination ? "#eff6ff" : "transparent" }}>
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, useIndividualDestination: !f.useIndividualDestination }))}
+                  style={{
+                    fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "4px", cursor: "pointer",
+                    border: form.useIndividualDestination ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                    background: form.useIndividualDestination ? "#2563eb" : "#f8fafc",
+                    color: form.useIndividualDestination ? "#fff" : "#374151",
+                  }}>
+                  📍 直送先個別設定{form.useIndividualDestination ? "（有効）" : ""}
+                </button>
+                {!form.useIndividualDestination && (
+                  <span style={{ fontSize: "10px", color: "#94a3b8", marginLeft: "8px" }}>
+                    未設定時は共通の送り先情報が使われます
+                  </span>
+                )}
+
+                {form.useIndividualDestination && (
+                  <div style={{ marginTop: "6px", padding: "8px", background: "#fff", border: "1.5px solid #93c5fd", borderRadius: "6px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#1d4ed8", marginBottom: "4px" }}>
+                      この明細だけの送り先（共通の送り先情報とは別に指定）
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "flex-end" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "80px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>出荷先</span>
+                        <input style={INP} value={form.destinationCode ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationCode: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "150px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>出荷先名</span>
+                        <input style={INP} value={form.destinationName ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationName: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "120px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>出荷先部署</span>
+                        <input style={INP} value={form.destinationDept ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationDept: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "100px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>ご担当者</span>
+                        <input style={INP} value={form.destinationPerson ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationPerson: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "90px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>郵便番号</span>
+                        <input style={INP} value={form.destinationZip ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationZip: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: 1, minWidth: "200px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>住所</span>
+                        <input style={INP} value={form.destinationAddress ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationAddress: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "110px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>TEL</span>
+                        <input style={INP} value={form.destinationTel ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationTel: e.target.value }))} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "110px" }}>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>FAX</span>
+                        <input style={INP} value={form.destinationFax ?? ""}
+                          onChange={e => setForm(f => ({ ...f, destinationFax: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </td>
+            </tr>
+
             {/* 計算結果・ボタン */}
             <tr>
               <td colSpan={2} style={{ ...TD, padding: "4px" }}>
@@ -1524,7 +1612,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
             {details.length === 0 ? (
               <tr><td colSpan={15} style={{ ...TD, textAlign: "center", padding: "12px", color: "#94a3b8" }}>明細がありません。上のフォームで入力後「明細に追加」してください。</td></tr>
             ) : details.map((d, i) => (
-              <tr key={d.clientDetailId} style={{ background: d.isOrdered ? "#fefce8" : i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
+              <Fragment key={d.clientDetailId}>
+              <tr style={{ background: d.isOrdered ? "#fefce8" : i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
                 <td style={{ ...TD, textAlign: "center", width: "60px" }}>
                   {d.isOrdered ? (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
@@ -1587,6 +1676,24 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                   </div>
                 </td>
               </tr>
+              {/* ★2026/07/14 追加: 個別直送先が設定されている行にコンパクトなサマリーを表示 */}
+              {d.useIndividualDestination && (
+                <tr style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
+                  <td colSpan={15} style={{ ...TD, padding: "3px 8px", background: "#eff6ff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", color: "#1d4ed8", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700, background: "#2563eb", color: "#fff", padding: "1px 6px", borderRadius: "9999px", fontSize: "9px", whiteSpace: "nowrap" }}>📍 個別直送先</span>
+                      <span style={{ fontWeight: 600 }}>{d.destinationName || "(名称未設定)"}</span>
+                      {d.destinationDept && <span style={{ color: "#64748b" }}>／{d.destinationDept}</span>}
+                      {d.destinationPerson && <span style={{ color: "#64748b" }}>／{d.destinationPerson}様</span>}
+                      {d.destinationZip && <span style={{ color: "#64748b" }}>／〒{d.destinationZip}</span>}
+                      {d.destinationAddress && <span style={{ color: "#64748b" }}>{d.destinationAddress}</span>}
+                      {d.destinationTel && <span style={{ color: "#64748b" }}>／TEL:{d.destinationTel}</span>}
+                      {d.destinationFax && <span style={{ color: "#64748b" }}>／FAX:{d.destinationFax}</span>}
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>
