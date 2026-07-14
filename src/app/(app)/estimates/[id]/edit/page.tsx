@@ -30,6 +30,14 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
   })
   if (!estimate) redirect("/estimates")
 
+  // 2026/07/13 追加: 見積が既に注文済み(estimateStatus==="ordered")の場合、
+  // 明細一覧に「注文済」バッジ・注文Noを表示しチェックボックスを無効化するため、
+  // 紐づく注文(Order)を取得する。受注は見積単位で1:1(estimateHeaderId unique)のため、
+  // 見積が注文済みならその見積の全明細が注文済み扱いとなる。
+  const relatedOrder = estimate.estimateStatus === "ordered"
+    ? await prisma.order.findFirst({ where: { estimateHeaderId: estimate.id }, select: { orderNo: true } })
+    : null
+
   const copySource = {
     estimateId:    estimate.id,
     estimateNo:    estimate.estimateNo ?? "",
@@ -72,18 +80,14 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
       unitPrice:  Number(d.unitPrice  ?? 0),
       totalPrice: Number(d.totalPrice ?? 0),
       deliveryDate:     d.shortestDelivery ?? undefined,
-      // ★2026/07/13 追加修正: EstimateNewClient.tsx の登録済み明細一覧「納期」列は
-      // deliveryDate ではなく fastDeliveryDate を参照している
-      // ({fmt(d.fastDeliveryDate)})。この行が無いと納期保証期限は表示されるのに
-      // 肝心の最短納期だけ常に空欄になる。/estimates/new/page.tsx と同じ形式に統一。
       fastDeliveryDate: d.shortestDelivery ?? undefined,
-      // ★2026/07/13 修正: .slice(0, 10)で日付のみに切り詰めると時刻(17:30等)が
-      // 失われ、EstimateNewClient側のisExpired()判定で「すでに期限切れ」と
-      // 誤判定される致命的バグがあった。/estimates/new/page.tsx と同様に
-      // フルISO文字列(時刻付き)のまま渡すよう修正。
       deliveryDeadline: d.deliveryDeadline
         ? d.deliveryDeadline.toISOString()
         : null,
+      // 2026/07/13 追加: 見積が注文済みなら全明細を注文済み扱いにし、
+      // チェックボックスを無効化して「注文済」+注文Noを表示する
+      isOrdered: estimate.estimateStatus === "ordered",
+      orderedOrderNo: relatedOrder?.orderNo ?? undefined,
       calculated: true,
     })),
   }
