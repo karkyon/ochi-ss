@@ -143,7 +143,9 @@ model EstimateHeader {
 
   customer   Customer         @relation(fields: [customerId], references: [id])
   details    EstimateDetail[]
-  order      Order?
+  // ★2026/07/14 部分注文対応: Order側のestimateHeaderIdから@uniqueを外し
+  // 1見積に複数受注を許可したため、こちらも単数(Order?)から配列(Order[])に変更
+  orders     Order[]
   syncEvents OutboxEvent[]
 
   @@index([customerId, estimateStatus])
@@ -201,6 +203,10 @@ model EstimateDetail {
   destinationAddress  String?   @map("indiv_destination_address")
   destinationTel      String?   @map("indiv_destination_tel")
   destinationFax      String?   @map("indiv_destination_fax")
+  // ★2026/07/14 部分注文対応: 明細単位の注文済み管理。
+  // 見積ヘッダーのestimateStatusに頼らず、明細自身がどの受注に属するかを持つ。
+  orderId             String?   @map("order_id")
+  orderedOrderNo      String?   @map("ordered_order_no")
   // 計算中間値（デバッグ・監査用）
   materialSizeT       Decimal?  @map("material_size_t") @db.Decimal(7, 3)
   materialSizeA       Decimal?  @map("material_size_a") @db.Decimal(7, 3)
@@ -227,7 +233,7 @@ model EstimateDetail {
 model Order {
   id               String    @id @default(uuid())
   orderNo          String?   @unique @map("order_no") // 業務側採番後に設定
-  estimateHeaderId String    @unique @map("estimate_header_id")
+  estimateHeaderId String    @map("estimate_header_id") // 部分注文対応: 1見積に複数受注を許可
   customerId       String    @map("customer_id")
   orderDate        DateTime  @default(now()) @map("order_date")
   orderStatus      String    @default("pending") @map("order_status")
@@ -246,6 +252,7 @@ model Order {
   syncEvents      OutboxEvent[]
 
   @@index([customerId, orderStatus])
+  @@index([estimateHeaderId])
   @@map("orders")
 }
 
