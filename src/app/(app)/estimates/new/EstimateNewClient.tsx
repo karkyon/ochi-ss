@@ -707,6 +707,12 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   const handleEditDetail = (id: string) => {
     const target = details.find(d => d.clientDetailId === id)
     if (!target) return
+    // ★2026/07/14 追加: UIでボタンを隠しているだけでなく、
+    // 関数自体でも注文済み明細の編集を拒否する（多層防御）。
+    if (target.isOrdered) {
+      alert("この明細は注文済みのため編集できません。")
+      return
+    }
     console.log("[handleEditDetail] 編集対象 id:", id, JSON.stringify(target, null, 2))
     setForm({ ...target, calculated: false })
     setTolInputs({
@@ -746,6 +752,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     setTimeout(() => focusById("f-mat-suggest"), 50)
   }
   const handleDel = (id: string) => {
+    // ★2026/07/14 追加: UIでボタンを隠しているだけでなく、
+    // 関数自体でも注文済み明細の削除を拒否する（多層防御）。
+    const target = details.find(d => d.clientDetailId === id)
+    if (target?.isOrdered) {
+      alert("この明細は注文済みのため削除できません。")
+      return
+    }
+    if (!confirm("この明細を削除しますか？")) return
     console.log("[handleDel] 明細削除 id:", id)
     setDetails(p => p.filter(d => d.clientDetailId !== id))
     setSelectedIds(p => { const n = new Set(p); n.delete(id); return n })
