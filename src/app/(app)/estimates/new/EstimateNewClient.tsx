@@ -416,6 +416,20 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
         fastDeliveryDate:     d.deliveryDate     ?? undefined,
         fastDeliveryDeadline: d.deliveryDeadline ?? undefined,
         calculated: true,
+        // ★2026/07/14 修正: 以下が欠落していたため、サーバー側(edit/page.tsx)が
+        // 正しく isOrdered/orderedOrderNo を渡していても復元時に消えていた。
+        // これが「注文済バッジが出ない」「注文済み明細が編集できてしまう」の原因。
+        isOrdered:      d.isOrdered ?? false,
+        orderedOrderNo: d.orderedOrderNo ?? undefined,
+        useIndividualDestination: d.useIndividualDestination ?? false,
+        destinationCode:    d.destinationCode    ?? "",
+        destinationName:    d.destinationName    ?? "",
+        destinationDept:    d.destinationDept    ?? "",
+        destinationPerson:  d.destinationPerson  ?? "",
+        destinationZip:     d.destinationZip     ?? "",
+        destinationAddress: d.destinationAddress ?? "",
+        destinationTel:     d.destinationTel     ?? "",
+        destinationFax:     d.destinationFax     ?? "",
       }))
       setDetails(restored)
       console.log("[EstimateNewClient] copySource明細復元:", restored.length, "件")
@@ -1059,7 +1073,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
           <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}
             onClick={() => { console.log("[新規] フォームリセット"); setForm(newForm()); setMatSuggest(""); setSpecSuggest(""); setEditingDetailId(null) }}>新規</button>
           <button className="btn-ochi btn-navy" style={{ fontSize: "13px" }}
-            onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "💾 この見積りを保存"}</button>
+            onClick={handleSave} disabled={saving || details.some(d => d.isOrdered)}>{saving ? "保存中..." : "💾 この見積りを保存"}</button>
           {draftId && (
             <a href={`/api/v1/estimates/${draftId}/pdf`} target="_blank" rel="noopener noreferrer"
               className="btn-ochi btn-outline" style={{ fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
@@ -1067,7 +1081,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
             </a>
           )}
           <button className="btn-ochi btn-amber" style={{ fontSize: "13px" }}
-            onClick={handleOrder}>📋 この見積りを注文</button>
+            onClick={handleOrder} disabled={details.some(d => d.isOrdered)}>📋 この見積りを注文</button>
           <Link href="/dashboard">
             <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}>← メインメニュー</button>
           </Link>
@@ -1077,6 +1091,16 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       {saveMsg && (
         <div style={{ background: saveMsg.startsWith("✅") ? "#f0fdf4" : "#fee2e2", border: "1px solid " + (saveMsg.startsWith("✅") ? "#86efac" : "#fca5a5"), borderRadius: "4px", padding: "4px 10px", fontSize: "11px", marginBottom: "6px" }}>
           {saveMsg}
+        </div>
+      )}
+
+      {/* ★2026/07/14 追加: この見積は既に注文済みです。
+          注文済みの見積は保存・追加保存できない仕様（API側でも422で拒否）。
+          保存ボタンを押させてからエラーを出すのは体験が悪いため、
+          先にバナーで案内しボタン自体も無効化する。 */}
+      {details.length > 0 && details.some(d => d.isOrdered) && (
+        <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "4px", padding: "6px 10px", fontSize: "11px", color: "#166534", marginBottom: "6px", fontWeight: 600 }}>
+          ✅ この見積は既に注文済みです（注文番号: {details.find(d => d.isOrdered)?.orderedOrderNo ?? "-"}）。この見積自体はこれ以上保存できません。追加の明細が必要な場合は、見積一覧の「複写」から新しい見積を作成してください。
         </div>
       )}
 
