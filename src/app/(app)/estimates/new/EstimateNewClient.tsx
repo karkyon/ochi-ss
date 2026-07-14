@@ -207,6 +207,10 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   const [showDistModal, setShowDistModal] = useState(false)  // 出荷先検索モーダル表示フラグ
   const [distModalKw, setDistModalKw] = useState("")         // モーダル内検索キーワード
   const [distModalRows, setDistModalRows] = useState<any[]>([]) // モーダル検索結果
+  // ★2026/07/14 追加: 出荷先検索モーダルを共通送り先(header)向けに開いたか、
+  // 明細個別直送先(detail)向けに開いたかを判定するフラグ。
+  // モーダル自体は1つを使い回し、選択時の反映先だけをこれで切り替える。
+  const [distModalTarget, setDistModalTarget] = useState<"header" | "detail">("header")
   const [distName, setDistName]       = useState("")
   const [distDept, setDistDept]       = useState("")
   const [distPerson, setDistPerson]   = useState("")
@@ -630,7 +634,14 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   // destination*フィールドのみを操作する。
   const handleIndivDistSearch = async () => {
     const code = (form.destinationCode ?? "").trim()
-    if (!code) return
+    if (!code) {
+      // コードが空 → 共通送り先と同様にモーダルを開く
+      setDistModalTarget("detail")
+      setShowDistModal(true)
+      setDistModalKw("")
+      setTimeout(() => handleDistModalSearch(""), 0)
+      return
+    }
     try {
       const res = await fetch(`/api/v1/masters/direct-delivery/search?code=${encodeURIComponent(code)}`)
       const d = await res.json()
@@ -884,12 +895,29 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   }
 
   // ── モーダルで行選択 ──
+  // distModalTarget が "detail" の場合は、このモーダルを開いた明細行の
+  // destination*フィールドへ反映する。"header"(デフォルト)の場合は
+  // 従来通り共通送り先(applyDelivery)へ反映する。
   const handleDistModalSelect = (row: any) => {
-    applyDelivery(row)
+    if (distModalTarget === "detail") {
+      setForm(f => ({
+        ...f,
+        destinationCode:    row.deliveryCode      ?? row.code      ?? f.destinationCode,
+        destinationName:    row.companyName        ?? row.name      ?? f.destinationName,
+        destinationDept:    row.departmentName      ?? row.department ?? f.destinationDept,
+        destinationPerson:  row.contactPerson       ?? row.person    ?? f.destinationPerson,
+        destinationZip:     row.postalCode          ?? row.zipCode   ?? f.destinationZip,
+        destinationAddress: [row.address1, row.address2, row.address3].filter(Boolean).join("") || row.address || f.destinationAddress,
+        destinationTel:     row.phoneNumber         ?? row.tel       ?? f.destinationTel,
+        destinationFax:     row.faxNumber           ?? row.fax       ?? f.destinationFax,
+      }))
+    } else {
+      applyDelivery(row)
+      setTimeout(() => focusById("f-contact"), 50)
+    }
     setShowDistModal(false)
     setDistModalKw("")
     setDistModalRows([])
-    setTimeout(() => focusById("f-contact"), 50)
   }
 
   // ── 送り先マスタ登録/更新チェック（保存・注文前に呼ぶ） ──
@@ -1092,7 +1120,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleDistSearch() } }} {...FH} />
               <button className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "1px 6px", height: "24px" }}
                 title="出荷先を検索"
-                onClick={() => { setShowDistModal(true); setDistModalKw(""); setTimeout(() => handleDistModalSearch(""), 0) }}>🔍</button>
+                onClick={() => { setDistModalTarget("header"); setShowDistModal(true); setDistModalKw(""); setTimeout(() => handleDistModalSearch(""), 0) }}>🔍</button>
             </div>
           </div>
           <div>
@@ -1507,7 +1535,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                             onChange={e => setForm(f => ({ ...f, destinationCode: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleIndivDistSearch() } }} />
                           <button type="button" className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "1px 6px", height: "24px" }}
-                            onClick={handleIndivDistSearch} title="出荷先マスタ検索">🔍</button>
+                            title="出荷先を検索"
+                            onClick={() => { setDistModalTarget("detail"); setShowDistModal(true); setDistModalKw(""); setTimeout(() => handleDistModalSearch(""), 0) }}>🔍</button>
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "150px" }}>
