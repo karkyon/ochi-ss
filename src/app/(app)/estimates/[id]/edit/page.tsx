@@ -30,13 +30,8 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
   })
   if (!estimate) redirect("/estimates")
 
-  // 2026/07/13 追加: 見積が既に注文済み(estimateStatus==="ordered")の場合、
-  // 明細一覧に「注文済」バッジ・注文Noを表示しチェックボックスを無効化するため、
-  // 紐づく注文(Order)を取得する。受注は見積単位で1:1(estimateHeaderId unique)のため、
-  // 見積が注文済みならその見積の全明細が注文済み扱いとなる。
-  const relatedOrder = estimate.estimateStatus === "ordered"
-    ? await prisma.order.findFirst({ where: { estimateHeaderId: estimate.id }, select: { orderNo: true } })
-    : null
+  // ★2026/07/14 部分注文対応: isOrdered/orderedOrderNoは明細自身が持つ
+  // orderId/orderedOrderNoから判定するため、ここでの受注取得は不要になった。
 
   const copySource = {
     estimateId:    estimate.id,
@@ -93,10 +88,10 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
       deliveryDeadline: d.deliveryDeadline
         ? d.deliveryDeadline.toISOString()
         : null,
-      // 2026/07/13 追加: 見積が注文済みなら全明細を注文済み扱いにし、
-      // チェックボックスを無効化して「注文済」+注文Noを表示する
-      isOrdered: estimate.estimateStatus === "ordered",
-      orderedOrderNo: relatedOrder?.orderNo ?? undefined,
+      // ★2026/07/14 部分注文対応: ヘッダーステータスからの推測ではなく、
+      // 明細自身が持つorderId/orderedOrderNoで判定する。
+      isOrdered: !!(d as any).orderId,
+      orderedOrderNo: (d as any).orderedOrderNo ?? undefined,
       calculated: true,
     })),
   }

@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
   if (error) return error
 
   const body = await req.json()
-  const { estimateId } = body as { estimateId: string }
+  // ★2026/07/14 部分注文対応
+  const { estimateId, detailIds } = body as { estimateId: string; detailIds?: string[] }
   if (!estimateId) return NextResponse.json({ error: "estimateId required" }, { status: 400 })
 
   const estimate = await withTenant(ctx.customerId, ctx.isSuperAdmin, (tx) =>
@@ -68,13 +69,17 @@ export async function POST(req: NextRequest) {
   )
   const ownerErr = assertOwner(estimate, ctx.customerId, ctx.isSuperAdmin)
   if (ownerErr) return ownerErr
-  if (estimate.estimateStatus === "ordered")
-    return NextResponse.json({ error: "この見積は既に注文済みです" }, { status: 409 })
-  if (estimate.details.length === 0)
-    return NextResponse.json({ error: "明細が1件もありません" }, { status: 400 })
+  // ★2026/07/14 部分注文対応: 見積ヘッダー全体のestimateStatusではなく、
+  // 明細ごとのorderId(注文済みかどうか)で判定する。detailIdsが指定されれば
+  // その明細のみ、未指定なら未注文の明細すべてを対象にする。
+  const targetDetails = estimate.details.filter((d: any) =>
+    !d.orderId && (!detailIds || detailIds.includes(d.id))
+  )
+  if (targetDetails.length === 0)
+    return NextResponse.json({ error: "注文可能な明細がありません（すべて注文済みか、対象の明細が見つかりません）" }, { status: 409 })
 
-  const totalAmount = estimate.details.reduce((s: number, d: any) => s + Number(d.totalPrice ?? 0), 0)
-  const detailCount = estimate.details.length
+  const totalAmount = targetDetails.reduce((s: number, d: any) => s + Number(d.totalPrice ?? 0), 0)
+  const detailCount = targetDetails.length
 
   async function generateOrderNo(): Promise<string> {
     const now = new Date()
@@ -92,7 +97,20 @@ export async function POST(req: NextRequest) {
     const o = await (tx as any).order.create({
       data: { orderNo, estimateHeaderId: estimateId, customerId: ctx.customerId, orderStatus: "pending", totalAmount, detailCount },
     })
-    await (tx as any).estimateHeader.update({ where: { id: estimateId }, data: { estimateStatus: "ordered" } })
+    // ★2026/07/14 部分注文対応: 対象明細だけを注文済みにし、残りの未注文明細はそのまま残す
+    await (tx as any).estimateDetail.updateMany({
+      where: { id: { in: targetDetails.map((d: any) => d.id) } },
+      data: { orderId: o.id, orderedOrderNo: orderNo },
+    })
+    // 見積の全明細が注文済みになった場合のみ見積ステータスを"ordered"にする。
+    // 一部だけ注文済みの場合は"saved"のままにし、残りの明細を編集・追加注文できるようにする。
+    const remaining = await (tx as any).estimateDetail.count({
+      where: { estimateHeaderId: estimateId, isDeleted: false, orderId: null },
+    })
+    await (tx as any).estimateHeader.update({
+      where: { id: estimateId },
+      data: { estimateStatus: remaining === 0 ? "ordered" : "saved" },
+    })
     return o
   })
 

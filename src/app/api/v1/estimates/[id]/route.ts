@@ -67,10 +67,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           remarks: body.remarks ?? null, estimateStatus: "saved", editMode: "edit", updatedAt: new Date(),
         },
       })
-      await (tx as any).estimateDetail.deleteMany({ where: { estimateHeaderId: id } })
+      // ★2026/07/14 部分注文対応: 注文済み(orderId設定済み)明細は削除対象から除外し、
+      // DBの既存内容をそのまま保持する。
+      await (tx as any).estimateDetail.deleteMany({ where: { estimateHeaderId: id, orderId: null } })
       await (tx as any).estimateDetail.createMany({
-        data: body.details.map((d: any, idx: number) => ({
-          estimateHeaderId: id, rowNo: idx + 1,
+        // ★2026/07/14 部分注文対応: 注文済み明細(d.isOrdered)はここで再作成しない
+        // (DBの既存行をそのまま保持)。rowNoはクライアントが全明細（注文済み含む）に
+        // 対して採番した値をそのまま使い、既存の注文済み行のrowNoと衝突しないようにする。
+        data: body.details.filter((d: any) => !d.isOrdered).map((d: any) => ({
+          estimateHeaderId: id, rowNo: d.rowNo,
           materialCode: d.materialCode, materialName: d.materialName ?? null,
           kakouShiyouCode: d.kakouShiyouCode, kakouShiyou: d.kakouShiyou ?? null,
           kakouShijiCodeT: d.kakouShijiCodeT ?? null, kakouShijiCodeA: d.kakouShijiCodeA ?? null,

@@ -8,6 +8,8 @@ export default function OrderConfirmPage() {
   const router = useRouter()
   const sp = useSearchParams()
   const estimateId = sp.get("estimateId")
+  // ★2026/07/14 部分注文対応: 未指定なら未注文の明細すべてが対象になる
+  const detailIdsParam = sp.get("detailIds")
 
   const [estimate, setEstimate]       = useState<any>(null)
   const [loading, setLoading]         = useState(true)
@@ -66,7 +68,7 @@ export default function OrderConfirmPage() {
       const res = await fetch("/api/v1/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estimateId }),
+        body: JSON.stringify({ estimateId, detailIds: detailIdsParam ? detailIdsParam.split(",") : undefined }),
       })
       const data = await res.json()
       if (res.status === 409) {

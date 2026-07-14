@@ -860,7 +860,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const nonOrderable = sel.filter(d => detailPattern(d) !== 3)
     if (nonOrderable.length > 0) { alert("注文できない明細が含まれています。\n金額・納期が両方算出された明細のみ注文できます。"); return }
     await handleSave()
-    if (draftId) window.location.href = "/orders/confirm?estimateId=" + draftId
+    // ★2026/07/14 部分注文対応: 選択した明細IDだけを注文確認画面へ渡す
+    const detailIdsParam = sel.map(d => d.clientDetailId).join(",")
+    if (draftId) window.location.href = "/orders/confirm?estimateId=" + draftId + "&detailIds=" + encodeURIComponent(detailIdsParam)
   }
 
   // ── 直送先：フィールドセット共通ヘルパー ──
@@ -1770,7 +1772,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                     : <span style={{ fontWeight: 700, fontSize: "10px" }}>納期回答待ち</span>}
                 </td>
                 <td style={{ ...TD, textAlign: "center" }}>
-                  {d.deliveryDeadline ? (
+                  {/* ★2026/07/14 部分注文対応: 注文済み明細は納期保証期限をブランク表示にする */}
+                  {!d.isOrdered && d.deliveryDeadline ? (
                     <>
                       <div style={{ fontSize: "10px", color: isExpired(d.deliveryDeadline) ? "#ef4444" : "#334155", fontWeight: 600 }}>{fmtDt(d.deliveryDeadline)}</div>
                       <div style={{ fontSize: "9px", fontWeight: 700, color: remainingLabel(d.deliveryDeadline).color }}>{remainingLabel(d.deliveryDeadline).text}</div>
