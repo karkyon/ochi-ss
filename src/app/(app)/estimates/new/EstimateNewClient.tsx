@@ -625,6 +625,51 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   // editingDetailId が設定されていれば、details配列内の該当行を
   // 同じ位置でフォーム内容に上書きする（編集前の行順・Noを維持）。
   // 未設定なら末尾に新規追加する（従来通り）。
+  // ★2026/07/14 追加: 明細個別直送先パネル専用のハンドラ
+  // 共通送り先(distCode等)とは完全に分離し、form(この明細)の
+  // destination*フィールドのみを操作する。
+  const handleIndivDistSearch = async () => {
+    const code = (form.destinationCode ?? "").trim()
+    if (!code) return
+    try {
+      const res = await fetch(`/api/v1/masters/direct-delivery/search?code=${encodeURIComponent(code)}`)
+      const d = await res.json()
+      console.log("[handleIndivDistSearch] レスポンス:", JSON.stringify(d, null, 2))
+      if (d.delivery) {
+        const dd = d.delivery
+        setForm(f => ({
+          ...f,
+          destinationName:    dd.companyName      ?? dd.name      ?? f.destinationName,
+          destinationDept:    dd.departmentName    ?? dd.department ?? f.destinationDept,
+          destinationPerson:  dd.contactPerson     ?? dd.person    ?? f.destinationPerson,
+          destinationZip:     dd.postalCode        ?? dd.zipCode   ?? f.destinationZip,
+          destinationAddress: [dd.address1, dd.address2, dd.address3].filter(Boolean).join("") || dd.address || f.destinationAddress,
+          destinationTel:     dd.phoneNumber       ?? dd.tel       ?? f.destinationTel,
+          destinationFax:     dd.faxNumber         ?? dd.fax       ?? f.destinationFax,
+        }))
+      } else {
+        alert(`出荷先コード「${code}」はマスタに存在しません。出荷先名を直接入力してください。`)
+      }
+    } catch (e: any) { console.error("[handleIndivDistSearch] エラー:", e.message) }
+  }
+
+  const handleIndivZip = async () => {
+    const digits = zipDigits(form.destinationZip ?? "")
+    if (digits.length < 7) {
+      setForm(f => ({ ...f, destinationZip: normalizeZip(f.destinationZip ?? "") }))
+      return
+    }
+    setForm(f => ({ ...f, destinationZip: normalizeZip(f.destinationZip ?? "") }))
+    try {
+      const res = await fetch(`/api/v1/postal-code?zip=${digits}`)
+      const d = await res.json()
+      console.log("[handleIndivZip] レスポンス:", JSON.stringify(d, null, 2))
+      if (!res.ok) throw new Error(d.error ?? "住所取得失敗")
+      const addr = d.address ?? [d.address1, d.address2, d.address3].filter(Boolean).join("")
+      if (addr) setForm(f => ({ ...f, destinationAddress: addr }))
+    } catch (e: any) { console.error("[handleIndivZip] エラー:", e.message) }
+  }
+
   const handleAdd = () => {
     if (!form.calculated) return
     if (editingDetailId) {
@@ -1455,10 +1500,15 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                       この明細だけの送り先（共通の送り先情報とは別に指定）
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "flex-end" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "80px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "110px" }}>
                         <span style={{ fontSize: "9px", color: "#64748b" }}>出荷先</span>
-                        <input style={INP} value={form.destinationCode ?? ""}
-                          onChange={e => setForm(f => ({ ...f, destinationCode: e.target.value }))} />
+                        <div style={{ display: "flex", gap: "3px" }}>
+                          <input style={INP} value={form.destinationCode ?? ""}
+                            onChange={e => setForm(f => ({ ...f, destinationCode: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleIndivDistSearch() } }} />
+                          <button type="button" className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "1px 6px", height: "24px" }}
+                            onClick={handleIndivDistSearch} title="出荷先マスタ検索">🔍</button>
+                        </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "150px" }}>
                         <span style={{ fontSize: "9px", color: "#64748b" }}>出荷先名</span>
@@ -1475,10 +1525,15 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
                         <input style={INP} value={form.destinationPerson ?? ""}
                           onChange={e => setForm(f => ({ ...f, destinationPerson: e.target.value }))} />
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "90px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1px", width: "130px" }}>
                         <span style={{ fontSize: "9px", color: "#64748b" }}>郵便番号</span>
-                        <input style={INP} value={form.destinationZip ?? ""}
-                          onChange={e => setForm(f => ({ ...f, destinationZip: e.target.value }))} />
+                        <div style={{ display: "flex", gap: "3px" }}>
+                          <input style={INP} value={form.destinationZip ?? ""} placeholder="0000000"
+                            onChange={e => setForm(f => ({ ...f, destinationZip: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleIndivZip() } }} />
+                          <button type="button" className="btn-ochi btn-outline" style={{ fontSize: "10px", padding: "1px 6px", height: "24px" }}
+                            onClick={handleIndivZip} title="郵便番号から住所検索">検索</button>
+                        </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: 1, minWidth: "200px" }}>
                         <span style={{ fontSize: "9px", color: "#64748b" }}>住所</span>
