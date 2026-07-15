@@ -43,8 +43,13 @@ export default function OrderConfirmPage() {
         } catch { /* 材料名解決は補助情報のためサイレントに継続 */ }
 
         // 納期有効期限チェック
+        // ★優先対応4: 既に注文済み(orderId確定済み)の明細や、detailIds指定時に
+        // 対象外となる明細まで期限切れ判定に含めると、今回のこの注文とは無関係な
+        // 行のせいで注文がブロックされてしまうため、「今回注文する対象」に限定する。
+        const pendingIdSet = detailIdsParam ? new Set(detailIdsParam.split(",")) : null
         const now = new Date()
         const expired: number[] = (d.details ?? [])
+          .filter((det: any) => !det.orderId && (!pendingIdSet || pendingIdSet.has(det.id)))
           .filter((det: any) => det.deliveryDeadline && new Date(det.deliveryDeadline) < now)
           .map((det: any) => det.rowNo)
         setExpiredRows(expired)
@@ -87,8 +92,17 @@ export default function OrderConfirmPage() {
     <div className="max-w-7xl mx-auto px-4 py-16 text-center text-gray-400">読み込み中...</div>
   )
 
-  const totalAmount = estimate?.details?.reduce((s: number, d: any) => s + (Number(d.totalPrice) ?? 0), 0) ?? 0
   const hasExpired  = expiredRows.length > 0
+
+  // ★優先対応4: 見積の明細のうち、既に他の注文で確定済み(orderId確定済み)の行と、
+  // 今回この画面で注文しようとしている行を明確に分離して表示する。
+  // これまでは区別なく全明細を合算表示していたため、以前一部だけ先行注文した
+  // 見積を再度開いた際に、既に注文済みの金額まで合計に混ざって見えてしまっていた。
+  const pendingIdSet = detailIdsParam ? new Set(detailIdsParam.split(",")) : null
+  const allDetails = estimate?.details ?? []
+  const pendingDetails = allDetails.filter((d: any) => !d.orderId && (!pendingIdSet || pendingIdSet.has(d.id)))
+  const alreadyOrderedDetails = allDetails.filter((d: any) => !!d.orderId)
+  const pendingTotalAmount = pendingDetails.reduce((s: number, d: any) => s + (Number(d.totalPrice) ?? 0), 0)
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -119,6 +133,28 @@ export default function OrderConfirmPage() {
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
       )}
 
+      {/* ★優先対応4: 既に注文済みの明細がある場合の明示 */}
+      {alreadyOrderedDetails.length > 0 && (
+        <div className="mb-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm">
+          <p className="font-semibold flex items-center gap-1">
+            <span>ℹ️</span>この見積には既に注文済みの明細があります（下の明細一覧・合計には含まれません）
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {alreadyOrderedDetails.map((d: any) => (
+              <li key={d.id} className="text-xs flex items-center gap-2">
+                <span className="inline-block px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-medium">受注済み</span>
+                <span>No.{d.rowNo}　{materials[d.materialCode] || d.materialName || d.materialCode}</span>
+                {d.orderedOrderNo && (
+                  <Link href={`/orders/${d.orderId}`} className="text-indigo-600 hover:underline">
+                    注文No: {d.orderedOrderNo} →
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {estimate && (
         <>
           {/* ヘッダー情報 */}
@@ -144,7 +180,7 @@ export default function OrderConfirmPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-4">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">注文明細</p>
-              <p className="text-sm font-bold text-gray-800">合計 ¥{totalAmount.toLocaleString()}</p>
+              <p className="text-sm font-bold text-gray-800">合計 ¥{pendingTotalAmount.toLocaleString()}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -156,7 +192,7 @@ export default function OrderConfirmPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {(estimate.details ?? []).map((d: any, idx: number) => {
+                  {pendingDetails.map((d: any, idx: number) => {
                     const expired = expiredRows.includes(d.rowNo)
                     const deadline = d.deliveryDeadline ? new Date(d.deliveryDeadline) : null
                     const matName = materials[d.materialCode] || d.materialName || d.materialCode
@@ -210,16 +246,22 @@ export default function OrderConfirmPage() {
             </Link>
             <button
               onClick={handleOrder}
-              disabled={ordering || hasExpired}
+              disabled={ordering || hasExpired || pendingDetails.length === 0}
               className={`px-6 py-2.5 text-sm rounded-lg font-medium transition-colors ${
-                hasExpired
+                hasExpired || pendingDetails.length === 0
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                   : ordering
                     ? "bg-indigo-400 text-white cursor-not-allowed"
                     : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}
             >
-              {ordering ? "注文処理中..." : hasExpired ? "⚠ 期限切れ明細あり（注文不可）" : "🛒 注文を確定する"}
+              {ordering
+                ? "注文処理中..."
+                : hasExpired
+                  ? "⚠ 期限切れ明細あり（注文不可）"
+                  : pendingDetails.length === 0
+                    ? "注文対象の明細がありません"
+                    : "🛒 注文を確定する"}
             </button>
           </div>
         </>

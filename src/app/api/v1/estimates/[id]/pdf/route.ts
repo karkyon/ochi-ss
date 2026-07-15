@@ -64,10 +64,11 @@ export async function GET(
   }
 
   const detailRows = details.map((d, i) => `
-    <tr>
+    <tr${d.orderId ? ' class="ordered-row"' : ""}>
       <td class="num">${i + 1}</td>
       <td>
-        <div class="cell-main">${d.materialName ?? d.materialCode ?? "—"}</div>
+        <div class="cell-main">${d.orderId ? `<span class="ordered-badge">受注済</span>` : ""}${d.materialName ?? d.materialCode ?? "—"}</div>
+        ${d.orderId ? `<div class="cell-sub">注文No: ${d.orderedOrderNo ?? "—"}</div>` : ""}
       </td>
       <td>
         <div class="cell-main">${d.kakouShiyou ?? "—"}</div>
@@ -172,6 +173,12 @@ export async function GET(
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .dim { font-size: 10px; color: #475569; }
     .strong { font-weight: 700; color: #1e3a5f; }
+    /* ★優先対応4: 受注済み明細の視覚的区別 */
+    tr.ordered-row td { background: #f8fafc !important; color: #94a3b8; }
+    .ordered-badge {
+      display: inline-block; font-size: 8px; font-weight: 700; letter-spacing: 0.5px;
+      color: #fff; background: #64748b; border-radius: 4px; padding: 1px 5px; margin-right: 4px;
+    }
 
     /* 金額内訳（旧帳票の 見積金額小計/運賃/消費税/合計 を踏襲） */
     .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 20px; }
