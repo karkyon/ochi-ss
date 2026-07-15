@@ -38,6 +38,11 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# 一時修正スクリプト・開発サーバーログ（誤ってコミットされる事故の再発防止）
+/fix_*.py
+/dev-server.log
+
 next-env.d.ts
 
 /src/generated/prisma
