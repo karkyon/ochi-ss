@@ -18,7 +18,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getSqlServerPool, sql } from "@/lib/sqlserver"
+import { getSqlServerPool } from "@/lib/sqlserver"
+import { runEstimateCalculation, strToKakouCode } from "@/lib/server/estimate-calc-engine"
 
 interface CalculateRequest {
   rowId?: number
@@ -59,24 +60,8 @@ interface CalculateRequest {
   tyokusousakiCharge?: string
 }
 
-// ── 加工指示コード 文字列→整数 逆引き ──
-// src/app/api/v1/masters/processing-specs/route.ts の codeToStr() と対になる変換。
-// SQL Server「WO加工仕様」テーブルの加工指示コードT/A/B(int)を、表示用に
-// codeToStr()で "RG"/"W"/"〜"/"SG" に変換した結果がフロントに渡っているため、
-// SP実行前にその逆変換で整数に戻す必要がある。
-// 確定根拠: SP実行時の実エラー
-//   "Conversion failed when converting the varchar value 'W' to data type int."
-//   (procName: usp_ASP_EstimateAmountCalculation_get, lineNumber: 533)
-// により、@Kakou_T/A/B, @KakouShijiCd_T/A/B は INT 系であることが判明した。
-function strToKakouCode(s: string | undefined | null): number | null {
-  switch (s) {
-    case "RG": return 1
-    case "W":  return 2
-    case "〜": return 4
-    case "SG": return 5
-    default:   return null
-  }
-}
+// 加工指示コード 文字列→整数 逆引き(strToKakouCode)は
+// src/lib/server/estimate-calc-engine.ts に共通化済み(重複実装を避けるため)。
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -116,22 +101,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const request = pool.request()
-
     const sessionId    = session.user.userId ?? ""
     const tokuisakiCd  = session.user.companyCode ?? ""
 
-    // ── 入力パラメータ（SP定義順に合わせる）──
-    request.input("SessionID",           sql.VarChar(30),      sessionId)
-    request.input("RowID",               sql.Int,              body.rowId ?? 0)
-    request.input("WOEstimateNo",        sql.VarChar(20),      body.estOrderNo ?? "")
-    request.input("ZairyouCd",           sql.VarChar(4),       body.materialCode)
-    request.input("ZairyouName",         sql.VarChar(20),      body.materialName ?? "")
-    request.input("KakouShiyouCd",       sql.SmallInt,         body.kakouShiyouCode)
-    request.input("KakouShiyou",         sql.VarChar(10),      body.kakouShiyou ?? "")
-    // SP実エラーで確定: @Kakou_T/A/B, @KakouShijiCd_T/A/B は INT 系。
-    // フロントは "W"/"RG"/"SG"/"〜" の表示用文字列を保持しているため、
-    // strToKakouCode() で元の整数コード(1/2/4/5)に逆変換してから渡す。
     const kakouTCode = strToKakouCode(body.kakouShijiCodeT)
     const kakouACode = strToKakouCode(body.kakouShijiCodeA)
     const kakouBCode = strToKakouCode(body.kakouShijiCodeB)
@@ -140,207 +112,75 @@ export async function POST(req: NextRequest) {
       A: { from: body.kakouShijiCodeA, to: kakouACode },
       B: { from: body.kakouShijiCodeB, to: kakouBCode },
     })
-    request.input("Kakou_T",             sql.Int,             kakouTCode)
-    request.input("Kakou_A",             sql.Int,             kakouACode)
-    request.input("Kakou_B",             sql.Int,             kakouBCode)
-    request.input("KakouShijiCd_T",      sql.Int,             kakouTCode)
-    request.input("KakouShijiCd_A",      sql.Int,             kakouACode)
-    request.input("KakouShijiCd_B",      sql.Int,             kakouBCode)
-    // SP定義: DECIMAL(8,3)
-    request.input("Size_T",              sql.Decimal(8, 3),    body.sizeT)
-    request.input("Size_A",              sql.Decimal(8, 3),    body.sizeA)
-    request.input("Size_B",              sql.Decimal(8, 3),    body.sizeB)
-    // SP定義の公差順: T_U, A_U, B_U, T_L, A_L, B_L
-    request.input("Kousa_T_U",           sql.Decimal(8, 3),    body.kousaTUpper ?? 0)
-    request.input("Kousa_A_U",           sql.Decimal(8, 3),    body.kousaAUpper ?? 0)
-    request.input("Kousa_B_U",           sql.Decimal(8, 3),    body.kousaBUpper ?? 0)
-    request.input("Kousa_T_L",           sql.Decimal(8, 3),    body.kousaTLower ?? 0)
-    request.input("Kousa_A_L",           sql.Decimal(8, 3),    body.kousaALower ?? 0)
-    request.input("Kousa_B_L",           sql.Decimal(8, 3),    body.kousaBLower ?? 0)
-    request.input("MentoriShiji",        sql.VarChar(10),      body.mentoriShiji ?? "")
-    request.input("Mentori_4",           sql.Decimal(8, 3),    body.mentori4 ?? 0)
-    request.input("Mentori_8",           sql.Decimal(8, 3),    body.mentori8 ?? 0)
-    request.input("Suryou",              sql.Int,              body.quantity)
-    request.input("RequestPrice",        sql.Money,            0)           // SP: MONEY = 0
-    request.input("RequestNouki",        sql.VarChar(10),      body.requestNouki ?? "")
-    request.input("CustomerNo",          sql.VarChar(100),     body.customerNo ?? "")
-    request.input("EndUserNo",           sql.VarChar(100),     body.endUserNo ?? "")
-    request.input("Refer",               sql.VarChar(255),     "")
-    request.input("TokuisakiCd",         sql.VarChar(6),       tokuisakiCd)
-    request.input("EndUserCd",           sql.VarChar(6),       body.endUserCd ?? "")
-    request.input("TyokusousakiCd",      sql.VarChar(6),       body.tyokusousakiCd ?? "")
-    request.input("TyokusousakiName",    sql.VarChar(80),      body.tyokusousakiName ?? "")
-    request.input("TyokusousakiZipCd",   sql.VarChar(10),      body.tyokusousakiYubin ?? "")
-    request.input("TyokusousakiAddr",    sql.VarChar(255),     body.tyokusousakiAddress ?? "")
-    // SP定義に存在するが旧コードに欠落していたパラメータ
-    request.input("TyokusousakiPost",    sql.VarChar(50),      body.tyokusousakiPost ?? "")
-    request.input("TyokusousakiCharge",  sql.VarChar(20),      body.tyokusousakiCharge ?? "")
-    request.input("EditMode",            sql.VarChar(10),      body.editMode)
 
-    // ── 出力パラメータ（SP定義の全OUTPUTに合わせる）──
-    request.output("ShortestNouki",       sql.VarChar(10))
-    request.output("UnitPrice",           sql.Money)
-    request.output("SumPrice",            sql.Money)
-    request.output("DeliveryDeadline",    sql.DateTime2)
-    // 中間値OUTPUT
-    request.output("ZairyouSizeT_OUT",    sql.Decimal(7, 3))
-    request.output("ZairyouSizeA_OUT",    sql.Decimal(7, 3))
-    request.output("ZairyouSizeB_OUT",    sql.Decimal(7, 3))
-    request.output("ColNo_OUT",           sql.Int)
-    request.output("RowNo_OUT",           sql.Int)
-    request.output("Exists_OUT",          sql.Bit)
-    request.output("OutOfRange_OUT",      sql.Bit)
-    request.output("Index_OUT",           sql.Decimal(5, 1))
-    request.output("Price_OUT",           sql.Money)
-    request.output("Index2_OUT",          sql.Decimal(5, 1))
-    request.output("Price2_OUT",          sql.Money)
-    request.output("ExceptSetting_OUT",   sql.Bit)
-    request.output("ZairyouUWeight_OUT",  sql.Decimal(18, 6))
-    request.output("ZairyouWeight_OUT",   sql.Decimal(18, 6))
-    request.output("ProductUWeight_OUT",  sql.Decimal(18, 6))
-    request.output("ProductWeight_OUT",   sql.Decimal(18, 6))
-    request.output("ZaishitsuEx_OUT",     sql.Decimal(4, 2))
-    request.output("ShiyouEx_OUT",        sql.Decimal(4, 2))
-    request.output("ItaatsuEx_OUT",       sql.Decimal(4, 2))
-    request.output("TorishiroEx_T_OUT",   sql.Decimal(4, 2))
-    request.output("TorishiroEx_A_OUT",   sql.Decimal(4, 2))
-    request.output("TorishiroEx_B_OUT",   sql.Decimal(4, 2))
-    request.output("Variation_T_OUT",     sql.Decimal(6, 2))
-    request.output("Variation_A_OUT",     sql.Decimal(6, 2))
-    request.output("Variation_B_OUT",     sql.Decimal(6, 2))
-    request.output("SuryouEx_OUT",        sql.Decimal(4, 2))
-    request.output("TokuisakiEx_OUT",     sql.Decimal(4, 2))
-    request.output("TyokusousakiEx_OUT",  sql.Decimal(4, 2))
-    request.output("KPatternCd_OUT",      sql.Decimal(18, 6))
-    request.output("KPColNo_OUT",         sql.Int)
-    request.output("KPRowNo_OUT",         sql.Int)
-    request.output("KPExists_OUT",        sql.Bit)
-    request.output("KPIndex_OUT",         sql.Decimal(5, 1))
-    request.output("6FKakouPrice_OUT",    sql.Money)
-    request.output("KakouPrice_OUT",      sql.Money)
-    request.output("SGKakouPrice_OUT",    sql.Money)
-    request.output("SGKakouPrice_T_OUT",  sql.Decimal(10, 2))
-    request.output("SGKakouPrice_A_OUT",  sql.Decimal(10, 2))
-    request.output("SGKakouPrice_B_OUT",  sql.Decimal(10, 2))
-    request.output("KakouPriceSummary_OUT", sql.Money)
-    request.output("DeliveryUCost_OUT",   sql.Money)
-    request.output("DeliveryCost_OUT",    sql.Money)
-    request.output("PatternCd_OUT",       sql.Int)
-    request.output("IndexNo_OUT",         sql.Int)
-    request.output("BaseCost_OUT",        sql.Money)
-    request.output("RegionCd_OUT",        sql.VarChar(3))
-    request.output("Adderess_OUT",        sql.VarChar(130))
-    request.output("AreaCd_OUT",          sql.Int)
-    request.output("Area_OUT",            sql.VarChar(20))
-    request.output("Prefectures_OUT",     sql.VarChar(20))
-    request.output("Coefficient_OUT",     sql.Decimal(3, 1))
+    // ── SP実行本体は共通エンジン(estimate-calc-engine.ts)に委譲 ──
+    // 見積保存時のサーバー側金額再検証(estimate-revalidate.ts)と全く同じ経路で
+    // SPを呼び出すことで、パラメータ組み立てのズレによる不整合を防ぐ。
+    const calcResult = await runEstimateCalculation(
+      pool,
+      {
+        editMode: body.editMode,
+        rowId: body.rowId,
+        estOrderNo: body.estOrderNo,
+        materialCode: body.materialCode,
+        materialName: body.materialName,
+        kakouShiyouCode: body.kakouShiyouCode,
+        kakouShiyou: body.kakouShiyou,
+        kakouShijiCodeT: body.kakouShijiCodeT,
+        kakouShijiCodeA: body.kakouShijiCodeA,
+        kakouShijiCodeB: body.kakouShijiCodeB,
+        sizeT: body.sizeT,
+        sizeA: body.sizeA,
+        sizeB: body.sizeB,
+        kousaTUpper: body.kousaTUpper,
+        kousaTLower: body.kousaTLower,
+        kousaAUpper: body.kousaAUpper,
+        kousaALower: body.kousaALower,
+        kousaBUpper: body.kousaBUpper,
+        kousaBLower: body.kousaBLower,
+        mentoriShiji: body.mentoriShiji,
+        mentori4: body.mentori4,
+        mentori8: body.mentori8,
+        quantity: body.quantity,
+        requestNouki: body.requestNouki,
+        endUserNo: body.endUserNo,
+        customerNo: body.customerNo,
+        endUserCd: body.endUserCd,
+        tyokusousakiCd: body.tyokusousakiCd,
+        tyokusousakiName: body.tyokusousakiName,
+        tyokusousakiYubin: body.tyokusousakiYubin,
+        tyokusousakiAddress: body.tyokusousakiAddress,
+        tyokusousakiPost: body.tyokusousakiPost,
+        tyokusousakiCharge: body.tyokusousakiCharge,
+      },
+      { sessionId, tokuisakiCd }
+    )
 
-    // ── SPに渡す全パラメータ(85項目)をログ出力（デバッグ用）──
-    const spParams = {
-      SessionID: sessionId, RowID: body.rowId ?? 0, WOEstimateNo: body.estOrderNo ?? "",
-      ZairyouCd: body.materialCode, ZairyouName: body.materialName ?? "",
-      KakouShiyouCd: body.kakouShiyouCode, KakouShiyou: body.kakouShiyou ?? "",
-      Kakou_T: kakouTCode, Kakou_A: kakouACode, Kakou_B: kakouBCode,
-      KakouShijiCd_T: kakouTCode, KakouShijiCd_A: kakouACode, KakouShijiCd_B: kakouBCode,
-      Size_T: body.sizeT, Size_A: body.sizeA, Size_B: body.sizeB,
-      Kousa_T_U: body.kousaTUpper ?? 0, Kousa_A_U: body.kousaAUpper ?? 0, Kousa_B_U: body.kousaBUpper ?? 0,
-      Kousa_T_L: body.kousaTLower ?? 0, Kousa_A_L: body.kousaALower ?? 0, Kousa_B_L: body.kousaBLower ?? 0,
-      MentoriShiji: body.mentoriShiji ?? "", Mentori_4: body.mentori4 ?? 0, Mentori_8: body.mentori8 ?? 0,
-      Suryou: body.quantity, RequestPrice: 0, RequestNouki: body.requestNouki ?? "",
-      CustomerNo: body.customerNo ?? "", EndUserNo: body.endUserNo ?? "", Refer: "",
-      TokuisakiCd: tokuisakiCd, EndUserCd: body.endUserCd ?? "",
-      TyokusousakiCd: body.tyokusousakiCd ?? "", TyokusousakiName: body.tyokusousakiName ?? "",
-      TyokusousakiZipCd: body.tyokusousakiYubin ?? "", TyokusousakiAddr: body.tyokusousakiAddress ?? "",
-      TyokusousakiPost: body.tyokusousakiPost ?? "", TyokusousakiCharge: body.tyokusousakiCharge ?? "",
-      EditMode: body.editMode,
-    }
-    const SP_NAME = "usp_ASP_EstimateAmountCalculation_get"
-    // ── SSMS貼り付け用EXEC文を生成してログ出力 ──
-    const nullOrStr = (v: any) => v === null || v === undefined ? "NULL" : `'${String(v).replace(/'/g, "''")}'`
-    const nullOrNum = (v: any) => v === null || v === undefined ? "NULL" : String(v)
-    const execSql = `USE [ochidb_dev]
-GO
-
-DECLARE @RC int
-DECLARE @SessionID varchar(30)        = ${nullOrStr(spParams.SessionID)}
-DECLARE @RowID int                    = ${nullOrNum(spParams.RowID)}
-DECLARE @WOEstimateNo varchar(20)     = ${nullOrStr(spParams.WOEstimateNo)}
-DECLARE @ZairyouCd varchar(4)         = ${nullOrStr(spParams.ZairyouCd)}
-DECLARE @ZairyouName varchar(20)      = ${nullOrStr(spParams.ZairyouName)}
-DECLARE @KakouShiyouCd smallint       = ${nullOrNum(spParams.KakouShiyouCd)}
-DECLARE @KakouShiyou varchar(10)      = ${nullOrStr(spParams.KakouShiyou)}
-DECLARE @Kakou_T varchar(10)          = ${nullOrNum(spParams.Kakou_T)}
-DECLARE @Kakou_A varchar(10)          = ${nullOrNum(spParams.Kakou_A)}
-DECLARE @Kakou_B varchar(10)          = ${nullOrNum(spParams.Kakou_B)}
-DECLARE @KakouShijiCd_T varchar(10)   = ${nullOrNum(spParams.KakouShijiCd_T)}
-DECLARE @KakouShijiCd_A varchar(10)   = ${nullOrNum(spParams.KakouShijiCd_A)}
-DECLARE @KakouShijiCd_B varchar(10)   = ${nullOrNum(spParams.KakouShijiCd_B)}
-DECLARE @Size_T decimal(8,3)          = ${nullOrNum(spParams.Size_T)}
-DECLARE @Size_A decimal(8,3)          = ${nullOrNum(spParams.Size_A)}
-DECLARE @Size_B decimal(8,3)          = ${nullOrNum(spParams.Size_B)}
-DECLARE @Kousa_T_U decimal(8,3)       = ${nullOrNum(spParams.Kousa_T_U)}
-DECLARE @Kousa_A_U decimal(8,3)       = ${nullOrNum(spParams.Kousa_A_U)}
-DECLARE @Kousa_B_U decimal(8,3)       = ${nullOrNum(spParams.Kousa_B_U)}
-DECLARE @Kousa_T_L decimal(8,3)       = ${nullOrNum(spParams.Kousa_T_L)}
-DECLARE @Kousa_A_L decimal(8,3)       = ${nullOrNum(spParams.Kousa_A_L)}
-DECLARE @Kousa_B_L decimal(8,3)       = ${nullOrNum(spParams.Kousa_B_L)}
-DECLARE @MentoriShiji varchar(10)     = ${nullOrStr(spParams.MentoriShiji)}
-DECLARE @Mentori_4 decimal(8,3)       = ${nullOrNum(spParams.Mentori_4)}
-DECLARE @Mentori_8 decimal(8,3)       = ${nullOrNum(spParams.Mentori_8)}
-DECLARE @Suryou int                   = ${nullOrNum(spParams.Suryou)}
-DECLARE @RequestPrice money           = ${nullOrNum(spParams.RequestPrice)}
-DECLARE @RequestNouki varchar(10)     = ${nullOrStr(spParams.RequestNouki)}
-DECLARE @CustomerNo varchar(100)      = ${nullOrStr(spParams.CustomerNo)}
-DECLARE @EndUserNo varchar(100)       = ${nullOrStr(spParams.EndUserNo)}
-DECLARE @Refer varchar(255)           = ${nullOrStr(spParams.Refer)}
-DECLARE @TokuisakiCd varchar(6)       = ${nullOrStr(spParams.TokuisakiCd)}
-DECLARE @EndUserCd varchar(6)         = ${nullOrStr(spParams.EndUserCd)}
-DECLARE @TyokusousakiCd varchar(6)    = ${nullOrStr(spParams.TyokusousakiCd)}
-DECLARE @TyokusousakiName varchar(80) = ${nullOrStr(spParams.TyokusousakiName)}
-DECLARE @TyokusousakiZipCd varchar(10)= ${nullOrStr(spParams.TyokusousakiZipCd)}
-DECLARE @TyokusousakiAddr varchar(255)= ${nullOrStr(spParams.TyokusousakiAddr)}
-DECLARE @TyokusousakiPost varchar(50) = ${nullOrStr(spParams.TyokusousakiPost)}
-DECLARE @TyokusousakiCharge varchar(20)=${nullOrStr(spParams.TyokusousakiCharge)}
-DECLARE @EditMode varchar(10)         = ${nullOrStr(spParams.EditMode)}
-DECLARE @ShortestNouki varchar(10)
-DECLARE @UnitPrice money
-DECLARE @SumPrice money
-DECLARE @DeliveryDeadline datetime2(7)
-
-EXECUTE @RC = [dbo].[usp_ASP_EstimateAmountCalculation_get]
-   @SessionID ,@RowID ,@WOEstimateNo ,@ZairyouCd ,@ZairyouName
-  ,@KakouShiyouCd ,@KakouShiyou ,@Kakou_T ,@Kakou_A ,@Kakou_B
-  ,@KakouShijiCd_T ,@KakouShijiCd_A ,@KakouShijiCd_B
-  ,@Size_T ,@Size_A ,@Size_B
-  ,@Kousa_T_U ,@Kousa_A_U ,@Kousa_B_U ,@Kousa_T_L ,@Kousa_A_L ,@Kousa_B_L
-  ,@MentoriShiji ,@Mentori_4 ,@Mentori_8 ,@Suryou ,@RequestPrice ,@RequestNouki
-  ,@CustomerNo ,@EndUserNo ,@Refer ,@TokuisakiCd ,@EndUserCd
-  ,@TyokusousakiCd ,@TyokusousakiName ,@TyokusousakiZipCd ,@TyokusousakiAddr
-  ,@TyokusousakiPost ,@TyokusousakiCharge ,@EditMode
-  ,@ShortestNouki OUTPUT ,@UnitPrice OUTPUT ,@SumPrice OUTPUT ,@DeliveryDeadline OUTPUT
-
-SELECT @ShortestNouki AS ShortestNouki, @UnitPrice AS UnitPrice, @SumPrice AS SumPrice, @DeliveryDeadline AS DeliveryDeadline
-GO`
-    console.log("========== [calculate] SP実行直前 ==========")
-    console.log("[calculate] 実行ストアドプロシージャ名:", SP_NAME)
-    console.log("[calculate] 全送信パラメータ(85項目):", JSON.stringify(spParams, null, 2))
-    console.log("\n========== [calculate] SSMS貼り付け用EXEC文 ==========")
-    console.log(execSql)
-    console.log("================================================")
-    const result = await request.execute(SP_NAME)
-    // ── SP実行結果(OUTPUT全項目)をログ出力（デバッグ用）──
+    // ── SP実行結果をログ出力（デバッグ用）──
     console.log("========== [calculate] SP実行結果 ==========")
-    console.log("[calculate] 実行済みストアドプロシージャ名:", SP_NAME)
-    console.log("[calculate] OUTPUT全項目:", JSON.stringify(result.output, null, 2))
-    console.log("[calculate] recordsets件数:", result.recordsets?.length ?? 0)
-    console.log("[calculate] rowsAffected:", JSON.stringify(result.rowsAffected))
+    console.log("[calculate] 実行済みストアドプロシージャ名:", "usp_ASP_EstimateAmountCalculation_get")
+    console.log("[calculate] 再計算結果:", JSON.stringify(calcResult, null, 2))
     console.log("================================================")
 
-    const out = result.output
-    const unitPrice: number    = Number(out["UnitPrice"]      ?? 0)
-    const sumPrice: number     = Number(out["SumPrice"]       ?? 0)
-    const shortestNouki: string = out["ShortestNouki"]        ?? ""
-    const deliveryDeadline     = out["DeliveryDeadline"]
+    const unitPrice: number     = calcResult.unitPrice
+    const sumPrice: number      = calcResult.sumPrice
+    const shortestNouki: string = calcResult.shortestNouki
+    const deliveryDeadline      = calcResult.deliveryDeadline
+    // ── 以降の処理(エラー判定・intermediate組み立て等)は既存コードのまま、
+    //    "out[...]" 参照との互換のため、計算結果を同じキー名に詰め直す ──
+    const out: Record<string, unknown> = {
+      Exists_OUT: calcResult.existsFlag,
+      OutOfRange_OUT: calcResult.outOfRange,
+      ZairyouSizeT_OUT: calcResult.materialSizeT,
+      ZairyouSizeA_OUT: calcResult.materialSizeA,
+      ZairyouSizeB_OUT: calcResult.materialSizeB,
+      ZairyouUWeight_OUT: calcResult.materialUnitWeight,
+      ZairyouWeight_OUT: calcResult.materialTotalWeight,
+      ProductUWeight_OUT: calcResult.productUnitWeight,
+      ProductWeight_OUT: calcResult.productTotalWeight,
+      "6FKakouPrice_OUT": calcResult.processingCost6f,
+      KakouPriceSummary_OUT: calcResult.processingCostTotal,
+    }
 
     if (unitPrice <= 0) {
       // ★2026/07/13 修正: 「計算結果が不正です」という汎用メッセージだけでは
@@ -383,7 +223,25 @@ GO`
       // shortestNouki空でも unitPrice>0 なら計算成功とみなす
     }
 
-    // ── SSMS貼り付け用EXEC文（SSMSの「結果をスクリプトとして生成」形式）──
+    // ── SSMS貼り付け用EXEC文（デバッグ・SSMS再現用。SP実行自体は共通エンジン側で完了済み）──
+    const spParams = {
+      SessionID: sessionId, RowID: body.rowId ?? 0, WOEstimateNo: body.estOrderNo ?? "",
+      ZairyouCd: body.materialCode, ZairyouName: body.materialName ?? "",
+      KakouShiyouCd: body.kakouShiyouCode, KakouShiyou: body.kakouShiyou ?? "",
+      Kakou_T: kakouTCode, Kakou_A: kakouACode, Kakou_B: kakouBCode,
+      KakouShijiCd_T: kakouTCode, KakouShijiCd_A: kakouACode, KakouShijiCd_B: kakouBCode,
+      Size_T: body.sizeT, Size_A: body.sizeA, Size_B: body.sizeB,
+      Kousa_T_U: body.kousaTUpper ?? 0, Kousa_A_U: body.kousaAUpper ?? 0, Kousa_B_U: body.kousaBUpper ?? 0,
+      Kousa_T_L: body.kousaTLower ?? 0, Kousa_A_L: body.kousaALower ?? 0, Kousa_B_L: body.kousaBLower ?? 0,
+      MentoriShiji: body.mentoriShiji ?? "", Mentori_4: body.mentori4 ?? 0, Mentori_8: body.mentori8 ?? 0,
+      Suryou: body.quantity, RequestPrice: 0, RequestNouki: body.requestNouki ?? "",
+      CustomerNo: body.customerNo ?? "", EndUserNo: body.endUserNo ?? "", Refer: "",
+      TokuisakiCd: tokuisakiCd, EndUserCd: body.endUserCd ?? "",
+      TyokusousakiCd: body.tyokusousakiCd ?? "", TyokusousakiName: body.tyokusousakiName ?? "",
+      TyokusousakiZipCd: body.tyokusousakiYubin ?? "", TyokusousakiAddr: body.tyokusousakiAddress ?? "",
+      TyokusousakiPost: body.tyokusousakiPost ?? "", TyokusousakiCharge: body.tyokusousakiCharge ?? "",
+      EditMode: body.editMode,
+    }
     const nullOrStr2 = (v: any) => v === null || v === undefined ? "NULL" : `'${String(v).replace(/'/g, "''")}'`
     const nullOrNum2 = (v: any) => v === null || v === undefined ? "NULL" : String(v)
     const p = spParams as any

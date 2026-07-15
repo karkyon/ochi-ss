@@ -6,6 +6,7 @@ import { validateWithZod, estimateHeaderSchema } from "@/lib/zod-schemas"
 import { getTenantCtx, assertOwner } from "@/lib/tenant-guard"
 import { withTenant } from "@/lib/with-tenant"
 import { audit } from "@/lib/audit-log"
+import { revalidateEstimateDetails } from "@/lib/server/estimate-revalidate"
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { ctx, error } = await getTenantCtx()
@@ -51,6 +52,38 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (existing.estimateStatus === "ordered")
     return NextResponse.json({ error: "注文済みの見積は編集できません" }, { status: 422 })
 
+  // ── サーバー側金額再検証 ──
+  // クライアント送信のunitPrice/totalPriceは表示用の参考値に過ぎず、
+  // ここでSQL Server側SPを再実行して得た値を正として以降の保存処理に使う。
+  // 既に受注済み(isOrdered)の明細は、そもそもここで再作成されない
+  // (下のcreateManyでも除外している)ため再検証の対象外とする。
+  const detailsToRevalidate = (body.details as any[]).filter((d) => !d.isOrdered)
+  const revalidation = await revalidateEstimateDetails(
+    detailsToRevalidate.map((d) => ({
+      rowNo: d.rowNo, materialCode: d.materialCode, materialName: d.materialName,
+      kakouShiyouCode: d.kakouShiyouCode, kakouShiyou: d.kakouShiyou,
+      kakouShijiCodeT: d.kakouShijiCodeT, kakouShijiCodeA: d.kakouShijiCodeA, kakouShijiCodeB: d.kakouShijiCodeB,
+      sizeT: d.sizeT, sizeA: d.sizeA, sizeB: d.sizeB,
+      kousaTUpper: d.kousaTUpper, kousaTLower: d.kousaTLower,
+      kousaAUpper: d.kousaAUpper, kousaALower: d.kousaALower,
+      kousaBUpper: d.kousaBUpper, kousaBLower: d.kousaBLower,
+      mentoriShiji: d.mentoriShiji, mentori4: d.mentori4, mentori8: d.mentori8,
+      quantity: d.quantity, unitPrice: d.unitPrice ?? 0, totalPrice: d.totalPrice ?? 0,
+      requestNouki: body.requestNouki, endUserNo: body.endUserNo,
+    })),
+    { sessionId: ctx.userId, tokuisakiCd: ctx.companyCode },
+    "Edit"
+  )
+  if (revalidation.hasError) {
+    return NextResponse.json(
+      {
+        error: "見積金額のサーバー側検証に失敗した明細があります。内容をご確認のうえ、再計算してから保存してください。",
+        details: revalidation.results.filter((r) => !r.ok).map((r) => r.reason),
+      },
+      { status: 422 }
+    )
+  }
+
   try {
     await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
       await (tx as any).estimateHeader.update({
@@ -74,7 +107,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         // ★2026/07/14 部分注文対応: 注文済み明細(d.isOrdered)はここで再作成しない
         // (DBの既存行をそのまま保持)。rowNoはクライアントが全明細（注文済み含む）に
         // 対して採番した値をそのまま使い、既存の注文済み行のrowNoと衝突しないようにする。
-        data: body.details.filter((d: any) => !d.isOrdered).map((d: any) => ({
+        data: body.details.filter((d: any) => !d.isOrdered).map((d: any) => {
+          // サーバー側再計算済みの値を正として使う（クライアント送信値は使わない）
+          const verified = revalidation.byRowNo.get(d.rowNo)
+          const verifiedUnitPrice = verified?.verifiedUnitPrice ?? d.unitPrice ?? 0
+          const verifiedTotalPrice = verified?.verifiedTotalPrice ?? d.totalPrice ?? 0
+          const verifiedShortestDelivery = verified?.verifiedShortestDelivery ?? d.shortestDelivery ?? null
+          const verifiedDeliveryDeadline = verified?.verifiedDeliveryDeadline ?? null
+          return {
           estimateHeaderId: id, rowNo: d.rowNo,
           materialCode: d.materialCode, materialName: d.materialName ?? null,
           kakouShiyouCode: d.kakouShiyouCode, kakouShiyou: d.kakouShiyou ?? null,
@@ -91,10 +131,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           mentori4: d.mentori4 != null ? new Prisma.Decimal(d.mentori4) : null,
           mentori8: d.mentori8 != null ? new Prisma.Decimal(d.mentori8) : null,
           quantity: d.quantity,
-          unitPrice: d.unitPrice != null ? new Prisma.Decimal(d.unitPrice) : null,
-          totalPrice: d.totalPrice != null ? new Prisma.Decimal(d.totalPrice) : null,
-          shortestDelivery: d.shortestDelivery ?? null,
-          deliveryDeadline: d.deliveryDeadline ? new Date(d.deliveryDeadline) : null,
+          unitPrice: new Prisma.Decimal(verifiedUnitPrice),
+          totalPrice: new Prisma.Decimal(verifiedTotalPrice),
+          shortestDelivery: verifiedShortestDelivery,
+          deliveryDeadline: verifiedDeliveryDeadline,
           useIndividualDestination: !!d.useIndividualDestination,
           destinationCode: d.useIndividualDestination ? (d.destinationCode ?? null) : null,
           destinationName: d.useIndividualDestination ? (d.destinationName ?? null) : null,
@@ -114,7 +154,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           processingCost6f: d.processingCost6f != null ? new Prisma.Decimal(d.processingCost6f) : null,
           processingCostTotal: d.processingCostTotal != null ? new Prisma.Decimal(d.processingCostTotal) : null,
           isDeleted: false,
-        })),
+          }
+        }),
       })
     })
 
