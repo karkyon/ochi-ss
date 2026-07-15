@@ -6,6 +6,7 @@ export type AuditAction = "READ" | "CREATE" | "UPDATE" | "DELETE" | "EXPORT" | "
 export type AuditResource =
   | "estimates" | "orders" | "direct_deliveries"
   | "notifications" | "pdf" | "users" | "masters"
+  | "estimate_revisions"
 
 interface AuditParams {
   customerId: string; userId: string; action: AuditAction; resource: AuditResource

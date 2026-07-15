@@ -152,6 +152,8 @@ model EstimateHeader {
   // 1見積に複数受注を許可したため、こちらも単数(Order?)から配列(Order[])に変更
   orders     Order[]
   syncEvents OutboxEvent[]
+  // ★優先対応3: 見積の版管理（リビジョン履歴）
+  revisions  EstimateRevision[]
 
   @@index([customerId, estimateStatus])
   @@index([customerId, isDraftOnly, draftExpiresAt])
@@ -232,6 +234,29 @@ model EstimateDetail {
   @@unique([estimateHeaderId, rowNo])
   @@index([estimateHeaderId])
   @@map("estimate_details")
+}
+
+/// 見積リビジョン履歴（優先対応3: 見積の版管理）
+/// PUT /api/v1/estimates/[id] で上書き保存される直前のヘッダー・明細一式を
+/// JSONスナップショットとして保存する。改ざん調査・復元用の監査証跡のため、
+/// 削除しない(isDeletedを持たない)。
+model EstimateRevision {
+  id               String   @id @default(uuid())
+  estimateHeaderId String   @map("estimate_header_id")
+  // 上書きされる直前にヘッダーが持っていたversion値
+  // (EstimateHeader.versionと対応。version=1の初期保存後の最初の編集で
+  //  versionNo=1のスナップショットが作られ、ヘッダーはversion=2になる)
+  versionNo        Int      @map("version_no")
+  headerSnapshot   Json     @map("header_snapshot")
+  detailsSnapshot  Json     @map("details_snapshot")
+  changedBy        String   @map("changed_by")
+  changeReason     String?  @map("change_reason")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  estimateHeader EstimateHeader @relation(fields: [estimateHeaderId], references: [id])
+
+  @@index([estimateHeaderId, versionNo])
+  @@map("estimate_revisions")
 }
 
 /// 注文（発注確定）

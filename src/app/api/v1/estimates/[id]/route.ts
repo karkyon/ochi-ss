@@ -93,6 +93,29 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
+      // ── 見積の版管理(優先対応3) ──
+      // 上書きされる直前のヘッダー・明細一式をJSONスナップショットとして保存する。
+      // Decimal/Dateはそのままだと@db.Json列に書けないため、
+      // JSON.stringify→JSON.parseで純粋なJSON値に変換してから保存する
+      // (Prisma.DecimalはtoJSON()を持つため文字列化される)。
+      const beforeHeader = await (tx as any).estimateHeader.findUnique({ where: { id } })
+      const beforeDetails = await (tx as any).estimateDetail.findMany({
+        where: { estimateHeaderId: id, isDeleted: false },
+        orderBy: { rowNo: "asc" },
+      })
+      if (beforeHeader) {
+        await (tx as any).estimateRevision.create({
+          data: {
+            estimateHeaderId: id,
+            versionNo: beforeHeader.version,
+            headerSnapshot: JSON.parse(JSON.stringify(beforeHeader)),
+            detailsSnapshot: JSON.parse(JSON.stringify(beforeDetails)),
+            changedBy: ctx.userId,
+            changeReason: body.changeReason ?? null,
+          },
+        })
+      }
+
       const updateResult = await (tx as any).estimateHeader.updateMany({
         // version が取得時と一致する行のみ更新対象にする。
         // 一致件数が0件 = 他ユーザーが先に更新済み(Lost Update防止)。
