@@ -78,7 +78,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       quantity: d.quantity, unitPrice: d.unitPrice ?? 0, totalPrice: d.totalPrice ?? 0,
       requestNouki: body.requestNouki, endUserNo: body.endUserNo,
     })),
-    { sessionId: ctx.userId, tokuisakiCd: ctx.companyCode }
+    // ★バグ修正: SessionIDはSP側でVarChar(30)。ctx.userId(=session.user.id)は
+    // 36文字のUUIDのため渡すと桁あふれで例外になる。calculate APIで実績のある
+    // session.user.userId(短いログインID)と同じ値を持つctx.userNameを渡す。
+    { sessionId: ctx.userName, tokuisakiCd: ctx.companyCode }
   )
   if (revalidation.hasError) {
     return NextResponse.json(
