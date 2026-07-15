@@ -877,8 +877,18 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const nonOrderable = sel.filter(d => detailPattern(d) !== 3)
     if (nonOrderable.length > 0) { alert("注文できない明細が含まれています。\n金額・納期が両方算出された明細のみ注文できます。"); return }
     await handleSave()
-    // ★2026/07/14 部分注文対応: 選択した明細IDだけを注文確認画面へ渡す
-    const detailIdsParam = sel.map(d => d.clientDetailId).join(",")
+    // ★重大バグ修正(2026/07/15): 従来はd.clientDetailId(ブラウザ生成UUID)を
+    // detailIdsとして渡していたが、サーバー側のEstimateDetail.id(保存時にDBが
+    // 発行するUUID)とは全く別物のため、注文確認画面・注文確定APIのどちらでも
+    // 一致せず「注文対象の明細がありません」「注文可能な明細がありません」に
+    // なっていた(部分注文機能がこれまで一度も正しく動作していなかった)。
+    // rowNoは保存時にクライアントとサーバーの双方で同じ採番(配列内index+1)を
+    // 使っており確実に一致するため、rowNoベースに統一する。
+    const detailIdsParam = details
+      .map((d, i) => ({ clientDetailId: d.clientDetailId, rowNo: i + 1 }))
+      .filter(d => selectedIds.has(d.clientDetailId))
+      .map(d => d.rowNo)
+      .join(",")
     if (draftId) window.location.href = "/orders/confirm?estimateId=" + draftId + "&detailIds=" + encodeURIComponent(detailIdsParam)
   }
 

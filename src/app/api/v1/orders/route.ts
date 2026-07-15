@@ -58,6 +58,11 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   // ★2026/07/14 部分注文対応
+  // ★重大バグ修正(2026/07/15): detailIdsは以前 EstimateDetail.id との一致を
+  // 期待していたが、クライアントはclientDetailId(ブラウザ生成UUID、DBのidとは
+  // 別物)しか持っておらず、常に一致せず「注文可能な明細がありません」に
+  // なっていた。クライアント側をrowNo(1始まりの行番号)基準に統一したため、
+  // ここでもrowNoで照合する。
   const { estimateId, detailIds } = body as { estimateId: string; detailIds?: string[] }
   if (!estimateId) return NextResponse.json({ error: "estimateId required" }, { status: 400 })
 
@@ -72,8 +77,9 @@ export async function POST(req: NextRequest) {
   // ★2026/07/14 部分注文対応: 見積ヘッダー全体のestimateStatusではなく、
   // 明細ごとのorderId(注文済みかどうか)で判定する。detailIdsが指定されれば
   // その明細のみ、未指定なら未注文の明細すべてを対象にする。
+  const detailRowNos = detailIds?.map((v) => Number(v)).filter((n) => !Number.isNaN(n))
   const targetDetails = estimate.details.filter((d: any) =>
-    !d.orderId && (!detailIds || detailIds.includes(d.id))
+    !d.orderId && (!detailRowNos || detailRowNos.includes(d.rowNo))
   )
   if (targetDetails.length === 0)
     return NextResponse.json({ error: "注文可能な明細がありません（すべて注文済みか、対象の明細が見つかりません）" }, { status: 409 })

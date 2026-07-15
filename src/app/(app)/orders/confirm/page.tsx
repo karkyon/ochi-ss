@@ -46,10 +46,10 @@ export default function OrderConfirmPage() {
         // ★優先対応4: 既に注文済み(orderId確定済み)の明細や、detailIds指定時に
         // 対象外となる明細まで期限切れ判定に含めると、今回のこの注文とは無関係な
         // 行のせいで注文がブロックされてしまうため、「今回注文する対象」に限定する。
-        const pendingIdSet = detailIdsParam ? new Set(detailIdsParam.split(",")) : null
+        const pendingIdSet = detailIdsParam ? new Set(detailIdsParam.split(",").map(Number)) : null
         const now = new Date()
         const expired: number[] = (d.details ?? [])
-          .filter((det: any) => !det.orderId && (!pendingIdSet || pendingIdSet.has(det.id)))
+          .filter((det: any) => !det.orderId && (!pendingIdSet || pendingIdSet.has(det.rowNo)))
           .filter((det: any) => det.deliveryDeadline && new Date(det.deliveryDeadline) < now)
           .map((det: any) => det.rowNo)
         setExpiredRows(expired)
@@ -98,9 +98,9 @@ export default function OrderConfirmPage() {
   // 今回この画面で注文しようとしている行を明確に分離して表示する。
   // これまでは区別なく全明細を合算表示していたため、以前一部だけ先行注文した
   // 見積を再度開いた際に、既に注文済みの金額まで合計に混ざって見えてしまっていた。
-  const pendingIdSet = detailIdsParam ? new Set(detailIdsParam.split(",")) : null
+  const pendingIdSet = detailIdsParam ? new Set(detailIdsParam.split(",").map(Number)) : null
   const allDetails = estimate?.details ?? []
-  const pendingDetails = allDetails.filter((d: any) => !d.orderId && (!pendingIdSet || pendingIdSet.has(d.id)))
+  const pendingDetails = allDetails.filter((d: any) => !d.orderId && (!pendingIdSet || pendingIdSet.has(d.rowNo)))
   const alreadyOrderedDetails = allDetails.filter((d: any) => !!d.orderId)
   const pendingTotalAmount = pendingDetails.reduce((s: number, d: any) => s + (Number(d.totalPrice) ?? 0), 0)
 
