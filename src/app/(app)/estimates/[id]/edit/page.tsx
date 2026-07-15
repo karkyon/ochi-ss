@@ -36,6 +36,7 @@ export default async function EstimateEditPage({ params }: { params: Promise<{ i
   const copySource = {
     estimateId:    estimate.id,
     estimateNo:    estimate.estimateNo ?? "",
+    version:       (estimate as any).version ?? 1,
     destinationCode:    estimate.destinationCode    ?? "",
     destinationName:    estimate.destinationName    ?? "",
     destinationDept:    estimate.destinationDept    ?? "",

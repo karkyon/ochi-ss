@@ -8,6 +8,11 @@ import { withTenant } from "@/lib/with-tenant"
 import { audit } from "@/lib/audit-log"
 import { revalidateEstimateDetails } from "@/lib/server/estimate-revalidate"
 
+// 楽観的排他制御(優先対応2): 更新対象のversionが一致しなかった場合に投げる。
+// withTenantのトランザクションコールバック内でthrowするとロールバックされるため、
+// 外側のcatchで捕捉して409を返す。
+class OptimisticLockError extends Error {}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { ctx, error } = await getTenantCtx()
   if (error) return error
@@ -43,6 +48,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!v.success) return NextResponse.json({ error: v.errors.join(" / ") }, { status: 422 })
   if (!body.inputDate) return NextResponse.json({ error: "inputDate は必須です" }, { status: 400 })
   if (!body.details?.length) return NextResponse.json({ error: "明細が1件も存在しません" }, { status: 400 })
+  if (body.version === undefined || body.version === null || typeof body.version !== "number")
+    return NextResponse.json({ error: "version は必須です（画面を再読み込みしてから保存してください）" }, { status: 400 })
 
   const existing = await withTenant(ctx.customerId, ctx.isSuperAdmin, (tx) =>
     (tx as any).estimateHeader.findFirst({ where: { id, customerId: ctx.customerId, isDeleted: false } })
@@ -86,8 +93,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
-      await (tx as any).estimateHeader.update({
-        where: { id },
+      const updateResult = await (tx as any).estimateHeader.updateMany({
+        // version が取得時と一致する行のみ更新対象にする。
+        // 一致件数が0件 = 他ユーザーが先に更新済み(Lost Update防止)。
+        where: { id, customerId: ctx.customerId, version: body.version },
         data: {
           inputDate: new Date(body.inputDate), estimateDate: new Date(body.inputDate),
           requestNouki: body.requestNouki ?? null, chargeName: body.chargeName ?? null,
@@ -98,8 +107,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           destinationTel: body.destinationTel ?? null, destinationFax: body.destinationFax ?? null,
           shippingMethodId: body.shippingMethodId ?? null,
           remarks: body.remarks ?? null, estimateStatus: "saved", editMode: "edit", updatedAt: new Date(),
+          version: { increment: 1 },
         },
       })
+      if (updateResult.count === 0) {
+        throw new OptimisticLockError(
+          "他のユーザーがこの見積を先に更新しました。画面を再読み込みしてから、変更内容を確認のうえ再度保存してください。"
+        )
+      }
       // ★2026/07/14 部分注文対応: 注文済み(orderId設定済み)明細は削除対象から除外し、
       // DBの既存内容をそのまま保持する。
       await (tx as any).estimateDetail.deleteMany({ where: { estimateHeaderId: id, orderId: null } })
@@ -162,6 +177,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     audit({ customerId: ctx.customerId, userId: ctx.userId, action: "UPDATE", resource: "estimates", resourceId: id, req })
     return NextResponse.json({ success: true, estimateId: id })
   } catch (err: any) {
+    if (err instanceof OptimisticLockError) {
+      return NextResponse.json({ error: err.message, reasonCode: "CONFLICT" }, { status: 409 })
+    }
     console.error("[estimates PUT] 更新エラー:", err)
     return NextResponse.json({ error: "更新中にエラーが発生しました", detail: err.message }, { status: 500 })
   }

@@ -140,6 +140,11 @@ model EstimateHeader {
   draftSavedAt       DateTime? @map("draft_saved_at") // 最終自動保存日時
   draftDeviceInfo    String?   @map("draft_device_info") // 保存端末情報
   isDeleted          Boolean   @default(false) @map("is_deleted")
+  // ★楽観的排他制御(優先対応2): 同時編集の後勝ち(Lost Update)を防止するための版番号。
+  // PUT /api/v1/estimates/[id] は更新時に「取得時のversion」と一致する行のみを
+  // 更新し、同時に version をインクリメントする。一致しない場合は
+  // 他ユーザーによる更新が割り込んだとみなし 409 を返す。
+  version            Int       @default(1) @map("version")
 
   customer   Customer         @relation(fields: [customerId], references: [id])
   details    EstimateDetail[]

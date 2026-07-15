@@ -309,6 +309,9 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
   const [saving, setSaving]   = useState(false)
   const [saveMsg, setSaveMsg] = useState("")
   const [draftId, setDraftId] = useState<string | null>(null)
+  // 楽観的排他制御(優先対応2): 取得時点のversionを保持し、PUT時に送り返す。
+  // サーバー側で保存時点のversionと不一致なら409(他ユーザーが先に更新)になる。
+  const [estimateVersion, setEstimateVersion] = useState<number>(1)
   const [historyModal, setHistoryModal] = useState<{ id: string; log: Array<{ at: string; action: string; detail: string }> } | null>(null)
 
   // マスタ（DBから取得したProcSpecにT/A/B列含む）
@@ -358,6 +361,7 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     if (!isCopy) {
       if (copySource.estimateId) setDraftId(copySource.estimateId)
       if (copySource.estimateNo) setEstimateNo(copySource.estimateNo)
+      if (typeof copySource.version === "number") setEstimateVersion(copySource.version)
     }
     if (copySource.customerOrderNo)   setCustOrderNo(copySource.customerOrderNo)
     if (copySource.endUserNo)         setEndUserNo(copySource.endUserNo)
@@ -797,6 +801,8 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
     const payload = {
       inputDate,
       estimateDate,
+      // 楽観的排他制御(優先対応2): 編集保存時のみ、取得時点のversionを送る。
+      version: estimateVersion,
       shippingMethodId: shippingMethod === "発送" ? 1 : shippingMethod === "直送" ? 2 : 3,
       customerOrderNo: custOrderNo,
       endUserNo,
@@ -839,11 +845,22 @@ export default function EstimateNewClient({ materials, processingSpecs: initSpec
       })
       const data = await res.json()
       console.log("[handleSave] レスポンス:", JSON.stringify(data, null, 2))
-      if (!res.ok) throw new Error(data.error ?? "保存失敗")
+      if (!res.ok) {
+        if (res.status === 409) {
+          // 楽観的排他制御(優先対応2): 他ユーザーが先に保存済み。
+          setSaveMsg("⚠️ " + (data.error ?? "他のユーザーがこの見積を先に更新しました。画面を再読み込みしてください。"))
+          setSaving(false)
+          return
+        }
+        throw new Error(data.error ?? "保存失敗")
+      }
       const savedId = data.estimateId ?? data.id
       const savedNo = data.estimateNo ?? estimateNo
       if (savedId) setDraftId(savedId)
       setEstimateNo(savedNo)
+      // 保存成功後、自分がこのセッションで確定させた新しいversionを反映しておく
+      // (再保存する場合に備え、次回PUTで再び自分のversionが有効になるようにする)
+      setEstimateVersion(v => v + 1)
       setSaveMsg("✅ 保存完了！見積番号: " + savedNo)
     } catch (e: any) {
       console.error("[handleSave] エラー:", e.message)
