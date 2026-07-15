@@ -137,8 +137,7 @@ export async function POST(req: NextRequest) {
       quantity: d.quantity, unitPrice: d.unitPrice, totalPrice: d.totalPrice,
       requestNouki: body.requestNouki, endUserNo: body.endUserNo,
     })),
-    { sessionId: ctx.userId, tokuisakiCd: ctx.companyCode },
-    "New"
+    { sessionId: ctx.userId, tokuisakiCd: ctx.companyCode }
   )
   if (revalidation.hasError) {
     return NextResponse.json(

@@ -78,8 +78,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       quantity: d.quantity, unitPrice: d.unitPrice ?? 0, totalPrice: d.totalPrice ?? 0,
       requestNouki: body.requestNouki, endUserNo: body.endUserNo,
     })),
-    { sessionId: ctx.userId, tokuisakiCd: ctx.companyCode },
-    "Edit"
+    { sessionId: ctx.userId, tokuisakiCd: ctx.companyCode }
   )
   if (revalidation.hasError) {
     return NextResponse.json(

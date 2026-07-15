@@ -81,8 +81,7 @@ const PRICE_DIFF_LOG_TOLERANCE = 1
 
 export async function revalidateEstimateDetails(
   details: RevalidateDetailInput[],
-  session: { sessionId: string; tokuisakiCd: string },
-  editMode: "New" | "Edit" | "Copy"
+  session: { sessionId: string; tokuisakiCd: string }
 ): Promise<RevalidateOutcome> {
   const byRowNo = new Map<number, RevalidatedDetail>()
 
@@ -111,7 +110,8 @@ export async function revalidateEstimateDetails(
       const calc = await runEstimateCalculation(
         pool,
         {
-          editMode,
+          // ★バグ修正: editModeは意図的に渡さない(NULL)。
+          // 見積計算API(calculate/route.ts)の実績ある呼び出しと同じ経路にする。
           materialCode: d.materialCode,
           materialName: d.materialName ?? undefined,
           kakouShiyouCode: d.kakouShiyouCode,
@@ -177,11 +177,12 @@ export async function revalidateEstimateDetails(
         verifiedDeliveryDeadline: calc.deliveryDeadline,
       })
     } catch (err: any) {
-      console.error(`[estimate-revalidate] 明細${d.rowNo}行目 再計算エラー:`, err?.message ?? err)
+      const detailMsg = err?.message || err?.originalError?.message || err?.originalError?.info?.message || String(err)
+      console.error(`[estimate-revalidate] 明細${d.rowNo}行目 再計算エラー:`, detailMsg, err)
       results.push({
         rowNo: d.rowNo,
         ok: false,
-        reason: `明細${d.rowNo}行目: サーバー側金額再検証中にエラーが発生しました。`,
+        reason: `明細${d.rowNo}行目: サーバー側金額再検証中にエラーが発生しました。(詳細: ${detailMsg})`,
       })
     }
   }

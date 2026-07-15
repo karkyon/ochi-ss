@@ -17,7 +17,14 @@ type SqlPool = Awaited<ReturnType<typeof getSqlServerPool>>
 export interface EstimateCalcInput {
   rowId?: number
   estOrderNo?: string
-  editMode: "New" | "Edit" | "Copy"
+  // ★バグ修正: 見積計算API(calculate/route.ts)は実際のフロント実装上
+  // editModeを一切送信しておらず、常にNULLとしてSPに渡されて動作実績がある。
+  // 一方、保存時のサーバー側再検証(estimate-revalidate.ts)では"New"/"Edit"という
+  // 実在の文字列値を渡していたため、SP内部が実績のあるNULL経路と異なる分岐に
+  // 入り、再計算が例外を投げていた(見積保存時「サーバー側金額再検証中にエラーが
+  // 発生しました」の根本原因)。実績のある呼び出し方に合わせるため任意項目とし、
+  // 呼び出し側が明示的に渡さない限りNULLのまま渡す。
+  editMode?: "New" | "Edit" | "Copy"
   materialCode: string
   materialName?: string
   kakouShiyouCode: number
