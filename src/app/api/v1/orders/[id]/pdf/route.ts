@@ -29,7 +29,10 @@ export async function GET(
   audit({ customerId: ctx.customerId, userId: ctx.userId, action: "EXPORT", resource: "pdf", resourceId: id, req })
 
   const estimate = order.estimateHeader as any
-  const details  = estimate?.details ?? []
+  // ★重大バグ修正(2026/07/15): estimate.detailsは見積ヘッダー配下の全明細
+  // (他の部分注文・未注文分も含む)であり、この注文に属する明細だけに
+  // 絞り込まないと、注文書PDFに他の注文分の明細・金額まで混入してしまう。
+  const details  = (estimate?.details ?? []).filter((d: any) => d.orderId === order.id)
   const orderDate = order.orderDate
     ? new Date(order.orderDate).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" })
     : "—"

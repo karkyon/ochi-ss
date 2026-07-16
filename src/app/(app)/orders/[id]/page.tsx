@@ -44,6 +44,10 @@ export default async function OrderDetailPage({ params }: Props) {
   if (!order) notFound()
 
   const est         = order.estimateHeader
+  // ★重大バグ修正(2026/07/15): est.detailsは見積ヘッダー配下の全明細(他の
+  // 部分注文・未注文分も含む)であり、この注文に属する明細だけに絞り込まないと
+  // 「別の注文の明細まで表示される/合計と明細一覧が食い違う」事故になる。
+  const orderDetails = (est.details as any[]).filter((d: any) => d.orderId === order.id)
   const totalAmount = Number(order.totalAmount ?? 0)
   const st          = STATUS_LABEL[order.orderStatus] ?? { label: order.orderStatus, color: "bg-gray-100 text-gray-600" }
 
@@ -83,7 +87,7 @@ export default async function OrderDetailPage({ params }: Props) {
             { label: "得意先名",         val: est.customerName },
             ...(est.customerOrderNo ? [{ label: "お客様注文番号", val: est.customerOrderNo }] : []),
             { label: "合計金額（税別）", val: totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : "—" },
-            { label: "明細件数",         val: `${order.detailCount ?? est.details.length}件` },
+            { label: "明細件数",         val: `${order.detailCount ?? orderDetails.length}件` },
             ...(order.trackingNo ? [{ label: "送り状番号", val: order.trackingNo }] : []),
           ].map(({ label, val }) => (
             <div key={label}>
@@ -133,7 +137,7 @@ export default async function OrderDetailPage({ params }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {est.details.map((d: any, i: number) => (
+              {orderDetails.map((d: any, i: number) => (
                 <tr key={d.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3 text-center text-gray-500">{i + 1}</td>
                   <td className="px-3 py-3 text-gray-700">

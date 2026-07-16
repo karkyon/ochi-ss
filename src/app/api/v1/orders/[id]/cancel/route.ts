@@ -18,6 +18,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: `${order.orderStatus} の注文はキャンセルできません` }, { status: 422 })
   await withTenant(ctx.customerId, ctx.isSuperAdmin, async (tx) => {
     await tx.order.update({ where: { id }, data: { orderStatus: "cancelled" } })
+    // ★重大バグ修正(2026/07/15): キャンセル時にEstimateDetail側の
+    // orderId/orderedOrderNoを解放していなかったため、キャンセル後も
+    // 明細が「受注済み」のまま残り、再度注文できなくなっていた
+    // (部分注文対応で明細ごとにorderIdを持たせるようになったのに、
+    //  キャンセル処理がその解放を実装していなかった)。
+    await tx.estimateDetail.updateMany({
+      where: { orderId: id },
+      data: { orderId: null, orderedOrderNo: null },
+    })
     await tx.estimateHeader.update({ where: { id: order.estimateHeaderId }, data: { estimateStatus: "saved" } })
     await tx.orderStatusHistory.create({
       data: { orderId: id, fromStatus: order.orderStatus, toStatus: "cancelled",

@@ -22,11 +22,15 @@ export async function GET(req: NextRequest, { params }: Props) {
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 })
   audit({ customerId: ctx.customerId, userId: ctx.userId, action: "READ", resource: "orders", resourceId: id, req })
   const est = order.estimateHeader
+  // ★重大バグ修正(2026/07/15): est.detailsは見積ヘッダー配下の全明細(他の
+  // 部分注文・未注文分も含む)であり、この注文に属する明細だけに絞り込まないと
+  // 「別の注文の明細まで表示される」事故になる。
+  const orderDetails = (est.details as any[]).filter((d: any) => d.orderId === order.id)
   return NextResponse.json({
     id: order.id, orderNo: order.orderNo ?? null,
     orderDate: new Date(order.orderDate).toISOString().slice(0,10),
     orderStatus: order.orderStatus, totalAmount: Number(order.totalAmount ?? 0),
-    detailCount: order.detailCount ?? est.details.length, trackingNo: order.trackingNo ?? null,
+    detailCount: order.detailCount ?? orderDetails.length, trackingNo: order.trackingNo ?? null,
     estimateNo: est.estimateNo ?? null, customerCode: est.customerCode, customerName: est.customerName,
     customerOrderNo: est.customerOrderNo ?? null,
     destinationCode: est.destinationCode ?? null, destinationName: est.destinationName ?? null,
@@ -34,7 +38,7 @@ export async function GET(req: NextRequest, { params }: Props) {
     destinationZip: est.destinationZip ?? null, destinationAddress: est.destinationAddress ?? null,
     destinationTel: est.destinationTel ?? null, destinationFax: est.destinationFax ?? null,
     remarks: est.remarks ?? null,
-    details: est.details.map((d: any) => ({
+    details: orderDetails.map((d: any) => ({
       rowNo: d.rowNo, materialCode: d.materialCode, materialName: d.materialName ?? null,
       kakouShiyou: d.kakouShiyou ?? null,
       sizeT: Number(d.sizeT), sizeA: Number(d.sizeA), sizeB: Number(d.sizeB), quantity: d.quantity,
