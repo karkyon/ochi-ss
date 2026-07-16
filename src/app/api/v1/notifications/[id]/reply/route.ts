@@ -1,15 +1,14 @@
 // POST /api/v1/notifications/[id]/reply — お知らせ返信
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { getTenantCtx } from "@/lib/tenant-guard"
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { ctx, error } = await getTenantCtx()
+  if (error) return error
 
   const { id } = await params
   let body: any
@@ -27,15 +26,19 @@ export async function POST(
   })
   if (!parent) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  // 返信通知作成（越智製作所へ送信される想定）
+  // ★重大バグ修正(2026/07/15): 返信通知を targetCustomers: null(=全顧客への
+  // 公開通知)として作成していたため、ある得意先が送った返信内容が
+  // 一覧APIを通じて他の全ての得意先にも見えてしまうマルチテナント漏洩に
+  // なっていた。返信は本来、送信した得意先と越智製作所内部だけが見るべき
+  // ものなので、targetCustomersを送信元の得意先IDに限定する。
   const reply = await prisma.notification.create({
     data: {
       title:    `返信: ${parent.title}`,
       content:  body.body,
       notifType: "info",
-      targetCustomers: Prisma.JsonNull,
+      targetCustomers: [ctx.customerId],
       publishedAt: new Date(),
-      createdBy: session.user.userId ?? session.user.customerId!,
+      createdBy: ctx.userName || ctx.customerId,
     },
   })
 
