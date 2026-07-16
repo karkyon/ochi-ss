@@ -1,22 +1,39 @@
 // src/app/(app)/orders/[id]/page.tsx
+// 2026/07/16 デザイン統一: 見積入力画面(EstimateNewClient.tsx)と同じ
+// デザイントークン(btn-ochiボタン・TH/TD/LBLテーブルスタイル・ネイビー基調)に
+// 全面刷新し、見積画面⇄注文詳細画面の行き来で統一感のないUIになっていた問題を解消。
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import OrderCancelButton from "./OrderCancelButton"
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  pending:     { label: "処理中",   color: "bg-yellow-100 text-yellow-700" },
-  confirmed:   { label: "確定",     color: "bg-blue-100 text-blue-700" },
-  in_progress: { label: "製造中",   color: "bg-purple-100 text-purple-700" },
-  shipped:     { label: "出荷済",   color: "bg-teal-100 text-teal-700" },
-  completed:   { label: "完了",     color: "bg-green-100 text-green-700" },
-  cancelled:   { label: "取消",     color: "bg-red-100 text-red-600" },
-}
-
-const STATUS_HIST_LABEL: Record<string, string> = {
+const STATUS_LABEL: Record<string, string> = {
   pending: "処理中", confirmed: "確定", in_progress: "製造中",
   shipped: "出荷済", completed: "完了", cancelled: "取消",
+}
+
+// ─── スタイル定数（見積入力画面(EstimateNewClient.tsx)と統一） ───
+const TH: React.CSSProperties = {
+  background: "#1e3a5f", color: "#fff", fontSize: "12px", fontWeight: 600,
+  padding: "5px 6px", textAlign: "center", border: "1px solid #334155", whiteSpace: "nowrap",
+}
+const TD: React.CSSProperties = {
+  border: "1px solid #e2e8f0", padding: "5px 8px", verticalAlign: "middle",
+}
+const LBL: React.CSSProperties = {
+  background: "#e8edf5", fontSize: "12px", fontWeight: 600, color: "#374151",
+  padding: "5px 8px", border: "1px solid #d1d5db", whiteSpace: "nowrap",
+}
+const VAL: React.CSSProperties = {
+  fontSize: "13px", color: "#1e293b", fontWeight: 500,
+}
+const SECTION_TITLE: React.CSSProperties = {
+  background: "#d8e9f5", color: "#1e3a5f", fontSize: "12px", fontWeight: 700,
+  padding: "5px 10px", borderRadius: "4px 4px 0 0", border: "1px solid #b3d4ed", borderBottom: "none",
+}
+const CARD: React.CSSProperties = {
+  border: "1px solid #e2e8f0", borderRadius: "0 0 6px 6px", marginBottom: "14px", overflow: "hidden",
 }
 
 interface Props { params: Promise<{ id: string }> }
@@ -49,165 +66,217 @@ export default async function OrderDetailPage({ params }: Props) {
   // 「別の注文の明細まで表示される/合計と明細一覧が食い違う」事故になる。
   const orderDetails = (est.details as any[]).filter((d: any) => d.orderId === order.id)
   const totalAmount = Number(order.totalAmount ?? 0)
-  const st          = STATUS_LABEL[order.orderStatus] ?? { label: order.orderStatus, color: "bg-gray-100 text-gray-600" }
+  const statusLabel = STATUS_LABEL[order.orderStatus] ?? order.orderStatus ?? "—"
+
+  // 公差フォーマットヘルパー（見積書PDFと同一ロジック）
+  const fmtKousa = (upper: any, lower: any) => {
+    if (upper == null && lower == null) return "—"
+    const u = upper != null ? `+${Number(upper)}` : ""
+    const l = lower != null ? `-${Number(lower)}` : ""
+    return u && l ? `${u}/${l}` : u || l
+  }
+  // 面取指示: 未入力・0のときは「0C」を表示しない
+  const fmtMentori = (v: any) => (v != null && Number(v) > 0 ? `${Number(v)}C` : "—")
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      {/* ページヘッダー */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-6 rounded-full bg-[#1a2744]" />
-          <h1 className="font-bold text-gray-800 text-lg">
-            注文詳細
-            {order.orderNo && <span className="ml-2 text-sm font-normal text-gray-500">（注文No: {order.orderNo}）</span>}
-          </h1>
+    <div style={{ fontSize: "13px", padding: "4px 8px", maxWidth: "1280px", margin: "0 auto" }}>
+      {/* ─── ヘッダーボタン(見積入力画面と統一) ─── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontWeight: 700, fontSize: "15px", color: "#1e3a5f" }}>注文詳細</span>
+          {order.orderNo && <span style={{ fontSize: "12px", color: "#64748b" }}>（注文No: {order.orderNo}）</span>}
+          <span style={{
+            display: "inline-block", fontSize: "11px", fontWeight: 700, padding: "2px 10px",
+            borderRadius: "999px", background: "#e0e7ff", color: "#3730a3",
+          }}>{statusLabel}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/orders" className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">← 注文一覧</Link>
-          <Link href={`/api/v1/orders/${order.id}/pdf`} target="_blank" className="px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-sm hover:bg-emerald-50">🖨️ 注文書PDF</Link>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <Link href="/orders">
+            <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}>← 注文一覧</button>
+          </Link>
+          <a href={`/api/v1/orders/${order.id}/pdf`} target="_blank" rel="noopener noreferrer"
+            className="btn-ochi btn-outline" style={{ fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+            📄 注文書PDF
+          </a>
           {["pending", "confirmed"].includes(order.orderStatus) && (
             <OrderCancelButton orderId={order.id} orderNo={order.orderNo ?? order.id.slice(0, 8)} />
           )}
-          <Link href="/dashboard" className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">メインメニュー</Link>
+          <Link href="/dashboard">
+            <button className="btn-ochi btn-outline" style={{ fontSize: "13px" }}>← メインメニュー</button>
+          </Link>
         </div>
       </div>
 
-      {/* 注文ヘッダー情報 */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">注文情報</p>
-          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-          {[
-            { label: "注文No",           val: order.orderNo ?? "（採番待ち）" },
-            { label: "注文日付",         val: new Date(order.orderDate).toLocaleDateString("ja-JP") },
-            { label: "見積No",           val: est.estimateNo ?? "—" },
-            { label: "得意先コード",     val: est.customerCode },
-            { label: "得意先名",         val: est.customerName },
-            ...(est.customerOrderNo ? [{ label: "お客様注文番号", val: est.customerOrderNo }] : []),
-            { label: "合計金額（税別）", val: totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : "—" },
-            { label: "明細件数",         val: `${order.detailCount ?? orderDetails.length}件` },
-            ...(order.trackingNo ? [{ label: "送り状番号", val: order.trackingNo }] : []),
-          ].map(({ label, val }) => (
-            <div key={label}>
-              <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
-              <p className="font-medium text-gray-800">{val}</p>
-            </div>
-          ))}
-        </div>
+      {/* ─── 注文情報 ─── */}
+      <div style={SECTION_TITLE}>注文情報</div>
+      <div style={CARD}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+          <tbody>
+            <tr>
+              <td style={LBL}>注文No</td>
+              <td style={TD}><span style={VAL}>{order.orderNo ?? "（採番待ち）"}</span></td>
+              <td style={LBL}>注文日付</td>
+              <td style={TD}><span style={VAL}>{new Date(order.orderDate).toLocaleDateString("ja-JP")}</span></td>
+              <td style={LBL}>見積No</td>
+              <td style={TD}><span style={VAL}>{est.estimateNo ?? "—"}</span></td>
+            </tr>
+            <tr>
+              <td style={LBL}>得意先コード</td>
+              <td style={TD}><span style={VAL}>{est.customerCode}</span></td>
+              <td style={LBL}>得意先名</td>
+              <td style={TD} colSpan={3}><span style={VAL}>{est.customerName}</span></td>
+            </tr>
+            <tr>
+              <td style={LBL}>お客様注文番号</td>
+              <td style={TD}><span style={VAL}>{est.customerOrderNo ?? "—"}</span></td>
+              <td style={LBL}>合計金額（税別）</td>
+              <td style={TD}><span style={{ ...VAL, fontWeight: 700, color: "#1e3a5f" }}>{totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : "—"}</span></td>
+              <td style={LBL}>明細件数</td>
+              <td style={TD}><span style={VAL}>{order.detailCount ?? orderDetails.length}件</span></td>
+            </tr>
+            {order.trackingNo && (
+              <tr>
+                <td style={LBL}>送り状番号</td>
+                <td style={TD} colSpan={5}><span style={VAL}>{order.trackingNo}</span></td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* 送り先情報 */}
+      {/* ─── 送り先情報 ─── */}
       {est.destinationName && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">送り先情報</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-            {[
-              { label: "送り先コード", val: est.destinationCode },
-              { label: "送り先名称",   val: est.destinationName, span: 2 },
-              { label: "部署名",       val: est.destinationDept },
-              { label: "担当者名",     val: est.destinationPerson },
-              { label: "郵便番号",     val: est.destinationZip ? `〒${est.destinationZip}` : null },
-              { label: "住所",         val: est.destinationAddress, span: 2 },
-              { label: "TEL",          val: est.destinationTel },
-              { label: "FAX",          val: est.destinationFax },
-            ].filter(f => f.val).map(({ label, val, span }) => (
-              <div key={label} className={span === 2 ? "lg:col-span-2" : ""}>
-                <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
-                <p className="font-medium text-gray-800">{val}</p>
-              </div>
-            ))}
+        <>
+          <div style={SECTION_TITLE}>送り先情報</div>
+          <div style={CARD}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+              <tbody>
+                <tr>
+                  <td style={LBL}>送り先コード</td>
+                  <td style={TD}><span style={VAL}>{est.destinationCode ?? "—"}</span></td>
+                  <td style={LBL}>送り先名称</td>
+                  <td style={TD} colSpan={3}><span style={VAL}>{est.destinationName}</span></td>
+                </tr>
+                <tr>
+                  <td style={LBL}>部署名</td>
+                  <td style={TD}><span style={VAL}>{est.destinationDept ?? "—"}</span></td>
+                  <td style={LBL}>担当者名</td>
+                  <td style={TD} colSpan={3}><span style={VAL}>{est.destinationPerson ?? "—"}</span></td>
+                </tr>
+                <tr>
+                  <td style={LBL}>郵便番号</td>
+                  <td style={TD}><span style={VAL}>{est.destinationZip ? `〒${est.destinationZip}` : "—"}</span></td>
+                  <td style={LBL}>住所</td>
+                  <td style={TD} colSpan={3}><span style={VAL}>{est.destinationAddress ?? "—"}</span></td>
+                </tr>
+                <tr>
+                  <td style={LBL}>TEL</td>
+                  <td style={TD}><span style={VAL}>{est.destinationTel ?? "—"}</span></td>
+                  <td style={LBL}>FAX</td>
+                  <td style={TD} colSpan={3}><span style={VAL}>{est.destinationFax ?? "—"}</span></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
+        </>
       )}
 
-      {/* 明細テーブル */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">注文明細</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                {["No","材料","加工仕様","T(mm)","A(mm)","B(mm)","数量","単価(円)","金額(円)","最短納期"].map(h => (
-                  <th key={h} className="px-3 py-3 text-xs font-semibold text-gray-500 text-right first:text-center last:text-left">{h}</th>
-                ))}
+      {/* ─── 注文明細 ─── */}
+      <div style={SECTION_TITLE}>注文明細</div>
+      <div style={{ ...CARD, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+          <thead>
+            <tr>
+              <th style={{ ...TH, width: "3%" }}>No</th>
+              <th style={{ ...TH, width: "10%" }}>材質</th>
+              <th style={{ ...TH, width: "12%" }}>仕上り表示記号<br />（加工仕様・指示）</th>
+              <th style={{ ...TH, width: "20%" }}>寸法(厚みT×長さB×幅A)<br />及び公差</th>
+              <th style={{ ...TH, width: "8%" }}>面取指示<br />(4C/8C)</th>
+              <th style={{ ...TH, width: "5%" }}>数量</th>
+              <th style={{ ...TH, width: "9%" }}>単価</th>
+              <th style={{ ...TH, width: "9%" }}>金額</th>
+              <th style={{ ...TH, width: "9%" }}>最短納期</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orderDetails.map((d: any, i: number) => (
+              <tr key={d.id} style={{ background: i % 2 === 1 ? "#f8fafc" : "#fff" }}>
+                <td style={{ ...TD, textAlign: "center" }}>{i + 1}</td>
+                <td style={TD}>
+                  <div style={{ fontWeight: 600, color: "#1e293b" }}>{d.materialName ?? d.materialCode ?? "—"}</div>
+                </td>
+                <td style={TD}>
+                  <div style={{ fontWeight: 600, color: "#1e293b" }}>{d.kakouShiyou ?? "—"}</div>
+                  <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>T:{d.kakouT ?? "-"} A:{d.kakouA ?? "-"} B:{d.kakouB ?? "-"}</div>
+                </td>
+                <td style={{ ...TD, textAlign: "center" }}>
+                  <div style={{ fontWeight: 600, color: "#1e293b" }}>{Number(d.sizeT)}×{Number(d.sizeB)}×{Number(d.sizeA)}</div>
+                  <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>
+                    T {fmtKousa(d.kousaTUpper, d.kousaTLower)} / A {fmtKousa(d.kousaAUpper, d.kousaALower)} / B {fmtKousa(d.kousaBUpper, d.kousaBLower)}
+                  </div>
+                </td>
+                <td style={{ ...TD, textAlign: "right", fontSize: "10px", color: "#475569" }}>{fmtMentori(d.mentori4)} / {fmtMentori(d.mentori8)}</td>
+                <td style={{ ...TD, textAlign: "right" }}>{d.quantity ?? ""}</td>
+                <td style={{ ...TD, textAlign: "right" }}>{d.unitPrice != null ? `¥${Number(d.unitPrice).toLocaleString()}` : "—"}</td>
+                <td style={{ ...TD, textAlign: "right", fontWeight: 700, color: "#1e3a5f" }}>{d.totalPrice != null ? `¥${Number(d.totalPrice).toLocaleString()}` : "—"}</td>
+                <td style={{ ...TD, fontSize: "10px", color: "#475569" }}>{d.shortestDelivery ?? "—"}</td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {orderDetails.map((d: any, i: number) => (
-                <tr key={d.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-3 text-center text-gray-500">{i + 1}</td>
-                  <td className="px-3 py-3 text-gray-700">
-                    <span className="font-medium">{d.materialCode}</span>
-                    {d.materialName && <span className="text-gray-400 text-xs ml-1">{d.materialName}</span>}
-                  </td>
-                  <td className="px-3 py-3 text-gray-700">{d.kakouShiyou ?? "—"}</td>
-                  <td className="px-3 py-3 text-right">{Number(d.sizeT)}</td>
-                  <td className="px-3 py-3 text-right">{Number(d.sizeA)}</td>
-                  <td className="px-3 py-3 text-right">{Number(d.sizeB)}</td>
-                  <td className="px-3 py-3 text-right">{d.quantity}</td>
-                  <td className="px-3 py-3 text-right">{d.unitPrice != null ? `¥${Number(d.unitPrice).toLocaleString()}` : "—"}</td>
-                  <td className="px-3 py-3 text-right font-medium">{d.totalPrice != null ? `¥${Number(d.totalPrice).toLocaleString()}` : "—"}</td>
-                  <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{d.shortestDelivery ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-gray-300 bg-gray-50">
-                <td colSpan={8} className="px-3 py-3 text-right font-semibold text-gray-700">合計（税別）</td>
-                <td className="px-3 py-3 text-right font-bold">{totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : "—"}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={7} style={{ ...TD, textAlign: "right", fontWeight: 700, color: "#374151", background: "#f1f5f9" }}>合　計（税別）</td>
+              <td style={{ ...TD, textAlign: "right", fontWeight: 700, fontSize: "13px", color: "#1e3a5f", background: "#f1f5f9" }}>
+                {totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : "—"}
+              </td>
+              <td style={{ ...TD, background: "#f1f5f9" }} />
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
-      {/* ステータス履歴 */}
+      {/* ─── ステータス変更履歴 ─── */}
       {order.statusHistories?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">ステータス変更履歴</p>
-          <div className="space-y-2">
+        <>
+          <div style={SECTION_TITLE}>ステータス変更履歴</div>
+          <div style={{ ...CARD, padding: "10px 12px" }}>
             {order.statusHistories.map((h: any) => {
-              const toSt = STATUS_LABEL[h.toStatus] ?? { label: h.toStatus, color: "bg-gray-100 text-gray-600" }
+              const toLabel = STATUS_LABEL[h.toStatus] ?? h.toStatus
               return (
-                <div key={h.id} className="flex items-center gap-3 text-sm">
-                  <span className="text-gray-400 text-xs whitespace-nowrap">{new Date(h.occurredAt).toLocaleDateString("ja-JP")}</span>
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${toSt.color}`}>{toSt.label}</span>
-                  {h.changeReason && <span className="text-gray-500 text-xs">{h.changeReason}</span>}
-                  {h.trackingNo && <span className="text-gray-500 text-xs">送り状: {h.trackingNo}</span>}
+                <div key={h.id} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", padding: "3px 0" }}>
+                  <span style={{ color: "#94a3b8", fontSize: "11px", whiteSpace: "nowrap" }}>{new Date(h.occurredAt).toLocaleDateString("ja-JP")}</span>
+                  <span style={{ display: "inline-block", fontSize: "11px", fontWeight: 700, padding: "1px 8px", borderRadius: "999px", background: "#e0e7ff", color: "#3730a3" }}>{toLabel}</span>
+                  {h.changeReason && <span style={{ color: "#64748b" }}>{h.changeReason}</span>}
+                  {h.trackingNo && <span style={{ color: "#64748b" }}>送り状: {h.trackingNo}</span>}
                 </div>
               )
             })}
           </div>
-        </div>
+        </>
       )}
 
-      {/* 仕様変更履歴 */}
+      {/* ─── 仕様変更履歴 ─── */}
       {order.specChanges?.length > 0 && (
-        <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 mb-4">
-          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-4">⚠️ 仕様変更履歴</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-amber-50 border-b border-amber-200">
+        <>
+          <div style={{ ...SECTION_TITLE, background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" }}>⚠️ 仕様変更履歴</div>
+          <div style={{ ...CARD, borderColor: "#fde68a", overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+              <thead>
                 <tr>
-                  {["行No","変更フィールド","変更前","変更後","変更理由","変更日時"].map(h => (
-                    <th key={h} className="px-3 py-2 text-left text-[10px] font-medium text-amber-600">{h}</th>
+                  {["行No", "変更フィールド", "変更前", "変更後", "変更理由", "変更日時"].map(h => (
+                    <th key={h} style={{ ...TH, background: "#fde68a", color: "#92400e", border: "1px solid #fcd34d" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {order.specChanges.map((h: any) => (
-                  <tr key={h.id} className="hover:bg-amber-50/50">
-                    <td className="px-3 py-2 text-center">{h.rowNo}</td>
-                    <td className="px-3 py-2 font-mono">{h.fieldName}</td>
-                    <td className="px-3 py-2 text-gray-400 line-through">{h.oldValue ?? "—"}</td>
-                    <td className="px-3 py-2 font-medium text-amber-700">{h.newValue}</td>
-                    <td className="px-3 py-2 text-gray-600">{h.changeReason ?? "—"}</td>
-                    <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
+                  <tr key={h.id}>
+                    <td style={{ ...TD, textAlign: "center" }}>{h.rowNo}</td>
+                    <td style={{ ...TD, fontFamily: "monospace" }}>{h.fieldName}</td>
+                    <td style={{ ...TD, color: "#94a3b8", textDecoration: "line-through" }}>{h.oldValue ?? "—"}</td>
+                    <td style={{ ...TD, fontWeight: 600, color: "#92400e" }}>{h.newValue}</td>
+                    <td style={TD}>{h.changeReason ?? "—"}</td>
+                    <td style={{ ...TD, color: "#94a3b8", whiteSpace: "nowrap" }}>
                       {h.occurredAt ? new Date(h.occurredAt).toLocaleDateString("ja-JP") : "—"}
                     </td>
                   </tr>
@@ -215,21 +284,24 @@ export default async function OrderDetailPage({ params }: Props) {
               </tbody>
             </table>
           </div>
-        </div>
+        </>
       )}
 
-      {/* 備考 */}
+      {/* ─── 備考 ─── */}
       {est.remarks && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">備考</p>
-          <p className="text-sm text-gray-700">{est.remarks}</p>
-        </div>
+        <>
+          <div style={SECTION_TITLE}>備考</div>
+          <div style={{ ...CARD, padding: "10px 12px", fontSize: "12px", color: "#334155" }}>{est.remarks}</div>
+        </>
       )}
 
-      {/* お問い合わせ */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-800">
-        <p className="font-semibold mb-1">ご不明な点はお問い合わせください</p>
-        <p>越智製作所　TEL: 072-882-5524　E-mail: weborder@ochi-ss.co.jp</p>
+      {/* ─── お問い合わせ ─── */}
+      <div style={{
+        background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px",
+        padding: "10px 14px", fontSize: "12px", color: "#334155", marginBottom: "20px",
+      }}>
+        <div style={{ fontWeight: 700, color: "#1e3a5f", marginBottom: "2px" }}>ご不明な点はお問い合わせください</div>
+        <div>越智製作所　TEL: 072-882-5524　E-mail: weborder@ochi-ss.co.jp</div>
       </div>
     </div>
   )

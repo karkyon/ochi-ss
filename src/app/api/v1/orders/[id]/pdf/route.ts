@@ -76,6 +76,8 @@ export async function GET(
     const l = lower != null ? `-${Number(lower)}` : ""
     return u && l ? `${u}/${l}` : u || l
   }
+  // 面取指示: 未入力・0のときは「0C」と表示しない
+  const fmtMentori = (v: any) => (v != null && Number(v) > 0 ? `${Number(v)}C` : "—")
 
   const detailRows = details.map((d: any, i: number) => `
     <tr>
@@ -87,11 +89,11 @@ export async function GET(
         <div class="cell-main">${d.kakouShiyou ?? "—"}</div>
         <div class="cell-sub">T:${d.kakouT ?? "-"} A:${d.kakouA ?? "-"} B:${d.kakouB ?? "-"}</div>
       </td>
-      <td class="num dim">
+      <td class="center dim">
         <div class="cell-main">${Number(d.sizeT)}×${Number(d.sizeB)}×${Number(d.sizeA)}</div>
         <div class="cell-sub">T ${fmtKousa(d.kousaTUpper, d.kousaTLower)} / A ${fmtKousa(d.kousaAUpper, d.kousaALower)} / B ${fmtKousa(d.kousaBUpper, d.kousaBLower)}</div>
       </td>
-      <td class="num dim">${d.mentori4 != null ? Number(d.mentori4) + "C" : "—"} / ${d.mentori8 != null ? Number(d.mentori8) + "C" : "—"}</td>
+      <td class="num dim">${fmtMentori(d.mentori4)} / ${fmtMentori(d.mentori8)}</td>
       <td class="num">${d.quantity ?? ""}</td>
       <td class="num">¥${Number(d.unitPrice ?? 0).toLocaleString()}</td>
       <td class="num strong">¥${Number(d.totalPrice ?? 0).toLocaleString()}</td>
@@ -190,6 +192,7 @@ export async function GET(
     .cell-main { font-weight: 600; color: #1e293b; }
     .cell-sub { font-size: 9px; color: #64748b; margin-top: 2px; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .center { text-align: center; font-variant-numeric: tabular-nums; }
     .dim { font-size: 10px; color: #475569; }
     .strong { font-weight: 700; color: #1e3a5f; }
 
@@ -208,11 +211,6 @@ export async function GET(
     .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 8px; }
     .company-info { font-size: 11px; color: #334155; line-height: 1.7; }
     .company-info .name { font-size: 15px; font-weight: 700; color: #1e3a5f; margin-bottom: 4px; }
-    .seal-area { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
-    .seal-box {
-      width: 56px; height: 56px; border: 1px dashed #94a3b8; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center; font-size: 10px; color: #94a3b8;
-    }
     .page-footer {
       margin-top: 18px; padding-top: 10px; border-top: 1px solid #e2e8f0;
       display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8;
@@ -238,10 +236,12 @@ export async function GET(
 
     <div class="top-grid">
       <div class="dest-box">
-        <div class="company">${estimate?.destinationName ?? "—"}<span class="sama">御中</span></div>
-        ${estimate?.destinationDept ? `<div class="sub">${estimate.destinationDept}</div>` : ""}
-        ${estimate?.destinationPerson ? `<div class="sub">${estimate.destinationPerson} 様</div>` : ""}
-        ${estimate?.destinationAddress ? `<div class="addr">〒${estimate?.destinationZip ?? ""} ${estimate.destinationAddress}</div>` : ""}
+        <div class="company">${estimate?.customerName ?? estimate?.destinationName ?? "—"}<span class="sama">御中</span></div>
+        ${estimate?.chargeName ? `<div class="sub">ご担当者：${estimate.chargeName} 様</div>` : ""}
+        ${estimate?.destinationName ? `
+        <div class="sub" style="margin-top:8px;"><strong>送り先：</strong>${estimate.destinationName}${estimate.destinationDept ? "　" + estimate.destinationDept : ""}${estimate.destinationPerson ? "　" + estimate.destinationPerson + " 様" : ""}</div>
+        ${estimate.destinationAddress ? `<div class="addr">〒${estimate?.destinationZip ?? ""} ${estimate.destinationAddress}</div>` : ""}
+        ` : ""}
         <div class="sub" style="margin-top:8px; color:#475569;">
           下記の通り注文を受け付けいたしました。内容をご確認くださいませ。
         </div>
@@ -254,10 +254,6 @@ export async function GET(
         <div class="info-row"><span class="label">担当者名</span><span class="value">${estimate?.chargeName ?? "—"}</span></div>
         <div class="info-row"><span class="label">注文状況</span><span class="value"><span class="status-pill">${statusLabel}</span></span></div>
         <div class="info-row"><span class="label">発行日</span><span class="value">${issueDate}</span></div>
-        <div class="seal-area">
-          <div class="seal-box">確認</div>
-          <div class="seal-box">担当</div>
-        </div>
       </div>
     </div>
 
