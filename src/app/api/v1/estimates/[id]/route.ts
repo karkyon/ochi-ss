@@ -200,6 +200,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     })
 
     audit({ customerId: ctx.customerId, userId: ctx.userId, action: "UPDATE", resource: "estimates", resourceId: id, req })
+
+    // ★2026/07/21 修正: PUT(更新保存)にoutboxEvent作成が抜けていたため、
+    // 見積を編集・上書き保存してもSQL Server側(WEBデータ確認)へ一切
+    // 同期されていなかった不具合を修正。POST側と同じ方針で作成する
+    // (失敗してもtry/catchで握りつぶし、保存自体は成功させる)。
+    try {
+      await prisma.outboxEvent.create({
+        data: {
+          aggregateType: "estimate", aggregateId: id, eventType: "estimate.updated",
+          payload: { estimateId: id, customerCode: ctx.companyCode,
+                     destinationName: body.destinationName ?? null, detailCount: body.details?.length ?? 0 },
+          status: "pending",
+        },
+      })
+    } catch (e) { console.error("[PUT /estimates/[id]] outbox:", e) }
+
     return NextResponse.json({ success: true, estimateId: id })
   } catch (err: any) {
     if (err instanceof OptimisticLockError) {
