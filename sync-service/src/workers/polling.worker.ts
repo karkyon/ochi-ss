@@ -43,10 +43,12 @@ async function processNewNotifications(): Promise<void> {
 
   const result = await pool.request().query<SqlNotification>(`
     SELECT TOP 100
-      通知ID, WEB注文番号, 通知種別,
+      通知ID, WEB受注ID, WEB見積ID, WEB注文番号, 通知種別,
       変更前ステータス, 変更後ステータス,
       変更フィールド名, 変更前値, 変更後値, 変更理由,
-      明細行番号, 送り状番号, 担当者, 発生日時
+      明細行番号, 送り状番号,
+      業務見積No, 業務受注No, 業務売上No, 直送先コード,
+      担当者, 発生日時
     FROM WEB進捗通知
     WHERE WEB反映済フラグ = 0
     ORDER BY 発生日時 ASC
@@ -102,7 +104,15 @@ async function processNewNotifications(): Promise<void> {
 //  通知種別ごとの処理
 // ---------------------------------------------------------------------------
 async function handleNotification(notif: SqlNotification): Promise<void> {
-  // 対象の Order を PostgreSQL から取得
+  // ★2026/07/16追加: number_assigned は Order.orderNo ではなく
+  //   WEB見積ID(EstimateHeader.id)で照合する。取込みは見積単位・
+  //   直送先単位で行われ、Orderがまだ存在しない/複数ある場合もあるため。
+  if (notif.通知種別 === "number_assigned") {
+    await handleNumberAssigned(notif);
+    return;
+  }
+
+  // 対象の Order を PostgreSQL から取得（既存ロジック、互換維持）
   const order = await prisma.order.findFirst({
     where: { orderNo: notif.WEB注文番号, isDeleted: false },
   });
@@ -127,6 +137,59 @@ async function handleNotification(notif: SqlNotification): Promise<void> {
 
     default:
       console.warn(`[BizPoller] unknown 通知種別: ${notif.通知種別}`);
+  }
+}
+
+async function handleNumberAssigned(notif: SqlNotification): Promise<void> {
+  if (!notif.WEB見積ID) {
+    console.warn(`[BizPoller] number_assigned notification missing WEB見積ID: ${notif.通知ID}`);
+    return;
+  }
+
+  const header = await prisma.estimateHeader.findUnique({ where: { id: notif.WEB見積ID } });
+  if (!header) {
+    console.warn(`[BizPoller] estimate header not found for number_assigned: ${notif.WEB見積ID}`);
+    return;
+  }
+
+  // 見積No（業務側8桁）をヘッダーへ反映（未設定の場合のみ。複数直送先に
+  // 分割された場合は最初に届いた見積Noを代表値として保持する）
+  if (!header.estimateNo && notif.業務見積No) {
+    await prisma.estimateHeader.update({
+      where: { id: header.id },
+      data: { estimateNo: notif.業務見積No },
+    });
+  }
+
+  // この見積・この直送先に対応する Order を探して業務受注No/売上Noを反映
+  // (部分注文対応のため、estimateHeaderId一致かつまだ業務番号未設定のものへ)
+  const order = await prisma.order.findFirst({
+    where: { estimateHeaderId: header.id, businessOrderNo: null, isDeleted: false },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (order) {
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        businessOrderNo: notif.業務受注No ?? null,
+        businessSalesNo: notif.業務売上No ?? null,
+        businessImportedAt: new Date(),
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        title: "ご注文が業務システムで受付されました",
+        content: `注文番号 ${order.orderNo} の受注番号が確定しました（受注No: ${notif.業務受注No ?? "---"}）。`,
+        notifType: "info",
+        targetCustomers: Prisma.JsonNull,
+        publishedAt: new Date(),
+        createdBy: "sync_service",
+      },
+    });
+  } else {
+    console.warn(`[BizPoller] no matching order found for number_assigned (estimateHeaderId=${header.id})`);
   }
 }
 
@@ -217,6 +280,8 @@ function resolveTargetTable(notifType: string): string {
 // SQL Server WEB進捗通知 レコードの型
 interface SqlNotification {
   通知ID: string;
+  WEB受注ID?: string;
+  WEB見積ID?: string;
   WEB注文番号: string;
   通知種別: string;
   変更前ステータス?: string;
@@ -227,6 +292,10 @@ interface SqlNotification {
   変更理由?: string;
   明細行番号?: number;
   送り状番号?: string;
+  業務見積No?: string;
+  業務受注No?: string;
+  業務売上No?: string;
+  直送先コード?: string;
   担当者?: string;
   発生日時: Date;
 }

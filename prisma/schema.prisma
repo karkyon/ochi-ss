@@ -124,6 +124,10 @@ model EstimateHeader {
   destinationAddress String?   @map("destination_address") // AES-256-GCM 暗号化
   destinationTel     String?   @map("destination_tel") // AES-256-GCM 暗号化
   destinationFax     String?   @map("destination_fax") // AES-256-GCM 暗号化
+  // ★Web見積確認/取込機能: ヘッダー共通送り先が登録済み直送先マスタの
+  //   どれに対応するかを保持する(未設定=都度入力の送り先)。
+  //   SQL Server側 usp_WebDirectDelivery_resolve が優先的にこの値で解決する。
+  directDeliveryId   String?   @map("direct_delivery_id")
   shippingMethodId   Int?      @map("shipping_method_id")
   requestNouki       String?   @map("request_nouki") // 希望納期（テキスト入力）
   chargeName         String?   @map("charge_name") // 担当者名
@@ -147,6 +151,7 @@ model EstimateHeader {
   version            Int       @default(1) @map("version")
 
   customer   Customer         @relation(fields: [customerId], references: [id])
+  directDelivery DirectDelivery? @relation(fields: [directDeliveryId], references: [id], map: "estimate_header_direct_delivery_fk")
   details    EstimateDetail[]
   // ★2026/07/14 部分注文対応: Order側のestimateHeaderIdから@uniqueを外し
   // 1見積に複数受注を許可したため、こちらも単数(Order?)から配列(Order[])に変更
@@ -202,6 +207,9 @@ model EstimateDetail {
   deliveryDeadline    DateTime? @map("delivery_deadline")
   // ★2026/07/14 追加: 明細単位の個別直送先（未設定時は見積ヘッダーの共通送り先を使用）
   useIndividualDestination Boolean @default(false) @map("use_individual_destination")
+  // ★Web見積確認/取込機能: 明細単位の個別直送先が登録済み直送先マスタの
+  //   どれに対応するかを保持する(未設定=都度入力の送り先)。
+  indivDirectDeliveryId String? @map("indiv_direct_delivery_id")
   destinationCode     String?   @map("indiv_destination_code")
   destinationName     String?   @map("indiv_destination_name")
   destinationDept     String?   @map("indiv_destination_dept")
@@ -230,6 +238,7 @@ model EstimateDetail {
   isDeleted Boolean  @default(false) @map("is_deleted")
 
   estimateHeader EstimateHeader @relation(fields: [estimateHeaderId], references: [id])
+  indivDirectDelivery DirectDelivery? @relation("IndivDirectDelivery", fields: [indivDirectDeliveryId], references: [id], map: "estimate_detail_indiv_direct_delivery_fk")
 
   @@unique([estimateHeaderId, rowNo])
   @@index([estimateHeaderId])
@@ -272,6 +281,13 @@ model Order {
   detailCount      Int?      @map("detail_count")
   trackingNo       String?   @map("tracking_no") // 送り状番号
   confirmedAt      DateTime? @map("confirmed_at")
+  // ★usp_WebEstimateImport_exec の実行結果(WEB進捗通知 通知種別=
+  //   'number_assigned')をpolling.worker.tsが反映する列。
+  //   orderNoはWeb側採番(Z+日付+連番)のままなので、業務システム側の
+  //   実際の受注No/売上Noはこちらに別途保持する。
+  businessOrderNo   String?   @map("business_order_no")
+  businessSalesNo   String?   @map("business_sales_no")
+  businessImportedAt DateTime? @map("business_imported_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
   isDeleted        Boolean   @default(false) @map("is_deleted")
@@ -315,6 +331,8 @@ model DirectDelivery {
   isDeleted         Boolean  @default(false) @map("is_deleted")
 
   customer Customer @relation(fields: [customerId], references: [id])
+  estimateHeaders EstimateHeader[]
+  estimateDetailsIndiv EstimateDetail[] @relation("IndivDirectDelivery")
 
   @@unique([customerCode, deliveryCode])
   @@map("direct_deliveries")
