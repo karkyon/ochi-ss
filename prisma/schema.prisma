@@ -156,7 +156,6 @@ model EstimateHeader {
   // ★2026/07/14 部分注文対応: Order側のestimateHeaderIdから@uniqueを外し
   // 1見積に複数受注を許可したため、こちらも単数(Order?)から配列(Order[])に変更
   orders     Order[]
-  syncEvents OutboxEvent[]
   // ★優先対応3: 見積の版管理（リビジョン履歴）
   revisions  EstimateRevision[]
 
@@ -295,7 +294,6 @@ model Order {
   estimateHeader  EstimateHeader       @relation(fields: [estimateHeaderId], references: [id])
   statusHistories OrderStatusHistory[]
   specChanges     SpecChangeHistory[]
-  syncEvents      OutboxEvent[]
 
   @@index([customerId, orderStatus])
   @@index([estimateHeaderId])
@@ -404,8 +402,11 @@ model OutboxEvent {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  estimateHeader EstimateHeader? @relation(fields: [aggregateId], references: [id], map: "outbox_estimate_fk")
-  order          Order?          @relation(fields: [aggregateId], references: [id], map: "outbox_order_fk")
+  // ★2026/07/21 修正: aggregateId は estimate/order 兼用のポリモーフィックIDのため、
+  //   単純な外部キー制約では両方を同時に満たせない(片方は必ず違反する)。
+  //   estimateHeader/orderへのFKリレーションは撤廃し、整合性はアプリケーション側で担保する。
+  //   (この2行のFKが原因で、outboxEvent.create()が常にP2003で失敗し、
+  //   Web→業務システムへの同期が一度も成立していなかった)
 
   @@index([status, createdAt])
   @@map("outbox_events")
