@@ -67,7 +67,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD}@postgres:5432/ochi_ss
+      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD_URLENC}@postgres:5432/ochi_ss
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
@@ -114,7 +114,7 @@ services:
     container_name: ochi_sync
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD}@postgres:5432/ochi_ss
+      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD_URLENC}@postgres:5432/ochi_ss
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       SQLSERVER_CONNECTION_STRING: ${SQLSERVER_CONNECTION_STRING}
       OUTBOX_POLL_INTERVAL_MS: 5000          # Web→業務: 5秒
@@ -141,7 +141,7 @@ services:
       - ../:/app:ro
       - cron_logs:/var/log/ochi
     environment:
-      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD}@postgres:5432/ochi_ss
+      DATABASE_URL: postgresql://ochi_app:${POSTGRES_PASSWORD_URLENC}@postgres:5432/ochi_ss
       TZ: Asia/Tokyo
     depends_on:
       postgres:
