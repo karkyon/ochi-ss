@@ -18,11 +18,28 @@ import { getSqlServerPool, closeSqlServerPool } from "./db/sqlserver";
 
 const prisma = new PrismaClient();
 
-const redisConnection = {
-  host: new URL(process.env.REDIS_URL!).hostname,
-  port: parseInt(new URL(process.env.REDIS_URL!).port || "6379", 10),
-  password: new URL(process.env.REDIS_URL!).password || undefined,
-};
+/**
+ * REDIS_URL を安全にパースする。
+ * ★2026/07/21 修正: JavaScript標準の new URL() は、パスワードに
+ *   '/' 等のURL予約文字が含まれる(未エンコードの)場合に
+ *   "Invalid URL" 例外を投げてしまう。正規表現で
+ *   "redis://[:password]@host:port" の形を直接抽出することで、
+ *   パスワードのURLエンコードを前提にしない、より頑健な実装にした。
+ */
+function parseRedisUrl(raw: string): { host: string; port: number; password?: string } {
+  const m = raw.match(/^redis:\/\/(?::([^@]*)@)?([^:@/]+):(\d+)/);
+  if (!m) {
+    throw new Error(`REDIS_URLの形式が不正です: ${raw}`);
+  }
+  const [, password, host, port] = m;
+  return {
+    host,
+    port: parseInt(port, 10),
+    password: password ? password : undefined,
+  };
+}
+
+const redisConnection = parseRedisUrl(process.env.REDIS_URL!);
 
 async function main() {
   console.log("[SyncService] starting...");
