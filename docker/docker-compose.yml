@@ -1,5 +1,3 @@
-version: "3.9"
-
 # =============================================================
 #  Ochi-ss Web Order System — Docker Compose
 #  対象環境: Ubuntu 24.04 / 192.168.1.11
@@ -111,8 +109,8 @@ services:
   # -----------------------------------------------------------
   sync-service:
     build:
-      context: ../sync-service
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: sync-service/Dockerfile
     container_name: ochi_sync
     restart: unless-stopped
     environment:
